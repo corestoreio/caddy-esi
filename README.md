@@ -8,16 +8,22 @@ for the [https://caddyserver.com](Caddy Webserver).
 
 ![Architectural overview](caddy-esi-archi.png)
 
-## Plugin configuration
+## Plugin configuration (optional)
 
 ```
 https://cyrillschumacher.local:2718 {
-
+    ...
+    other caddy directives
+    ...
     esi {
+        timeout 5ms|100us|1m|...
+        ttl 5ms|100us|1m|...
+        backend redis://localhost:6379/0
+        
+        # next 3 are used for ESI includes
         redisAWS1 redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0
         redisLocal1 redis://localhost:6379/3
         redisLocal2 redis://localhost:6380/1
-        timeout 5ms
     }
 }
 ```
@@ -27,7 +33,9 @@ https://cyrillschumacher.local:2718 {
 resource to load data from. The value of the not reserved keywords must be a
 valid URI. Reserved keys are:
 
-- timeout
+- `timeout`, default x [time.Duration](https://golang.org/pkg/time/#Duration). Time when a request to a source should be cancled. 
+- `ttl`, global time-to-live in the storage backend for ESI data. Defaults to zero, caching disabled.
+- `backend`, Redis URL to cache the data returned from the ESI sources. Defaults to empty, caching disabled. `backend` uses the ESI attribute `src` as a cache key.
 - ... ?
 
 ## Supported ESI Tags
@@ -37,6 +45,7 @@ Implemented:
 - [ ] Caddy configuration parsing
 - [ ] Basic Tag
 - [ ] With timeout
+- [ ] With ttl
 - [ ] Load local file after timeout
 - [ ] Flip src to AJAX call after timeout
 - [ ] Forward all headers
@@ -74,10 +83,22 @@ after that the page output starts.
 
 The basic tag with the attribute `timeout` waits for the src until the timeout
 occurs. After the timeout, the ESI tag gets not rendered and hence displays
-nothing. The timeout overwrites the default `esi.timeout`.
+nothing. The attribute `timeout` overwrites the default `esi.timeout`.
 
 ```
 <esi:include src="https://micro.service/esi/foo" timeout="time.Duration" />
+```
+
+### With ttl (optional)
+
+The basic tag with the attribute `ttl` stores the returned data from the `src`
+in the specified `esi.backend`. The attribute `ttl` overwrites the default
+`esi.ttl`. If `esi.backend` has not been set or `ttl` set to empty, caching is disabled.
+
+`esi.backend` uses the `src` as a cache key.
+
+```
+<esi:include src="https://micro.service/esi/foo" ttl="time.Duration" />
 ```
  
 ### Load local file after timeout (optional)
