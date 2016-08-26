@@ -33,9 +33,13 @@ https://cyrillschumacher.local:2718 {
 resource to load data from. The value of the not reserved keywords must be a
 valid URI. Reserved keys are:
 
-- `timeout`, default x [time.Duration](https://golang.org/pkg/time/#Duration). Time when a request to a source should be cancled. 
-- `ttl`, global time-to-live in the storage backend for ESI data. Defaults to zero, caching disabled.
-- `backend`, Redis URL to cache the data returned from the ESI sources. Defaults to empty, caching disabled. `backend` uses the ESI attribute `src` as a cache key.
+- `timeout`, default x [time.Duration](https://golang.org/pkg/time/#Duration).
+Time when a request to a source should be canceled.
+- `ttl`, global time-to-live in the storage backend for ESI data. Defaults to
+zero, caching disabled.
+- `backend`, Redis URL to cache the data returned from the ESI sources. Defaults
+to empty, caching disabled. `backend` uses the ESI attribute `src` as a cache
+key.
 - ... ?
 
 ## Supported ESI Tags
@@ -43,7 +47,7 @@ valid URI. Reserved keys are:
 Implemented:
 
 - [ ] Caddy configuration parsing
-- [ ] Basic Tag
+- [ ] Basic ESI Tag
 - [ ] With timeout
 - [ ] With ttl
 - [ ] Load local file after timeout
@@ -56,6 +60,18 @@ Implemented:
 - [ ] Dynamic sources
 - [ ] Conditional tag loading
 - [ ] Redis access
+- [ ] Handle compressed content from backends
+
+Implementation ideas:
+
+ESI Tags within a pages must get replaced with a stream replacement algorithm.
+Take a stream of bytes and look for the bytes “<esi:include...>” and when they
+are found, replace them with the fetched content from the backend. The code
+cannot assume that there are any line feeds or other delimiters in the stream
+and the code must assume that the stream is of any arbitrary length. The
+solution cannot meaningfully buffer to the end of the stream and then process
+the replacement.
+
 
 ### Basic tag
 
@@ -93,7 +109,8 @@ nothing. The attribute `timeout` overwrites the default `esi.timeout`.
 
 The basic tag with the attribute `ttl` stores the returned data from the `src`
 in the specified `esi.backend`. The attribute `ttl` overwrites the default
-`esi.ttl`. If `esi.backend` has not been set or `ttl` set to empty, caching is disabled.
+`esi.ttl`. If `esi.backend` has not been set or `ttl` set to empty, caching is
+disabled.
 
 `esi.backend` uses the `src` as a cache key.
 
@@ -144,8 +161,8 @@ additionally defined.
 ### Return all headers (optional)
 
 The basic tag with the attribute `returnheaders` returns all `src` headers to
-the final response. Other attributes can be additionally defined. If duplicate headers
-from multiple sources occurs, they are getting appended to the response.
+the final response. Other attributes can be additionally defined. If duplicate
+headers from multiple sources occurs, they are getting appended to the response.
 
 ```
 <esi:include src="https://micro.service/esi/foo" returnheaders="all"/>
