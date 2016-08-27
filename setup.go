@@ -1,9 +1,13 @@
 package esi
 
 import (
+	"net/http"
+
 	"fmt"
+	"time"
 
 	"github.com/mholt/caddy"
+	"github.com/mholt/caddy/caddyhttp/httpserver"
 )
 
 func init() {
@@ -15,24 +19,120 @@ func init() {
 
 // setup used internally by Caddy to set up this middleware
 func setup(c *caddy.Controller) error {
-	_, err := esiParse(c)
+	rc, err := esiParse(c)
 	if err != nil {
 		return err
 	}
 
-	c.OnShutdown(func() error {
-		// close all open connections to the backends
-		return nil
+	cfg := httpserver.GetConfig(c)
+
+	e := ESI{
+		Root:    cfg.Root,
+		FileSys: http.Dir(cfg.Root),
+		rc:      rc,
+	}
+
+	cfg.AddMiddleware(func(next httpserver.Handler) httpserver.Handler {
+		e.Next = next
+		return e
 	})
 
-	// @see markdown middleware
-
-	fmt.Printf("%#v\n\n", c)
+	c.OnShutdown(func() error {
+		// todo close all open connections to the backends
+		return nil
+	})
+	c.OnRestart(func() error {
+		// todo clear all internal caches
+		return nil
+	})
 
 	return nil
 }
 
-func esiParse(c *caddy.Controller) (*Config, error) {
+func esiParse(c *caddy.Controller) (rc *RootConfig, _ error) {
 
-	return nil,nil
+	// todo: parse it that way that only one pointer gets created for multiple equal
+	// resource/backend connections.
+
+	for c.Next() {
+		esi := &Config{
+			Resources: make(map[string]Resourcer),
+		}
+
+		// Get the path scope
+		args := c.RemainingArgs()
+		switch len(args) {
+		case 0:
+			esi.PathScope = "/"
+		case 1:
+			esi.PathScope = args[0]
+		default:
+			return nil, c.ArgErr()
+		}
+
+		// Load any other configuration parameters
+		for c.NextBlock() {
+			if err := loadParams(c, esi); err != nil {
+				return nil, err
+			}
+		}
+		if rc == nil {
+			// lazy init
+			rc = NewRootConfig()
+		}
+		rc.Configs = append(rc.Configs, esi)
+	}
+	return rc, nil
+}
+
+func loadParams(c *caddy.Controller, esic *Config) error {
+
+	switch key := c.Val(); key {
+	case "timeout":
+		if !c.NextArg() {
+			return c.ArgErr()
+		}
+		d, err := time.ParseDuration(c.Val())
+		if err != nil {
+			return fmt.Errorf("[caddyesi] Invalid duration in timeout configuration: %q", c.Val())
+		}
+		esic.Timeout = d
+		return nil
+	case "ttl":
+		if !c.NextArg() {
+			return c.ArgErr()
+		}
+		d, err := time.ParseDuration(c.Val())
+		if err != nil {
+			return fmt.Errorf("[caddyesi] Invalid duration in ttl configuration: %q", c.Val())
+		}
+		esic.TTL = d
+		return nil
+	case "backend":
+		if !c.NextArg() {
+			return c.ArgErr()
+		}
+		be, err := parseBackendUrl(c.Val())
+		if err != nil {
+			return err
+		}
+		esic.Backends = append(esic.Backends, be)
+		return nil
+
+	default:
+		//catch all
+		if !c.NextArg() {
+			return c.ArgErr()
+		}
+		if key == "" || c.Val() == "" {
+			return nil // continue
+		}
+		// todo generic resource loading and parsing
+		rc, err := NewRedis(c.Val())
+		if err != nil {
+			return fmt.Errorf("[caddyesi] Cannot parse URL %q with key %q. Error: %s", c.Val(), key, err)
+		}
+		esic.Resources[key] = rc
+		return nil
+	}
 }
