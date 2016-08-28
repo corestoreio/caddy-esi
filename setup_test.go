@@ -36,9 +36,9 @@ func TestSetup(t *testing.T) {
 		{
 			`esi`,
 			&RootConfig{
-				Configs: Configs{
-					&Config{
-						PathScope: "/",
+				PathConfigs: PathConfigs{
+					&PathConfig{
+						Scope:     "/",
 						Timeout:   0,
 						TTL:       0,
 						Backends:  nil,
@@ -55,11 +55,11 @@ func TestSetup(t *testing.T) {
 				backend redis://localhost:6379/0
 			}`,
 			&RootConfig{
-				Configs: Configs{
-					&Config{
-						PathScope: "/",
-						Timeout:   time.Millisecond * 5,
-						TTL:       time.Millisecond * 10,
+				PathConfigs: PathConfigs{
+					&PathConfig{
+						Scope:   "/",
+						Timeout: time.Millisecond * 5,
+						TTL:     time.Millisecond * 10,
 						Backends: Backends{
 							backendMock{},
 						},
@@ -74,9 +74,9 @@ func TestSetup(t *testing.T) {
 				timeout Dms
 			}`,
 			&RootConfig{
-				Configs: Configs{
-					&Config{
-						PathScope: "/",
+				PathConfigs: PathConfigs{
+					&PathConfig{
+						Scope:     "/",
 						Backends:  nil,
 						Resources: map[string]Resourcer{},
 					},
@@ -91,11 +91,11 @@ func TestSetup(t *testing.T) {
 				backend redis//localhost:6379/0
 			}`,
 			&RootConfig{
-				Configs: Configs{
-					&Config{
-						PathScope: "/",
-						Timeout:   time.Millisecond * 5,
-						TTL:       time.Millisecond * 10,
+				PathConfigs: PathConfigs{
+					&PathConfig{
+						Scope:   "/",
+						Timeout: time.Millisecond * 5,
+						TTL:     time.Millisecond * 10,
 						Backends: Backends{
 							backendMock{},
 						},
@@ -113,11 +113,11 @@ func TestSetup(t *testing.T) {
 				backend redis://localhost:6380/0
 			}`,
 			&RootConfig{
-				Configs: Configs{
-					&Config{
-						PathScope: "/",
-						Timeout:   time.Millisecond * 5,
-						TTL:       time.Millisecond * 10,
+				PathConfigs: PathConfigs{
+					&PathConfig{
+						Scope:   "/",
+						Timeout: time.Millisecond * 5,
+						TTL:     time.Millisecond * 10,
 						Backends: Backends{
 							backendMock{},
 							backendMock{},
@@ -132,16 +132,16 @@ func TestSetup(t *testing.T) {
 			`esi /blog
 			esi /guestbook`,
 			&RootConfig{
-				Configs: Configs{
-					&Config{
-						PathScope: "/blog",
+				PathConfigs: PathConfigs{
+					&PathConfig{
+						Scope:     "/blog",
 						Timeout:   0,
 						TTL:       0,
 						Backends:  nil,
 						Resources: map[string]Resourcer{},
 					},
-					&Config{
-						PathScope: "/guestbook",
+					&PathConfig{
+						Scope:     "/guestbook",
 						Timeout:   0,
 						TTL:       0,
 						Backends:  nil,
@@ -171,11 +171,11 @@ func TestSetup(t *testing.T) {
 				redisLocal1 redis://localhost:6379/3
 			}`,
 			&RootConfig{
-				Configs: Configs{
-					&Config{
-						PathScope: "/catalog/product",
-						Timeout:   time.Millisecond * 122,
-						TTL:       time.Millisecond * 123,
+				PathConfigs: PathConfigs{
+					&PathConfig{
+						Scope:   "/catalog/product",
+						Timeout: time.Millisecond * 122,
+						TTL:     time.Millisecond * 123,
 						Backends: Backends{
 							backendMock{},
 							backendMock{},
@@ -186,10 +186,10 @@ func TestSetup(t *testing.T) {
 							"redisLocal2": resourceMock{},
 						},
 					},
-					&Config{
-						PathScope: "/checkout/cart",
-						Timeout:   time.Millisecond * 131,
-						TTL:       time.Millisecond * 132,
+					&PathConfig{
+						Scope:   "/checkout/cart",
+						Timeout: time.Millisecond * 131,
+						TTL:     time.Millisecond * 132,
 						Backends: Backends{
 							backendMock{},
 						},
@@ -221,25 +221,25 @@ func TestSetup(t *testing.T) {
 		if !ok {
 			t.Fatalf("%d: Expected handler to be type ESI, got: %#v", i, handler)
 		}
-		assert.Exactly(t, len(test.wantRC.Configs), len(myHandler.rc.Configs), "Index %d", i)
-		for j, wantC := range test.wantRC.Configs {
+		assert.Exactly(t, len(test.wantRC.PathConfigs), len(myHandler.rc.PathConfigs), "Index %d", i)
+		for j, wantC := range test.wantRC.PathConfigs {
 
 			if wantC.Backends != nil {
-				assert.NotNil(t, myHandler.rc.Configs[j].Backends, "Index %d => %d", i, j)
-				assert.Exactly(t, len(wantC.Backends), len(myHandler.rc.Configs[j].Backends), "Index %d => %d", i, j)
+				assert.NotNil(t, myHandler.rc.PathConfigs[j].Backends, "Index %d => %d", i, j)
+				assert.Exactly(t, len(wantC.Backends), len(myHandler.rc.PathConfigs[j].Backends), "Index %d => %d", i, j)
 				// set to nil or assert.Extactly at the end will fail because different pointers.
 				wantC.Backends = nil
-				myHandler.rc.Configs[j].Backends = nil
+				myHandler.rc.PathConfigs[j].Backends = nil
 			}
 
 			if len(wantC.Resources) > 0 {
-				assert.NotNil(t, myHandler.rc.Configs[j].Resources, "Index %d => %d", i, j)
-				assert.Exactly(t, len(wantC.Resources), len(myHandler.rc.Configs[j].Resources), "Index %d => %d", i, j)
+				assert.NotNil(t, myHandler.rc.PathConfigs[j].Resources, "Index %d => %d", i, j)
+				assert.Exactly(t, len(wantC.Resources), len(myHandler.rc.PathConfigs[j].Resources), "Index %d => %d", i, j)
 				// set to nil or assert.Extactly at the end will fail because different pointers.
 				wantC.Resources = nil
-				myHandler.rc.Configs[j].Resources = nil
+				myHandler.rc.PathConfigs[j].Resources = nil
 			}
-			assert.Exactly(t, wantC, myHandler.rc.Configs[j], "Index %d => %d", i, j)
+			assert.Exactly(t, wantC, myHandler.rc.PathConfigs[j], "Index %d => %d", i, j)
 		}
 	}
 }

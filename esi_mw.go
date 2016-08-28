@@ -21,34 +21,28 @@ type ESI struct {
 	rc *RootConfig
 }
 
-func (e ESI) configForPath(r *http.Request) *Config {
-	for _, c := range e.rc.Configs {
-		if httpserver.Path(r.URL.Path).Matches(c.PathScope) { // not negated
-			return c
-		}
-	}
-	return nil
-}
-
 // ServeHTTP implements the http.Handler interface.
 func (e ESI) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
-	cfg := e.configForPath(r)
+	cfg := e.rc.PathConfigs.ConfigForPath(r)
 	if cfg == nil {
 		return e.Next.ServeHTTP(w, r) // exit early
 	}
 
-	// todo: we must wrap the responseWrite to provide stream parsing and replacement other handlers
-	// "github.com/zenazn/goji/web/mutil"
+	// todo: we must wrap the ResponseWriter to provide stream parsing and replacement other handlers
 	// parse the stream ... build the cache of ESI tags.
-	// requestID(r) uint64
-	//lw := mutil.WrapWriter(w)
 
 	// We only deal with HEAD/GET
 	switch r.Method {
 	case http.MethodGet, http.MethodHead:
 	default:
-		return http.StatusMethodNotAllowed, nil
+		return e.Next.ServeHTTP(w, r) // go on ...
 	}
 
-	return http.StatusTeapot, nil
+	tags := e.rc.ESITagsByRequest(r)
+	if len(tags) == 0 {
+		// no tags found
+		// start parsing the stream; wrap the ResponseWriter
+	}
+
+	return e.Next.ServeHTTP(w, r)
 }

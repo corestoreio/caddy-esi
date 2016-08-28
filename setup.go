@@ -19,7 +19,7 @@ func init() {
 
 // setup used internally by Caddy to set up this middleware
 func setup(c *caddy.Controller) error {
-	rc, err := esiParse(c)
+	rc, err := configEsiParse(c)
 	if err != nil {
 		return err
 	}
@@ -43,19 +43,22 @@ func setup(c *caddy.Controller) error {
 	})
 	c.OnRestart(func() error {
 		// todo clear all internal caches
+		e.rc.mu.Lock()
+		defer e.rc.mu.Unlock()
+		e.rc.cache = make(map[uint64]ESITags)
 		return nil
 	})
 
 	return nil
 }
 
-func esiParse(c *caddy.Controller) (rc *RootConfig, _ error) {
+func configEsiParse(c *caddy.Controller) (rc *RootConfig, _ error) {
 
 	// todo: parse it that way that only one pointer gets created for multiple equal
 	// resource/backend connections.
 
 	for c.Next() {
-		esi := &Config{
+		esi := &PathConfig{
 			Resources: make(map[string]Resourcer),
 		}
 
@@ -63,16 +66,16 @@ func esiParse(c *caddy.Controller) (rc *RootConfig, _ error) {
 		args := c.RemainingArgs()
 		switch len(args) {
 		case 0:
-			esi.PathScope = "/"
+			esi.Scope = "/"
 		case 1:
-			esi.PathScope = args[0]
+			esi.Scope = args[0]
 		default:
 			return nil, c.ArgErr()
 		}
 
 		// Load any other configuration parameters
 		for c.NextBlock() {
-			if err := loadParams(c, esi); err != nil {
+			if err := configLoadParams(c, esi); err != nil {
 				return nil, err
 			}
 		}
@@ -80,12 +83,12 @@ func esiParse(c *caddy.Controller) (rc *RootConfig, _ error) {
 			// lazy init
 			rc = NewRootConfig()
 		}
-		rc.Configs = append(rc.Configs, esi)
+		rc.PathConfigs = append(rc.PathConfigs, esi)
 	}
 	return rc, nil
 }
 
-func loadParams(c *caddy.Controller, esic *Config) error {
+func configLoadParams(c *caddy.Controller, esic *PathConfig) error {
 
 	switch key := c.Val(); key {
 	case "timeout":
