@@ -82,9 +82,8 @@ func ParseESITags(r io.Reader) (ret ESITags, _ error) {
 
 			data = data[tep:]
 			// recalculate positions in the new slice
-			tsp, tep  = bytes.Index(data, esiTagStart), bytes.Index(data, esiTagEnd)
+			tsp, tep = bytes.Index(data, esiTagStart), bytes.Index(data, esiTagEnd)
 		}
-
 
 		// start more in-depth search with lookahead into the next coming buffer
 
@@ -115,15 +114,16 @@ func ParseESITags(r io.Reader) (ret ESITags, _ error) {
 			ep, data = getPosition(br, data, esiTagEnd)
 			dataLen := len(data)
 
-			//fmt.Printf("startPos %d | ep %d | newdata: %q\n", startPos, ep, data)
+			//fmt.Printf("startPos %d | ep %d | newdata: %q\n\n", startPos, ep, data)
 
 			if ep > -1 {
-				ret[tagIndex].RawTag = append(ret[tagIndex].RawTag, data[len(esiTagEnd):]...)
+				ret[tagIndex].RawTag = append(ret[tagIndex].RawTag, data...)
+				//ret[tagIndex].RawTag = append(ret[tagIndex].RawTag, data[len(esiTagEnd):]...)
 				endPosFound = true
 				if endPos < 0 {
 					endPos = 0
 				}
-				endPos += ep + 1
+				endPos += ep + len(esiTagEnd)
 			} else {
 				// as long as we don't have found the end tag, append the data to the RawTag
 				ret[tagIndex].RawTag = append(ret[tagIndex].RawTag, data...)

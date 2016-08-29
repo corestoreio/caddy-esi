@@ -35,10 +35,17 @@ var testRunner = func(rc io.ReadCloser, wantTags ESITags, wantErr string) func(*
 		}
 		assert.NoError(t, err)
 		if have, want := len(haveTags), len(wantTags); have != want {
-			t.Fatalf("ESITags Count does not match: Have: %v Want: %v", have, want)
+			t.Errorf("ESITags Count does not match: Have: %v Want: %v", have, want)
 		}
-		for i, tg := range wantTags {
-			assert.Exactly(t, string(tg.RawTag), string(haveTags[i].RawTag))
+		if len(wantTags) <= len(haveTags) {
+			for i, tg := range wantTags {
+				assert.Exactly(t, string(tg.RawTag), string(haveTags[i].RawTag))
+			}
+		}
+		if len(haveTags) <= len(wantTags) {
+			for i, tg := range haveTags {
+				assert.Exactly(t, string(wantTags[i].RawTag), string(tg.RawTag))
+			}
 		}
 	}
 }
@@ -69,7 +76,19 @@ func TestParseESITags_File(t *testing.T) {
 				RawTag: []byte("<esi:include src=\"https://micro.service/customer/account\" timeout=\"8ms\" onerror=\"accountNotAvailable.html\"/>"),
 			},
 			&ESITag{
-				RawTag: []byte("<esi:include srsrc=\"https://micro.service/checkout/cat\" timeout=\"9ms\" onerror=\"nonocart.html\" forwardheaders=\"Cookie,Accept-Language,Authorization\"/>"),
+				RawTag: []byte(`<esi:include src="https://micro.service/checkout/cart" timeout="9ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"/>`),
+			},
+		},
+		"",
+	))
+	t.Run("Page3 Buffer Lookahead", testRunner(
+		mustOpenFile("page3.html"),
+		ESITags{
+			&ESITag{
+				RawTag: []byte(`<esi:include src="https://micro.service/customer/account" timeout="18ms" onerror="accountNotAvailable.html"/>`),
+			},
+			&ESITag{
+				RawTag: []byte(`<esi:include src="https://micro.service/checkout/cart" timeout="19ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"/>`),
 			},
 		},
 		"",

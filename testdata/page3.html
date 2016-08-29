@@ -23,6 +23,8 @@
     <script  type="text/javascript"  src="http://m2demo.domainname.com/pub/static/frontend/Magento/luma/en_US/requirejs/require.js"></script>
     <script  type="text/javascript"  src="http://m2demo.domainname.com/pub/static/frontend/Magento/luma/en_US/mage/requirejs/mixins.js"></script>
     <script  type="text/javascript"  src="http://m2demo.domainname.com/pub/static/_requirejs/frontend/Magento/luma/en_US/requirejs-config.js"></script>
+    <esi:include src="https://micro.service/customer/account" timeout="18ms" onerror="accountNotAvailable.html"/>
+
     <link  rel="stylesheet" type="text/css"  media="all" href="http://m2demo.domainname.com/pub/media/styles.css" />            </head>
 <body data-container="body" data-mage-init='{"loaderAjax": {}, "loader": { "icon": "http://m2demo.domainname.com/pub/static/frontend/Magento/luma/en_US/images/loader-2.gif"}}' class="page-with-filter page-products categorypath-women-bottoms-women category-bottoms-women catalog-category-view page-layout-2columns-left">
 <script>
@@ -35,104 +37,7 @@
             callback: function ($) {
                 'use strict';
 
-                var dependencies = [],
-                    versionObj;
 
-                $.initNamespaceStorage('mage-translation-storage');
-                $.initNamespaceStorage('mage-translation-file-version');
-                versionObj = $.localStorage.get('mage-translation-file-version');
-
-                if (versionObj.version !== '17da2ac0c643bb5f9f3442672524bdbdf968fe2c') {
-                    dependencies.push(
-                        'text!js-translation.json'
-                    );
-
-                }
-
-                require.config({
-                    deps: dependencies,
-                    callback: function (string) {
-                        if (typeof string === 'string') {
-                            $.mage.translate.add(JSON.parse(string));
-                            $.localStorage.set('mage-translation-storage', string);
-                            $.localStorage.set(
-                                'mage-translation-file-version',
-                                {
-                                    version: '17da2ac0c643bb5f9f3442672524bdbdf968fe2c'
-                                }
-                            );
-                        } else {
-                            $.mage.translate.add($.localStorage.get('mage-translation-storage'));
-                        }
-                    }
-                });
-            }
-        });
-    </script>
-
-<script type="text/x-magento-init">
-    {
-        "*": {
-            "mage/cookies": {
-                "expires": null,
-                "path": "/",
-                "domain": ".m2demo.domainname.com",
-                "secure": false,
-                "lifetime": "3600"
-            }
-        }
-    }
-</script>
-<noscript>
-    <div class="message global noscript">
-        <div class="content">
-            <p>
-                <strong>JavaScript seems to be disabled in your browser.</strong>
-                <span>For the best experience on our site, be sure to turn on Javascript in your browser.</span>
-            </p>
-        </div>
-    </div>
-</noscript>
-<div class="message global demo">
-    <div class="content">
-        <p>This is demo store. No orders will be fulfilled.</p>
-    </div>
-</div>
-<!-- BEGIN GOOGLE ANALYTICS CODE -->
-<script>
-//<![CDATA[
-    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
-
-
-ga('create', 'UA-xxxxx-1', 'auto');
-ga('send', 'pageview');
-
-//]]>
-</script>
-<!-- END GOOGLE ANALYTICS CODE -->
-<div class="page-wrapper"><header class="page-header"><div class="panel wrapper"><div class="panel header"><a class="action skip contentarea" href="#contentarea"><span>Skip to Content</span></a>
-
-    <ul class="header links">        <li class="greet welcome" data-bind="scope: 'customer'">
-        <span data-bind="text: customer().fullname ? $t('Welcome, %1!').replace('%1', customer().fullname) : 'Default welcome msg!'"></span>
-    </li>
-        <script type="text/x-magento-init">
-        {
-            "*": {
-                "Magento_Ui/js/core/app": {
-                    "components": {
-                        "customer": {
-                            "component": "Magento_Customer/js/view/customer"
-                        }
-                    }
-                }
-            }
-        }
-        </script>
-        <li class="authorization-link" data-label="or">
-            <esi:include src="https://micro.service/customer/account" timeout="8ms" onerror="accountNotAvailable.html"/>
             <a href="http://m2demo.domainname.com/customer/account/login/">
                 Sign In    </a>
         </li>
@@ -144,15 +49,17 @@ ga('send', 'pageview');
     </a>
 
     <div data-block="minicart" class="minicart-wrapper">
-        <esi:include src="https://micro.service/checkout/cart" timeout="9ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"/>
+
         <a class="action showcart" href="http://m2demo.domainname.com/checkout/cart/"
            data-bind="scope: 'minicart_content'">
             <span class="text">My Cart</span>
             <span class="counter qty empty"
                   data-bind="css: { empty: cart().summary_count == 0 }, blockLoader: isLoading">
-            <span class="counter-number"><!-- ko text: cart().summary_count --><!-- /ko --></span>
+            <span class="-number"><!-- ko text: cart().summary_count -->
+
+            <!-- /ko --></span>
             <span class="counter-label">
-            <!-- ko if: cart().summary_count -->
+            <!-- ko if: cart().summary_count --><esi:include src="https://micro.service/checkout/cart" timeout="19ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"/>
                 <!-- ko text: cart().summary_count --><!-- /ko -->
                 <!-- ko i18n: 'items' --><!-- /ko -->
                 <!-- /ko -->
