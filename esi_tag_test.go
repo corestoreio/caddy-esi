@@ -77,23 +77,35 @@ func TestParseESITags_File(t *testing.T) {
 }
 
 func TestParseESITags_String(t *testing.T) {
-	t.Run("Line_80", testRunner(
+	t.Run("Empty", testRunner(
 		strReader(``),
 		nil,
 		"",
 	))
-	t.Run("Line_85", testRunner(
-		strReader("x \x00 <i>x</i>          <esi:include\x00 src=\"https:...\" />\x00"),
+	t.Run("Null Bytes", testRunner(
+		strReader("x \x00 <i>x</i>          \x00<esi:include\x00 src=\"https:...\" />\x00"),
 		ESITags{
 			&ESITag{
-				RawTag: []byte("<esi:include\x00\x00 src=\"https:...\" />"),
+				RawTag: []byte("<esi:include\x00 src=\"https:...\" />"),
 			},
 		},
 		"",
 	))
-	t.Run("Line_73", testRunner(
+	t.Run("Missing EndTag", testRunner(
 		strReader(`<esi:include src="..." <b>`),
 		nil,
 		"[caddyesi] Opening close tag mismatch!\n\"<esi:include src=\\\"...\\\" <b>\"\n",
+	))
+	t.Run("Multitags in Buffer", testRunner(
+		strReader("abcdefg<esi:include src=\"url1\"/>u\np<esi:include src=\"url2\" />k"),
+		ESITags{
+			&ESITag{
+				RawTag: []byte("<esi:include src=\"url1\"/>"),
+			},
+			&ESITag{
+				RawTag: []byte("<esi:include src=\"url2\" />"),
+			},
+		},
+		"",
 	))
 }

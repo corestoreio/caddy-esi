@@ -36,7 +36,7 @@ var (
 
 // ParseESITags parses a stream of HTML data to look for ESI Tags
 func ParseESITags(r io.Reader) (ret ESITags, _ error) {
-	const innerBufSize = 64 // min size len(esiTagStart)
+	const innerBufSize = 2048 // min size len(esiTagStart)
 
 	br := bufio.NewReader(r)
 
@@ -57,12 +57,43 @@ func ParseESITags(r io.Reader) (ret ESITags, _ error) {
 		globalPos += n
 		data := buffer[:n]
 
+		//bufferDirectHit:
+		// special case direct hit of start and end tag within the buffer slice
+		//fmt.Printf("tagIndeX %d %q\n\n", tagIndex, data)
+
+		for tsp, tep := bytes.Index(data, esiTagStart), bytes.Index(data, esiTagEnd); tsp > -1 && tsp < tep; {
+
+			//if tsp, tep := bytes.Index(data, esiTagStart), bytes.Index(data, esiTagEnd); tsp > -1 && tsp < tep {
+			tep += len(esiTagEnd)
+			ret = append(ret, &ESITag{
+				RawTag:   make([]byte, tep-tsp),
+				TagStart: globalPos,
+			})
+			tagIndex++
+			copy(ret[tagIndex].RawTag, data[tsp:tep])
+			totalTagEnds++
+
+			//fmt.Printf("tagIndex %d %q => tsp %d tep %d\n", tagIndex, data[tsp:tep],tsp, tep)
+
+			//if tep > len(data) {
+			//	clearBuffer(buffer)
+			//	break
+			//}
+
+			data = data[tep:]
+			// recalculate positions in the new slice
+			tsp, tep  = bytes.Index(data, esiTagStart), bytes.Index(data, esiTagEnd)
+		}
+
+
+		// start more in-depth search with lookahead into the next coming buffer
+
 		if startPos < 0 {
 			// find start position and do a look ahead. if look ahead, then
 			// return the new data slice and forward bufio.Reader
 			startPos, data = getPosition(br, data, esiTagStart)
 
-			fmt.Printf("Start: globalPos %03d startPos %04d DATA: %q\n", globalPos, startPos, data)
+			//fmt.Printf("Start: globalPos %03d startPos %04d DATA: %q\n", globalPos, startPos, data)
 
 			if startPos < 0 {
 				clearBuffer(buffer)
@@ -84,7 +115,7 @@ func ParseESITags(r io.Reader) (ret ESITags, _ error) {
 			ep, data = getPosition(br, data, esiTagEnd)
 			dataLen := len(data)
 
-			fmt.Printf("startPos %d | ep %d | newdata: %q\n", startPos, ep, data)
+			//fmt.Printf("startPos %d | ep %d | newdata: %q\n", startPos, ep, data)
 
 			if ep > -1 {
 				ret[tagIndex].RawTag = append(ret[tagIndex].RawTag, data[len(esiTagEnd):]...)
@@ -100,7 +131,6 @@ func ParseESITags(r io.Reader) (ret ESITags, _ error) {
 			}
 		}
 
-		//if endPos < 0 {
 		if !endPosFound {
 			clearBuffer(buffer)
 			continue
