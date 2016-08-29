@@ -43,7 +43,7 @@ func ParseESITags(r io.Reader) (ret ESITags, _ error) {
 	buffer := make([]byte, innerBufSize)
 	var globalPos int
 	var startPos = -1
-	var endPos = -1
+
 	var tagIndex = -1
 	var totalTagEnds int
 	for {
@@ -63,7 +63,6 @@ func ParseESITags(r io.Reader) (ret ESITags, _ error) {
 
 		for tsp, tep := bytes.Index(data, esiTagStart), bytes.Index(data, esiTagEnd); tsp > -1 && tsp < tep; {
 
-			//if tsp, tep := bytes.Index(data, esiTagStart), bytes.Index(data, esiTagEnd); tsp > -1 && tsp < tep {
 			tep += len(esiTagEnd)
 			ret = append(ret, &ESITag{
 				RawTag:   make([]byte, tep-tsp),
@@ -75,15 +74,12 @@ func ParseESITags(r io.Reader) (ret ESITags, _ error) {
 
 			//fmt.Printf("tagIndex %d %q => tsp %d tep %d\n", tagIndex, data[tsp:tep],tsp, tep)
 
-			//if tep > len(data) {
-			//	clearBuffer(buffer)
-			//	break
-			//}
-
 			data = data[tep:]
 			// recalculate positions in the new slice
 			tsp, tep = bytes.Index(data, esiTagStart), bytes.Index(data, esiTagEnd)
 		}
+
+		//fmt.Printf("tagIndeX %d %q\n\n", tagIndex, data)
 
 		// start more in-depth search with lookahead into the next coming buffer
 
@@ -92,12 +88,13 @@ func ParseESITags(r io.Reader) (ret ESITags, _ error) {
 			// return the new data slice and forward bufio.Reader
 			startPos, data = getPosition(br, data, esiTagStart)
 
-			//fmt.Printf("Start: globalPos %03d startPos %04d DATA: %q\n", globalPos, startPos, data)
-
 			if startPos < 0 {
 				clearBuffer(buffer)
 				continue
 			}
+
+			//fmt.Printf("Start: globalPos %03d startPos %04d DATA: %q\n", globalPos, startPos, data)
+
 			ret = append(ret, &ESITag{
 				RawTag:   make([]byte, 0, 256),
 				TagStart: globalPos,
@@ -112,23 +109,18 @@ func ParseESITags(r io.Reader) (ret ESITags, _ error) {
 			var ep int
 			// we do not know if the end tag already is in the data, even with a look ahead.
 			ep, data = getPosition(br, data, esiTagEnd)
-			dataLen := len(data)
+			//dataLen := len(data)
 
 			//fmt.Printf("startPos %d | ep %d | newdata: %q\n\n", startPos, ep, data)
 
 			if ep > -1 {
-				ret[tagIndex].RawTag = append(ret[tagIndex].RawTag, data...)
+				//ret[tagIndex].RawTag = append(ret[tagIndex].RawTag, data...)
 				//ret[tagIndex].RawTag = append(ret[tagIndex].RawTag, data[len(esiTagEnd):]...)
 				endPosFound = true
-				if endPos < 0 {
-					endPos = 0
-				}
-				endPos += ep + len(esiTagEnd)
-			} else {
-				// as long as we don't have found the end tag, append the data to the RawTag
-				ret[tagIndex].RawTag = append(ret[tagIndex].RawTag, data...)
-				endPos += dataLen
 			}
+
+			// as long as we don't have found the end tag, append the data to the RawTag
+			ret[tagIndex].RawTag = append(ret[tagIndex].RawTag, data...)
 		}
 
 		if !endPosFound {
@@ -136,12 +128,12 @@ func ParseESITags(r io.Reader) (ret ESITags, _ error) {
 			continue
 		}
 		if startPos > -1 && endPosFound {
-			//fmt.Printf("End: globalPos %03d startPos %04d endPos %04d DATA: %q\n", globalPos, startPos, endPos, ret[tagIndex].RawTag)
+			cutOff := bytes.Index(ret[tagIndex].RawTag, esiTagEnd) + len(esiTagEnd)
+			//fmt.Printf("End: globalPos %03d startPos %04d endPos %04d DATA: %q\n\n", globalPos, startPos, cutOff, ret[tagIndex].RawTag)
 			// trim the RawTag buffer until the EndTag
-			ret[tagIndex].RawTag = ret[tagIndex].RawTag[:endPos]
+			ret[tagIndex].RawTag = ret[tagIndex].RawTag[:cutOff]
 			ret[tagIndex].TagEnd = globalPos
 			startPos = -1
-			endPos = -1
 			endPosFound = false
 			clearBuffer(buffer)
 			totalTagEnds++
@@ -162,18 +154,27 @@ func ParseESITags(r io.Reader) (ret ESITags, _ error) {
 
 // getPosition searches a sep within data
 func getPosition(br *bufio.Reader, data, sep []byte) (startPos int, _ []byte) {
-	sepLen := len(sep)
+	sepLen := len(data)
 	startPos = bytes.Index(data, sep)
 	if startPos < 0 {
 		// look ahead without advancing the reader
-		peek, err := br.Peek(sepLen)
-		if err == nil {
-			data = append(data, peek...)
+		peek, _ := br.Peek(sepLen)
+
+		if len(peek) > 0 {
+			//fmt.Printf("PEEK: sep: %q data %q\n\npeek: %q\n\n\n", sep,data, peek)
+			dataOrg := data
+			data = append(data, peek...) // merge because part of the sep can be in "data" and the other part in "peek"
 			startPos = bytes.Index(data, sep)
 			if startPos > -1 { // yay found via look ahead! so advance the reader
+				if sepLen > len(peek) {
+					sepLen = len(peek)
+				}
 				if _, err := br.Discard(sepLen); err != nil {
 					panic(err) // todo remove panic
 				}
+			} else {
+				// not found sep, so reset to previous
+				data = dataOrg
 			}
 		}
 	}

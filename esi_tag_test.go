@@ -85,10 +85,10 @@ func TestParseESITags_File(t *testing.T) {
 		mustOpenFile("page3.html"),
 		ESITags{
 			&ESITag{
-				RawTag: []byte(`<esi:include src="https://micro.service/customer/account" timeout="18ms" onerror="accountNotAvailable.html"/>`),
+				RawTag: []byte(`<esi:include src="https://micr1.service/customer/account" timeout="18ms" onerror="accountNotAvailable.html"/>`),
 			},
 			&ESITag{
-				RawTag: []byte(`<esi:include src="https://micro.service/checkout/cart" timeout="19ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"/>`),
+				RawTag: []byte(`<esi:include src="https://micr2.service/checkout/cart" timeout="19ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"/>`),
 			},
 		},
 		"",
