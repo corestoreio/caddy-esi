@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 	"time"
+
+	"github.com/SchumacherFM/caddyesi/bufpool"
 )
 
 type Conditioner interface { // no, not the shampoo ;-)
@@ -37,8 +40,12 @@ func ParseESITags(r io.Reader) (ret ESITags, _ error) {
 	ret = make(ESITags, 0, 5) // avg 5 tags per parse ...
 
 	sc := bufio.NewScanner(r)
+	buf := bufpool.Get()
+	defer bufpool.Put(buf)
+	sc.Buffer(buf.Bytes(), cap(buf.Bytes())+2)
 
-	ef := newTagFinder(maxSizeESITag)
+	ef := finderPoolGet()
+	defer finderPoolPut(ef)
 	sc.Split(ef.split)
 
 	var tagIndex int
@@ -57,6 +64,23 @@ func ParseESITags(r io.Reader) (ret ESITags, _ error) {
 		tagIndex++
 	}
 	return ret, nil
+}
+
+var finderPool = sync.Pool{
+	New: func() interface{} {
+		return newTagFinder(maxSizeESITag)
+	},
+}
+
+func finderPoolGet() *tagFinder {
+	return finderPool.Get().(*tagFinder)
+}
+
+func finderPoolPut(tf *tagFinder) {
+	tf.buf.Reset()
+	tf.tagState = stateStart
+	tf.n = 0
+	finderPool.Put(tf)
 }
 
 type tagState int

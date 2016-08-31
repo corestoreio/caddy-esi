@@ -116,6 +116,8 @@ func TestParseESITags_File(t *testing.T) {
 var benchmarkParseESITags ESITags
 
 // BenchmarkParseESITags-4   	   50000	     32894 ns/op	 139.99 MB/s	    9392 B/op	      12 allocs/op
+// BenchmarkParseESITags-4   	   50000	     31768 ns/op	 144.95 MB/s	    5137 B/op	       9 allocs/op <= sync.Pool Finder
+// BenchmarkParseESITags-4   	   50000	     30989 ns/op	 148.60 MB/s	    1041 B/op	       8 allocs/op <= additional sync.Pool Scanner
 func BenchmarkParseESITags(b *testing.B) {
 	f := mustOpenFile("page3.html")
 	defer f.Close()
@@ -147,7 +149,6 @@ func BenchmarkParseESITags(b *testing.B) {
 			b.Errorf("Tag mismatch:want: %q\nhave: %q\n", tg.RawTag, benchmarkParseESITags[i].RawTag)
 		}
 	}
-
 }
 
 func TestParseESITags_String(t *testing.T) {
@@ -160,7 +161,9 @@ func TestParseESITags_String(t *testing.T) {
 		strReader("x \x00 <i>x</i>          \x00<esi:include\x00 src=\"https:...\" />\x00"),
 		ESITags{
 			&ESITag{
-				RawTag: []byte("include\x00 src=\"https:...\" "),
+				RawTag:   []byte("include\x00 src=\"https:...\" "),
+				TagStart: 23,
+				TagEnd:   55,
 			},
 		},
 		"",
@@ -172,13 +175,17 @@ func TestParseESITags_String(t *testing.T) {
 		//"[caddyesi] Opening close tag mismatch!\n\"<esi:include src=\\\"...\\\" <b>\"\n",
 	))
 	t.Run("Multitags in Buffer", testRunner(
-		strReader("abcdefg<esi:include src=\"url1\"/>u\np<esi:include src=\"url2\" />k"),
+		strReader(`abcdefg<esi:include src="url1"/>u p<esi:include src="url2" />k`),
 		ESITags{
 			&ESITag{
-				RawTag: []byte("include src=\"url1\""),
+				RawTag:   []byte("include src=\"url1\""),
+				TagStart: 7,
+				TagEnd:   32,
 			},
 			&ESITag{
-				RawTag: []byte("include src=\"url2\" "),
+				RawTag:   []byte("include src=\"url2\" "),
+				TagStart: 36,
+				TagEnd:   62,
 			},
 		},
 		"",
