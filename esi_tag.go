@@ -34,7 +34,7 @@ const maxSizeESITag = 4096
 // ParseESITags parses a stream of HTML data to look for ESI Tags. If found it
 // returns all tags.
 func ParseESITags(r io.Reader) (ret ESITags, _ error) {
-	ret = make(ESITags,0,5) // avg 5 tags per parse ...
+	ret = make(ESITags, 0, 5) // avg 5 tags per parse ...
 
 	sc := bufio.NewScanner(r)
 
@@ -46,7 +46,7 @@ func ParseESITags(r io.Reader) (ret ESITags, _ error) {
 		if sc.Err() != nil {
 			return nil, sc.Err()
 		}
-		tag := sc.Text()
+		tag := sc.Bytes()
 
 		ret = append(ret, &ESITag{
 			RawTag:   make([]byte, len(tag)),
@@ -62,20 +62,20 @@ func ParseESITags(r io.Reader) (ret ESITags, _ error) {
 type tagState int
 
 const (
-	stateStart tagState = iota
-	stateTag           // read <
-	stateTagE          // read <e
-	stateTagES         // read <es
-	stateTagESI        // read <esi
-	stateTagESIc       // read <esi:
-	stateData          // now reading stuff behind :
-	stateSlash         // found / which might be start of />
-	stateFound         // found /> as end of esi tag
+	stateStart   tagState = iota
+	stateTag              // read <
+	stateTagE             // read <e
+	stateTagES            // read <es
+	stateTagESI           // read <esi
+	stateTagESIc          // read <esi:
+	stateData             // now reading stuff behind :
+	stateSlash            // found / which might be start of />
+	stateFound            // found /> as end of esi tag
 )
 
 // tagFinder represents a state machine
 type tagFinder struct {
-	       tagState
+	tagState
 	n          int
 	begin, end int
 	buf        *bytes.Buffer
@@ -84,7 +84,7 @@ type tagFinder struct {
 func newTagFinder(bufCap int) *tagFinder {
 	return &tagFinder{
 		tagState: stateStart,
-		buf:   bytes.NewBuffer(make([]byte, 0, bufCap)), // for now max size of one esi tag
+		buf:      bytes.NewBuffer(make([]byte, 0, bufCap)), // for now max size of one esi tag
 	}
 }
 
@@ -147,7 +147,7 @@ func (e *tagFinder) scan(b byte) (bool, error) {
 	case stateSlash:
 		if b == '>' {
 			e.tagState = stateFound
-			e.end = e.n
+			e.end = e.n + 1 // to also exclude the >.
 			e.n++
 			return true, nil
 		}

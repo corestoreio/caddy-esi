@@ -8,10 +8,12 @@ import (
 	"strings"
 	"testing"
 
+	"bytes"
+
 	"github.com/stretchr/testify/assert"
 )
 
-func mustOpenFile(file string) io.ReadCloser {
+func mustOpenFile(file string) *os.File {
 	f, err := os.Open("testdata/" + file)
 	if err != nil {
 		panic(fmt.Sprintf("%s => %s", file, err))
@@ -37,17 +39,32 @@ var testRunner = func(rc io.ReadCloser, wantTags ESITags, wantErr string) func(*
 		if have, want := len(haveTags), len(wantTags); have != want {
 			t.Errorf("ESITags Count does not match: Have: %v Want: %v", have, want)
 		}
-		if len(wantTags) <= len(haveTags) {
-			for i, tg := range wantTags {
-				assert.Exactly(t, string(tg.RawTag), string(haveTags[i].RawTag))
-			}
-		}
-		if len(haveTags) <= len(wantTags) {
-			for i, tg := range haveTags {
-				assert.Exactly(t, string(wantTags[i].RawTag), string(tg.RawTag))
-			}
+
+		for i, tg := range wantTags {
+			assert.Exactly(t, string(tg.RawTag), string(haveTags[i].RawTag))
+			assert.Exactly(t, tg.TagStart, haveTags[i].TagStart)
+			assert.Exactly(t, tg.TagEnd, haveTags[i].TagEnd)
 		}
 	}
+}
+
+// page3Results used in test and in benchmark; relates to file testdata/page3.html
+var page3Results = ESITags{
+	&ESITag{
+		RawTag:   []byte(`include src="https://micr1.service/customer/account" timeout="18ms" onerror="accountNotAvailable.html"`),
+		TagStart: 2009,
+		TagEnd:   2118,
+	},
+	&ESITag{
+		RawTag:   []byte(`include src="https://micr2.service/checkout/cart" timeout="19ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"`),
+		TagStart: 4043,
+		TagEnd:   4190,
+	},
+	&ESITag{
+		RawTag:   []byte("include src=\"https://micr3.service/page/lastviewed\" timeout=\"20ms\" onerror=\"nofooter.html\" forwardheaders=\"Cookie,Accept-Language,Authorization\""),
+		TagStart: 4455,
+		TagEnd:   4606,
+	},
 }
 
 func TestParseESITags_File(t *testing.T) {
@@ -55,7 +72,9 @@ func TestParseESITags_File(t *testing.T) {
 		mustOpenFile("page0.html"),
 		ESITags{
 			&ESITag{
-				RawTag: []byte("include   src=\"https://micro.service/esi/foo\"\n                                            "),
+				RawTag:   []byte("include   src=\"https://micro.service/esi/foo\"\n                                            "),
+				TagStart: 196,
+				TagEnd:   293,
 			},
 		},
 		"",
@@ -64,7 +83,9 @@ func TestParseESITags_File(t *testing.T) {
 		mustOpenFile("page1.html"),
 		ESITags{
 			&ESITag{
-				RawTag: []byte("include src=\"https://micro.service/esi/foo\" timeout=\"8ms\" onerror=\"mylocalFile.html\""),
+				RawTag:   []byte("include src=\"https://micro.service/esi/foo\" timeout=\"8ms\" onerror=\"mylocalFile.html\""),
+				TagStart: 20644,
+				TagEnd:   20735,
 			},
 		},
 		"",
@@ -73,29 +94,60 @@ func TestParseESITags_File(t *testing.T) {
 		mustOpenFile("page2.html"),
 		ESITags{
 			&ESITag{
-				RawTag: []byte("include src=\"https://micro.service/customer/account\" timeout=\"8ms\" onerror=\"accountNotAvailable.html\""),
+				RawTag:   []byte("include src=\"https://micro.service/customer/account\" timeout=\"8ms\" onerror=\"accountNotAvailable.html\""),
+				TagStart: 6280,
+				TagEnd:   6388,
 			},
 			&ESITag{
-				RawTag: []byte(`include src="https://micro.service/checkout/cart" timeout="9ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"`),
+				RawTag:   []byte(`include src="https://micro.service/checkout/cart" timeout="9ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"`),
+				TagStart: 7104,
+				TagEnd:   7250,
 			},
 		},
 		"",
 	))
-	t.Run("Page3 Buffer Lookahead", testRunner(
+	t.Run("Page3", testRunner(
 		mustOpenFile("page3.html"),
-		ESITags{
-			&ESITag{
-				RawTag: []byte(`include src="https://micr1.service/customer/account" timeout="18ms" onerror="accountNotAvailable.html"`),
-			},
-			&ESITag{
-				RawTag: []byte(`include src="https://micr2.service/checkout/cart" timeout="19ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"`),
-			},
-			&ESITag{
-				RawTag: []byte("include src=\"https://micr3.service/page/lastviewed\" timeout=\"20ms\" onerror=\"nofooter.html\" forwardheaders=\"Cookie,Accept-Language,Authorization\""),
-			},
-		},
+		page3Results,
 		"",
 	))
+}
+
+var benchmarkParseESITags ESITags
+
+// BenchmarkParseESITags-4   	   50000	     32894 ns/op	 139.99 MB/s	    9392 B/op	      12 allocs/op
+func BenchmarkParseESITags(b *testing.B) {
+	f := mustOpenFile("page3.html")
+	defer f.Close()
+
+	fi, err := f.Stat()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.SetBytes(fi.Size())
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := f.Seek(0, 0); err != nil {
+			b.Fatal(err)
+		}
+		var err error
+		benchmarkParseESITags, err = ParseESITags(f)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		if have, want := len(benchmarkParseESITags), len(page3Results); have != want {
+			b.Fatalf("ESITags Count does not match: Have: %v Want: %v", have, want)
+		}
+	}
+	for i, tg := range page3Results {
+		if !bytes.Equal(tg.RawTag, benchmarkParseESITags[i].RawTag) {
+			b.Errorf("Tag mismatch:want: %q\nhave: %q\n", tg.RawTag, benchmarkParseESITags[i].RawTag)
+		}
+	}
+
 }
 
 func TestParseESITags_String(t *testing.T) {
