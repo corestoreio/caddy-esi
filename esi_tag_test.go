@@ -55,7 +55,7 @@ func TestParseESITags_File(t *testing.T) {
 		mustOpenFile("page0.html"),
 		ESITags{
 			&ESITag{
-				RawTag: []byte("<esi:include   src=\"https://micro.service/esi/foo\"\n                                            />"),
+				RawTag: []byte("include   src=\"https://micro.service/esi/foo\"\n                                            "),
 			},
 		},
 		"",
@@ -64,7 +64,7 @@ func TestParseESITags_File(t *testing.T) {
 		mustOpenFile("page1.html"),
 		ESITags{
 			&ESITag{
-				RawTag: []byte("<esi:include src=\"https://micro.service/esi/foo\" timeout=\"8ms\" onerror=\"mylocalFile.html\"/>"),
+				RawTag: []byte("include src=\"https://micro.service/esi/foo\" timeout=\"8ms\" onerror=\"mylocalFile.html\""),
 			},
 		},
 		"",
@@ -73,10 +73,10 @@ func TestParseESITags_File(t *testing.T) {
 		mustOpenFile("page2.html"),
 		ESITags{
 			&ESITag{
-				RawTag: []byte("<esi:include src=\"https://micro.service/customer/account\" timeout=\"8ms\" onerror=\"accountNotAvailable.html\"/>"),
+				RawTag: []byte("include src=\"https://micro.service/customer/account\" timeout=\"8ms\" onerror=\"accountNotAvailable.html\""),
 			},
 			&ESITag{
-				RawTag: []byte(`<esi:include src="https://micro.service/checkout/cart" timeout="9ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"/>`),
+				RawTag: []byte(`include src="https://micro.service/checkout/cart" timeout="9ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"`),
 			},
 		},
 		"",
@@ -85,10 +85,13 @@ func TestParseESITags_File(t *testing.T) {
 		mustOpenFile("page3.html"),
 		ESITags{
 			&ESITag{
-				RawTag: []byte(`<esi:include src="https://micr1.service/customer/account" timeout="18ms" onerror="accountNotAvailable.html"/>`),
+				RawTag: []byte(`include src="https://micr1.service/customer/account" timeout="18ms" onerror="accountNotAvailable.html"`),
 			},
 			&ESITag{
-				RawTag: []byte(`<esi:include src="https://micr2.service/checkout/cart" timeout="19ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"/>`),
+				RawTag: []byte(`include src="https://micr2.service/checkout/cart" timeout="19ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"`),
+			},
+			&ESITag{
+				RawTag: []byte("include src=\"https://micr3.service/page/lastviewed\" timeout=\"20ms\" onerror=\"nofooter.html\" forwardheaders=\"Cookie,Accept-Language,Authorization\""),
 			},
 		},
 		"",
@@ -105,7 +108,7 @@ func TestParseESITags_String(t *testing.T) {
 		strReader("x \x00 <i>x</i>          \x00<esi:include\x00 src=\"https:...\" />\x00"),
 		ESITags{
 			&ESITag{
-				RawTag: []byte("<esi:include\x00 src=\"https:...\" />"),
+				RawTag: []byte("include\x00 src=\"https:...\" "),
 			},
 		},
 		"",
@@ -113,16 +116,17 @@ func TestParseESITags_String(t *testing.T) {
 	t.Run("Missing EndTag", testRunner(
 		strReader(`<esi:include src="..." <b>`),
 		nil,
-		"[caddyesi] Opening close tag mismatch!\n\"<esi:include src=\\\"...\\\" <b>\"\n",
+		"",
+		//"[caddyesi] Opening close tag mismatch!\n\"<esi:include src=\\\"...\\\" <b>\"\n",
 	))
 	t.Run("Multitags in Buffer", testRunner(
 		strReader("abcdefg<esi:include src=\"url1\"/>u\np<esi:include src=\"url2\" />k"),
 		ESITags{
 			&ESITag{
-				RawTag: []byte("<esi:include src=\"url1\"/>"),
+				RawTag: []byte("include src=\"url1\""),
 			},
 			&ESITag{
-				RawTag: []byte("<esi:include src=\"url2\" />"),
+				RawTag: []byte("include src=\"url2\" "),
 			},
 		},
 		"",
