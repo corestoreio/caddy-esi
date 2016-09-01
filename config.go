@@ -18,8 +18,8 @@ type Backender interface {
 
 type Backends []Backender
 
-// Resourcer fetches a key from a resource and returns its value.
-type Resourcer interface {
+// ResourceFetcher fetches a key from a resource and returns its value.
+type ResourceFetcher interface {
 	Get(key []byte) ([]byte, error)
 }
 
@@ -74,7 +74,7 @@ type PathConfig struct {
 
 	// Resources used in ESI:Include to fetch data from.
 	// string is the src attribute in an ESI tag
-	Resources map[string]Resourcer
+	Resources map[string]ResourceFetcher
 }
 
 func requestID(r *http.Request) uint64 {

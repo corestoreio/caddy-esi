@@ -28,6 +28,8 @@ func (e ESI) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
 		return e.Next.ServeHTTP(w, r) // exit early
 	}
 
+	// maybe use a hashing function to check if content changes ...
+
 	// todo: we must wrap the ResponseWriter to provide stream parsing and replacement other handlers
 	// parse the stream ... build the cache of ESI tags.
 

@@ -46,7 +46,8 @@ key.
 
 Implemented:
 
-- [ ] Caddy configuration parsing
+- [x] Caddy configuration parsing
+- [x] ESI parsing
 - [ ] Basic ESI Tag
 - [ ] With timeout
 - [ ] With ttl

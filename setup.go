@@ -59,7 +59,7 @@ func configEsiParse(c *caddy.Controller) (rc *RootConfig, _ error) {
 
 	for c.Next() {
 		esi := &PathConfig{
-			Resources: make(map[string]Resourcer),
+			Resources: make(map[string]ResourceFetcher),
 		}
 
 		// Get the path scope

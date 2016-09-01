@@ -10,7 +10,7 @@ import (
 )
 
 var _ Backender = (*backendMock)(nil)
-var _ Resourcer = (*resourceMock)(nil)
+var _ ResourceFetcher = (*resourceMock)(nil)
 
 type backendMock struct{}
 
@@ -42,7 +42,7 @@ func TestSetup(t *testing.T) {
 						Timeout:   0,
 						TTL:       0,
 						Backends:  nil,
-						Resources: map[string]Resourcer{},
+						Resources: map[string]ResourceFetcher{},
 					},
 				},
 			},
@@ -63,7 +63,7 @@ func TestSetup(t *testing.T) {
 						Backends: Backends{
 							backendMock{},
 						},
-						Resources: map[string]Resourcer{},
+						Resources: map[string]ResourceFetcher{},
 					},
 				},
 			},
@@ -78,7 +78,7 @@ func TestSetup(t *testing.T) {
 					&PathConfig{
 						Scope:     "/",
 						Backends:  nil,
-						Resources: map[string]Resourcer{},
+						Resources: map[string]ResourceFetcher{},
 					},
 				},
 			},
@@ -99,7 +99,7 @@ func TestSetup(t *testing.T) {
 						Backends: Backends{
 							backendMock{},
 						},
-						Resources: map[string]Resourcer{},
+						Resources: map[string]ResourceFetcher{},
 					},
 				},
 			},
@@ -122,7 +122,7 @@ func TestSetup(t *testing.T) {
 							backendMock{},
 							backendMock{},
 						},
-						Resources: map[string]Resourcer{},
+						Resources: map[string]ResourceFetcher{},
 					},
 				},
 			},
@@ -138,14 +138,14 @@ func TestSetup(t *testing.T) {
 						Timeout:   0,
 						TTL:       0,
 						Backends:  nil,
-						Resources: map[string]Resourcer{},
+						Resources: map[string]ResourceFetcher{},
 					},
 					&PathConfig{
 						Scope:     "/guestbook",
 						Timeout:   0,
 						TTL:       0,
 						Backends:  nil,
-						Resources: map[string]Resourcer{},
+						Resources: map[string]ResourceFetcher{},
 					},
 				},
 			},
@@ -180,7 +180,7 @@ func TestSetup(t *testing.T) {
 							backendMock{},
 							backendMock{},
 						},
-						Resources: map[string]Resourcer{
+						Resources: map[string]ResourceFetcher{
 							"redisAWS1":   resourceMock{},
 							"redisLocal1": resourceMock{},
 							"redisLocal2": resourceMock{},
@@ -193,7 +193,7 @@ func TestSetup(t *testing.T) {
 						Backends: Backends{
 							backendMock{},
 						},
-						Resources: map[string]Resourcer{
+						Resources: map[string]ResourceFetcher{
 							"redisLocal1": resourceMock{},
 						},
 					},
