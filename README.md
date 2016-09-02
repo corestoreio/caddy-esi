@@ -47,7 +47,9 @@ key.
 Implemented:
 
 - [x] Caddy configuration parsing
-- [x] ESI parsing
+- [x] ESI tag parsing
+- [ ] ESI tag replacement
+- [ ] Background Fetcher workers
 - [ ] Basic ESI Tag
 - [ ] With timeout
 - [ ] With ttl

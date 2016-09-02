@@ -91,3 +91,15 @@ func BenchmarkESITag_ParseRaw_MicroService(b *testing.B) {
 		b.Errorf("Have: %v Want: %v", have, want)
 	}
 }
+
+func TestESITags_ParseKey(t *testing.T) {
+	t.Error("@todo")
+}
+
+func TestESITags_ParseCondition(t *testing.T) {
+	t.Error("@todo")
+}
+
+func TestESITags_ParseResource(t *testing.T) {
+	t.Error("@todo")
+}
