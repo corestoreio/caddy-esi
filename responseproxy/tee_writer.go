@@ -1,4 +1,25 @@
-package esi
+// Copyright (c) 2014, 2015, 2016 Carl Jackson (carl@avtok.com)
+//
+// MIT License
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy of
+// this software and associated documentation files (the "Software"), to deal in
+// the Software without restriction, including without limitation the rights to
+// use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+// the Software, and to permit persons to whom the Software is furnished to do so,
+// subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+// FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+// COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+// IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+// CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+package responseproxy
 
 import (
 	"bufio"
@@ -7,14 +28,9 @@ import (
 	"net/http"
 )
 
-// this code is from the goji framework and acts as an idea to wrap a writer
-// todo: remote the Tee and BytesWritten
-// the Write() method parses the stream for ESI tags and replaces the ESI
-// tags with the real content.
-
-// WriterProxy is a proxy around an http.ResponseWriter that allows you to hook
+// TeeWriter is a proxy around an http.ResponseWriter that allows you to hook
 // into various parts of the response process.
-type WriterProxy interface {
+type TeeWriter interface {
 	http.ResponseWriter
 	// Status returns the HTTP status of the request, or 0 if one has not
 	// yet been sent.
@@ -32,9 +48,9 @@ type WriterProxy interface {
 	Unwrap() http.ResponseWriter
 }
 
-// WrapWriter wraps an http.ResponseWriter, returning a proxy that allows you to
+// WrapTee wraps an http.ResponseWriter, returning a proxy that allows you to
 // hook into various parts of the response process.
-func WrapWriter(w http.ResponseWriter) WriterProxy {
+func WrapTee(w http.ResponseWriter) TeeWriter {
 	_, cn := w.(http.CloseNotifier)
 	_, fl := w.(http.Flusher)
 	_, hj := w.(http.Hijacker)
