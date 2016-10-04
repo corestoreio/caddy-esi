@@ -64,6 +64,7 @@ Implemented:
 - [ ] Conditional tag loading
 - [ ] Redis access
 - [ ] Handle compressed content from backends
+- [ ] Coalesce multiple requests into one backend request
 
 Implementation ideas:
 
@@ -182,11 +183,23 @@ response.
 <esi:include src="https://micro.service/esi/foo" returnheaders="Set-Cookie"/>
 ```
 
+### Coalesce multiple requests into one backend request (optional)
+
+The basic tag with the attribute `coalesce="true"` takes care that for multiple
+incoming requests only one backend request gets fired. Other attributes can be
+additionally defined.  
+
+```
+<esi:include src="https://micro.service/esi/foo" coalesce="true"/>
+```
+
 ### Multiple sources
 
 The basic ESI tag can contain multiple sources. The ESI processor tries to load
 `src` attributes in its specified order. The next `src` gets called after the
-`esi.timeout` or `timeout`. Other attributes can be additionally defined.
+`esi.timeout` or `timeout`. Other attributes can be additionally defined. Add
+the attribute `race="true"` to fire all requests at once and the one which is
+the fastest gets served and the others dropped.
 
 ```
 <esi:include 
