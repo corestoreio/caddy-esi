@@ -1,4 +1,4 @@
-package esi
+package esitag
 
 import (
 	"strings"

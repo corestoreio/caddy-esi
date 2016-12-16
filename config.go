@@ -1,4 +1,4 @@
-package esi
+package caddyesi
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
 	"github.com/pierrec/xxHash/xxHash64"
 )
@@ -26,18 +27,18 @@ type ResourceFetcher interface {
 type RootConfig struct {
 	PathConfigs
 	mu    sync.RWMutex
-	cache map[uint64]ESITags
+	cache map[uint64]esitag.Entities
 }
 
 func NewRootConfig() *RootConfig {
 	return &RootConfig{
-		cache: make(map[uint64]ESITags),
+		cache: make(map[uint64]esitag.Entities),
 	}
 }
 
 // ESITagsByRequest selects in the ServeHTTP function all ESITags identified byt
 // its requestID.
-func (rc *RootConfig) ESITagsByRequest(r *http.Request) (t ESITags) {
+func (rc *RootConfig) ESITagsByRequest(r *http.Request) (t esitag.Entities) {
 	rc.mu.RLock()
 	t = rc.cache[requestID(r)]
 	rc.mu.RUnlock()

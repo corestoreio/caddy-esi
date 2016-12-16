@@ -1,4 +1,4 @@
-package esi
+package caddyesi
 
 import (
 	"testing"

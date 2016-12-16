@@ -1,11 +1,11 @@
-package esi
+package caddyesi
 
 import (
-	"net/http"
-
 	"fmt"
+	"net/http"
 	"time"
 
+	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/mholt/caddy"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
 )
@@ -45,7 +45,7 @@ func setup(c *caddy.Controller) error {
 		// todo clear all internal caches
 		e.rc.mu.Lock()
 		defer e.rc.mu.Unlock()
-		e.rc.cache = make(map[uint64]ESITags)
+		e.rc.cache = make(map[uint64]esitag.Entities)
 		return nil
 	})
 

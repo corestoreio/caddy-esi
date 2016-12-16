@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/corestoreio/csfw/util/errors"
+	"github.com/pkg/errors"
 )
 
 // PipedWriter is a proxy around an http.ResponseWriter that allows you write
@@ -41,6 +41,7 @@ type PipedWriter interface {
 // writes to your ReaderFrom. You must call "defer Close()" to quite the internal
 // goroutine.
 func WrapPiped(iorf io.ReaderFrom, w http.ResponseWriter) PipedWriter {
+	// TODO(CyS) http.Pusher is missing for http2
 	_, cn := w.(http.CloseNotifier)
 	_, fl := w.(http.Flusher)
 	_, hj := w.(http.Hijacker)

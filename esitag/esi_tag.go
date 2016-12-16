@@ -1,24 +1,37 @@
-package esi
+package esitag
 
 import (
-	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
+// TemplateIdentifier if some strings contain these characters then a
+// template.Template will be created. For now a resource key or an URL.
+const TemplateIdentifier = "{{"
+
+// Resource specifies the location to a 3rd party remote system
 type Resource struct {
-	URL      string
-	KVNet    string
+	// URL location to make a network request
+	URL string
+	// KVNet ?
+	KVNet string
+	// Template gets reated when the URL contains the template identifiers.
 	Template *template.Template
 }
 
+// Resources contains multiple unique Resource entries
 type Resources []Resource
 
+// ResourceKey contains the key for a lookup in a 3rd party system, for example
+// in Redis this key will be used to retrieve the value.
 type ResourceKey struct {
-	Key      string
+	Key string
+	// Template gets created when the Key contains the template identifiers.
 	Template *template.Template
 }
 
@@ -38,8 +51,8 @@ func (c condition) OK(r *http.Request) bool {
 	return false
 }
 
-// ESITag represents a single ESI tag
-type ESITag struct {
+// Entity represents a single fully parsed ESI tag
+type Entity struct {
 	RawTag            []byte
 	TagStart          int // start position in the stream
 	TagEnd            int // end position in the stream
@@ -59,7 +72,7 @@ var regexESITag = regexp.MustCompile(`([a-z]+)="([^"\r\n]+)"`)
 
 // ParseRaw parses the RawTag field and fills the remaining fields of the
 // struct.
-func (et *ESITag) ParseRaw() error {
+func (et *Entity) ParseRaw() error {
 	if len(et.RawTag) == 0 {
 		return nil
 	}
@@ -71,7 +84,7 @@ func (et *ESITag) ParseRaw() error {
 
 	for _, subs := range matches {
 		if len(subs) != 3 {
-			return fmt.Errorf("[caddyesi] ESITag.ParseRaw: Incorrect number of regex matches: %#v => All matches: %#v\nTag: %q", subs, matches, et.RawTag)
+			return errors.Errorf("[caddyesi] ESITag.ParseRaw: Incorrect number of regex matches: %#v => All matches: %#v\nTag: %q", subs, matches, et.RawTag)
 		}
 		key := subs[1]
 		value := strings.TrimSpace(subs[2])
@@ -79,29 +92,29 @@ func (et *ESITag) ParseRaw() error {
 		switch key {
 		case "src":
 			if err := et.parseResource(value); err != nil {
-				return fmt.Errorf("[caddyesi] Failed to parse src %q in tag %q", value, et.RawTag)
+				return errors.Errorf("[caddyesi] Failed to parse src %q in tag %q", value, et.RawTag)
 			}
 		case "onerror":
 			et.OnError = value
 		case "key":
 			if err := et.parseKey(value); err != nil {
-				return fmt.Errorf("[caddyesi] Failed to parse key %q in tag %q", value, et.RawTag)
+				return errors.Errorf("[caddyesi] Failed to parse key %q in tag %q", value, et.RawTag)
 			}
 		case "condition":
 			if err := et.parseCondition(value); err != nil {
-				return fmt.Errorf("[caddyesi] Failed to parse condition %q in tag %q", value, et.RawTag)
+				return errors.Errorf("[caddyesi] Failed to parse condition %q in tag %q", value, et.RawTag)
 			}
 		case "timeout":
 			var err error
 			et.Timeout, err = time.ParseDuration(value)
 			if err != nil {
-				return fmt.Errorf("[caddyesi] ESITag.ParseRaw. Cannot parse duration in timeout: %s => %q\nTag: %q", err, value, et.RawTag)
+				return errors.Errorf("[caddyesi] ESITag.ParseRaw. Cannot parse duration in timeout: %s => %q\nTag: %q", err, value, et.RawTag)
 			}
 		case "ttl":
 			var err error
 			et.TTL, err = time.ParseDuration(value)
 			if err != nil {
-				return fmt.Errorf("[caddyesi] ESITag.ParseRaw. Cannot parse duration in ttl: %s => %q\nTag: %q", err, value, et.RawTag)
+				return errors.Errorf("[caddyesi] ESITag.ParseRaw. Cannot parse duration in ttl: %s => %q\nTag: %q", err, value, et.RawTag)
 			}
 		case "forwardheaders":
 			if value == "all" {
@@ -123,52 +136,53 @@ func (et *ESITag) ParseRaw() error {
 	return nil
 }
 
-func (et *ESITag) parseKey(s string) error {
-	if strings.Contains(s, "{{") { // todo make configurable
+func (et *Entity) parseKey(s string) error {
+	if strings.Contains(s, TemplateIdentifier) { // todo make configurable
 		var err error
 		et.ResourceKey.Template, err = template.New("key").Parse(s)
-		return fmt.Errorf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", s, err, et.RawTag)
+		return errors.Errorf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", s, err, et.RawTag)
 	}
 	et.ResourceKey.Key = s
 	return nil
 }
 
-func (et *ESITag) parseCondition(s string) error {
+func (et *Entity) parseCondition(s string) error {
 	tpl, err := template.New("condition").Parse(s)
 	if err != nil {
-		fmt.Errorf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", s, err, et.RawTag)
+		errors.Errorf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", s, err, et.RawTag)
 	}
 	et.Conditioner = condition{Template: tpl}
 	return nil
 }
 
-func (et *ESITag) parseResource(s string) error {
+func (et *Entity) parseResource(s string) error {
 	var r Resource
 	isURL := strings.Contains(s, "://")
 	switch {
-	case isURL && strings.Contains(s, "{{"):
+	case isURL && strings.Contains(s, TemplateIdentifier):
 		tpl, err := template.New("tpl").Parse(s)
 		if err != nil {
-			return fmt.Errorf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", s, err, et.RawTag)
+			return errors.Errorf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", s, err, et.RawTag)
 		}
 		r = Resource{Template: tpl}
 	case isURL:
 		r = Resource{URL: s}
 	default:
+		panic("KVNet: " + s)
 		r = Resource{KVNet: s}
 	}
 	et.Resources = append(et.Resources, r)
 	return nil
 }
 
-// ESITags represents a list of ESI tags
-type ESITags []*ESITag
+// Entities represents a list of ESI tags
+type Entities []*Entity
 
 // ParseRaw all ESI tags
-func (et ESITags) ParseRaw() error {
+func (et Entities) ParseRaw() error {
 	for i := range et {
 		if err := et[i].ParseRaw(); err != nil {
-			return err
+			return errors.Wrapf(err, "[caddyesi] Entities ParseRaw failed at index %d", i)
 		}
 	}
 	return nil
