@@ -12,8 +12,10 @@ func dropSpaces(r rune) rune {
 	return r
 }
 
-func trimStrings(sl []string) {
+func commaListToSlice(str string) []string {
+	sl := strings.Split(str, ",")
 	for i := range sl {
 		sl[i] = strings.Map(dropSpaces, sl[i])
 	}
+	return sl
 }
