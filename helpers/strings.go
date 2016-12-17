@@ -1,4 +1,4 @@
-package esitag
+package helpers
 
 import (
 	"strings"
@@ -12,10 +12,15 @@ func dropSpaces(r rune) rune {
 	return r
 }
 
-func commaListToSlice(str string) []string {
+// CommaListToSlice transforms a comma separated string into a slice with
+// trimmed spaces.
+func CommaListToSlice(str string) []string {
 	sl := strings.Split(str, ",")
 	for i := range sl {
 		sl[i] = strings.Map(dropSpaces, sl[i])
+	}
+	if len(sl) == 1 && sl[0] == "" {
+		return []string{}
 	}
 	return sl
 }

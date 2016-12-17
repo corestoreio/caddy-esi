@@ -6,8 +6,8 @@ import (
 	"github.com/mholt/caddy/caddyhttp/httpserver"
 )
 
-// ESI implements the ESI tag middleware
-type ESI struct {
+// Middleware implements the ESI tag middleware
+type Middleware struct {
 	// Root the Server root
 	Root string
 
@@ -17,34 +17,38 @@ type ESI struct {
 	// Next HTTP handler in the chain
 	Next httpserver.Handler
 
-	// The list of ESI configurations
-	rc *RootConfig
+	// PathConfigs The list of ESI configurations for each path prefix and theirs
+	// caches.
+	PathConfigs
 }
 
 // ServeHTTP implements the http.Handler interface.
-func (e ESI) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
-	cfg := e.rc.PathConfigs.ConfigForPath(r)
+func (mw Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
+	cfg := mw.PathConfigs.ConfigForPath(r)
 	if cfg == nil {
-		return e.Next.ServeHTTP(w, r) // exit early
+		return mw.Next.ServeHTTP(w, r) // exit early
 	}
+	if !cfg.isRequestAllowed(r) {
+		return mw.Next.ServeHTTP(w, r) // go on ...
+	}
+
+	// What's next?
+	// - Calculate a unique identifier for each page. This ID will be used to
+	//   look up the already parsed ESI tags to avoid re-parsing. See func requestID()
+	// -
 
 	// maybe use a hashing function to check if content changes ...
 
 	// todo: we must wrap the ResponseWriter to provide stream parsing and replacement other handlers
 	// parse the stream ... build the cache of ESI tags.
 
-	// We only deal with HEAD/GET
-	switch r.Method {
-	case http.MethodGet, http.MethodHead:
-	default:
-		return e.Next.ServeHTTP(w, r) // go on ...
-	}
-
-	tags := e.rc.ESITagsByRequest(r)
+	tags := cfg.ESITagsByRequest(r)
 	if len(tags) == 0 {
 		// no tags found
 		// start parsing the stream; wrap the ResponseWriter
 	}
 
-	return e.Next.ServeHTTP(w, r)
+	// start replacement
+
+	return mw.Next.ServeHTTP(w, r)
 }

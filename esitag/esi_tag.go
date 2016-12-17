@@ -8,6 +8,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/SchumacherFM/caddyesi/helpers"
 	"github.com/pkg/errors"
 )
 
@@ -144,13 +145,13 @@ func (et *Entity) ParseRaw() error {
 			if value == "all" {
 				et.ForwardHeadersAll = true
 			} else {
-				et.ForwardHeaders = commaListToSlice(value)
+				et.ForwardHeaders = helpers.CommaListToSlice(value)
 			}
 		case "returnheaders":
 			if value == "all" {
 				et.ReturnHeadersAll = true
 			} else {
-				et.ReturnHeaders = commaListToSlice(value)
+				et.ReturnHeaders = helpers.CommaListToSlice(value)
 			}
 			// default: ignore all other tags
 		}

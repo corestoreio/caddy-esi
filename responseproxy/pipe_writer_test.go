@@ -24,6 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// todo fix race condition
+
 func TestWrapPipe(t *testing.T) {
 	wOrg := httptest.NewRecorder()
 	data := []byte(`Commander Data encrypts the computer with a fractal algorithm to protect it from the Borgs.`)

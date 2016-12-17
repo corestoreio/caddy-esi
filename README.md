@@ -15,15 +15,20 @@ https://cyrillschumacher.local:2718 {
     ...
     other caddy directives
     ...
-    esi {
+    esi [/path_optional] {
         timeout 5ms|100us|1m|...
         ttl 5ms|100us|1m|...
-        backend redis://localhost:6379/0
-        
+        [request_id_hash [host,path,query_string,ip]]
+        [allowed_methods [GET,POST,DELETE]]
+        [cache redis://localhost:6379/0]
+        [cache redis://localhost:6380/0]
+        [cache memcache://localhost:11211/2]
+        [cache inmemory]
+
         # next 3 are used for ESI includes
         redisAWS1 redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0
-        redisLocal1 redis://localhost:6379/3
-        redisLocal2 redis://localhost:6380/1
+        redisLocal1 redis://localhost:6381/3
+        memcacheLocal2 memcache://localhost:11211/1
     }
 }
 ```
@@ -34,12 +39,12 @@ resource to load data from. The value of the not reserved keywords must be a
 valid URI. Reserved keys are:
 
 - `timeout`, default x [time.Duration](https://golang.org/pkg/time/#Duration).
-Time when a request to a source should be canceled.
-- `ttl`, global time-to-live in the storage backend for ESI data. Defaults to
-zero, caching disabled.
-- `backend`, Redis URL to cache the data returned from the ESI sources. Defaults
-to empty, caching disabled. `backend` uses the ESI attribute `src` as a cache
-key.
+Time when a request to a source should be canceled. Can only occur one time.
+- `ttl`, global time-to-live in the cache for ESI data. Defaults to
+zero, caching disabled. Can only occur one time.
+- `cache` defines a cache service which stores the retrieved data from a e.g. micro service but only when the ttl (within an ESI tag) has been set. Can only occur multiple times.
+- `request_id_hash` optional and special directive on how to identify a request to the same page. More information will be soon available.
+- `allowed_methods` optional, defaults to GET only.
 - ... ?
 
 ## Supported ESI Tags
@@ -252,9 +257,9 @@ gets created.
 
 ## Unsupported ESI Tags
 
-All other as defined in
-[https://www.w3.org/TR/esi-lang](https://www.w3.org/TR/esi-lang) because you can
-then use a server side scripting language.
+All other tags, as defined in
+[https://www.w3.org/TR/esi-lang](https://www.w3.org/TR/esi-lang), won't be
+supported. You should switch to a server side scripting language ;-).
 
 # Contribute
 

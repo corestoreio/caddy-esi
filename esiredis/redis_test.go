@@ -1,8 +1,13 @@
-package caddyesi
+package esiredis_test
 
-import "testing"
+import (
+	"testing"
 
-var _ Backender = (*Redis)(nil)
+	"github.com/SchumacherFM/caddyesi"
+	"github.com/SchumacherFM/caddyesi/esiredis"
+)
+
+var _ caddyesi.KVFetcher = (*esiredis.Redis)(nil)
 
 func TestParseRedis(t *testing.T) {
 	tests := []struct {
@@ -94,7 +99,7 @@ func TestParseRedis(t *testing.T) {
 	}
 	for i, test := range tests {
 
-		haveAddress, havePW, haveDB, haveErr := parseRedisURL(test.raw)
+		haveAddress, havePW, haveDB, haveErr := esiredis.ParseURL(test.raw)
 
 		if have, want := haveAddress, test.wantAddress; have != want {
 			t.Errorf("(%d) Address: Have: %v Want: %v", i, have, want)

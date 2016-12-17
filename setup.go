@@ -1,13 +1,14 @@
 package caddyesi
 
 import (
-	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
-	"github.com/SchumacherFM/caddyesi/esitag"
+	"github.com/SchumacherFM/caddyesi/helpers"
 	"github.com/mholt/caddy"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
+	"github.com/pkg/errors"
 )
 
 func init() {
@@ -19,22 +20,22 @@ func init() {
 
 // setup used internally by Caddy to set up this middleware
 func setup(c *caddy.Controller) error {
-	rc, err := configEsiParse(c)
+	pcs, err := configEsiParse(c)
 	if err != nil {
 		return err
 	}
 
 	cfg := httpserver.GetConfig(c)
 
-	e := ESI{
-		Root:    cfg.Root,
-		FileSys: http.Dir(cfg.Root),
-		rc:      rc,
+	mw := Middleware{
+		Root:        cfg.Root,
+		FileSys:     http.Dir(cfg.Root),
+		PathConfigs: pcs,
 	}
 
 	cfg.AddMiddleware(func(next httpserver.Handler) httpserver.Handler {
-		e.Next = next
-		return e
+		mw.Next = next
+		return mw
 	})
 
 	c.OnShutdown(func() error {
@@ -43,84 +44,90 @@ func setup(c *caddy.Controller) error {
 	})
 	c.OnRestart(func() error {
 		// todo clear all internal caches
-		e.rc.mu.Lock()
-		defer e.rc.mu.Unlock()
-		e.rc.cache = make(map[uint64]esitag.Entities)
+		//e.rc.mu.Lock()
+		//defer e.rc.mu.Unlock()
+		//e.rc.cache = make(map[uint64]esitag.Entities)
 		return nil
 	})
 
 	return nil
 }
 
-func configEsiParse(c *caddy.Controller) (rc *RootConfig, _ error) {
+func configEsiParse(c *caddy.Controller) (PathConfigs, error) {
+	pcs := make(PathConfigs, 0, 2)
 
-	// todo: parse it that way that only one pointer gets created for multiple equal
-	// resource/backend connections.
+	// todo: parse it that way that only one pointer gets created for multiple equal resource/backend connections.
 
 	for c.Next() {
-		esi := &PathConfig{
-			Resources: make(map[string]ResourceFetcher),
-		}
+		pc := NewPathConfig()
 
 		// Get the path scope
 		args := c.RemainingArgs()
 		switch len(args) {
 		case 0:
-			esi.Scope = "/"
+			pc.Scope = "/"
 		case 1:
-			esi.Scope = args[0]
+			pc.Scope = args[0]
 		default:
 			return nil, c.ArgErr()
 		}
 
 		// Load any other configuration parameters
 		for c.NextBlock() {
-			if err := configLoadParams(c, esi); err != nil {
+			if err := configLoadParams(c, pc); err != nil {
 				return nil, err
 			}
 		}
-		if rc == nil {
-			// lazy init
-			rc = NewRootConfig()
-		}
-		rc.PathConfigs = append(rc.PathConfigs, esi)
+		pcs = append(pcs, pc)
 	}
-	return rc, nil
+	return pcs, nil
 }
 
-func configLoadParams(c *caddy.Controller, esic *PathConfig) error {
-
+func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 	switch key := c.Val(); key {
+
 	case "timeout":
 		if !c.NextArg() {
 			return c.ArgErr()
 		}
 		d, err := time.ParseDuration(c.Val())
 		if err != nil {
-			return fmt.Errorf("[caddyesi] Invalid duration in timeout configuration: %q", c.Val())
+			return errors.Errorf("[caddyesi] Invalid duration in timeout configuration: %q", c.Val())
 		}
-		esic.Timeout = d
-		return nil
+		pc.Timeout = d
+
 	case "ttl":
 		if !c.NextArg() {
 			return c.ArgErr()
 		}
 		d, err := time.ParseDuration(c.Val())
 		if err != nil {
-			return fmt.Errorf("[caddyesi] Invalid duration in ttl configuration: %q", c.Val())
+			return errors.Errorf("[caddyesi] Invalid duration in ttl configuration: %q", c.Val())
 		}
-		esic.TTL = d
-		return nil
-	case "backend":
+		pc.TTL = d
+
+	case "cache":
 		if !c.NextArg() {
 			return c.ArgErr()
 		}
-		be, err := parseBackendUrl(c.Val())
+
+		cchr, err := newCacher(c.Val())
 		if err != nil {
-			return err
+			return errors.Errorf("[caddyesi] Failed to instantiate a new cache object for %q with URL: %q", key, c.Val())
 		}
-		esic.Backends = append(esic.Backends, be)
-		return nil
+		pc.Caches = append(pc.Caches, cchr)
+
+	case "request_id_hash":
+		if !c.NextArg() {
+			return c.ArgErr()
+		}
+		pc.RequestIDSource = helpers.CommaListToSlice(c.Val())
+
+	case "allowed_methods":
+		if !c.NextArg() {
+			return c.ArgErr()
+		}
+		pc.AllowedMethods = helpers.CommaListToSlice(strings.ToUpper(c.Val()))
 
 	default:
 		//catch all
@@ -130,12 +137,15 @@ func configLoadParams(c *caddy.Controller, esic *PathConfig) error {
 		if key == "" || c.Val() == "" {
 			return nil // continue
 		}
-		// todo generic resource loading and parsing
-		rc, err := NewRedis(c.Val())
-		if err != nil {
-			return fmt.Errorf("[caddyesi] Cannot parse URL %q with key %q. Error: %s", c.Val(), key, err)
+		if pc.KVServices == nil {
+			pc.KVServices = make(map[string]KVFetcher, 10)
 		}
-		esic.Resources[key] = rc
-		return nil
+		kvf, err := newKVFetcher(c.Val())
+		if err != nil {
+			return errors.Wrapf(err, "[caddyesi] configLoadParams for Key %q and Value %q", key, c.Val())
+		}
+		pc.KVServices[key] = kvf
 	}
+
+	return nil
 }

@@ -1,45 +1,40 @@
-package caddyesi
+package esiredis
 
 import (
-	"fmt"
+	"context"
 	"net"
 	"net/url"
 	"regexp"
 	"strconv"
+
+	"github.com/pkg/errors"
 )
 
 type Redis struct {
 	// todo
 }
 
-func NewRedis(rawURL string) (*Redis, error) {
-	_, _, _, err := parseRedisURL(rawURL)
+func New(rawURL string) (*Redis, error) {
+	_, _, _, err := ParseURL(rawURL)
 	if err != nil {
-		return nil, fmt.Errorf("[caddyesi] Error parsing URL %q => %s", rawURL, err)
+		return nil, errors.Errorf("[esiredis] Error parsing URL %q => %s", rawURL, err)
 	}
 	return &Redis{}, nil
 }
 
-func mustNewRedisConfig(rawURL string) *Redis {
-	r, err := NewRedis(rawURL)
-	if err != nil {
-		panic(err)
-	}
-	return r
-}
-
-func (r *Redis) Set(key, val []byte) error {
-	// todo
-	return nil
-}
-func (r *Redis) Get(key []byte) ([]byte, error) {
+func (r *Redis) Get(ctx context.Context, key []byte) ([]byte, error) {
 	// todo
 	return nil, nil
 }
 
+func (r *Redis) Close() error {
+	// todo
+	return nil
+}
+
 var pathDBRegexp = regexp.MustCompile(`/(\d*)\z`)
 
-// ParseRedis parses a given URL using the Redis
+// ParseURL parses a given URL using the Redis
 // URI scheme. URLs should follow the draft IANA specification for the
 // scheme (https://www.iana.org/assignments/uri-schemes/prov/redis).
 //
@@ -49,21 +44,21 @@ var pathDBRegexp = regexp.MustCompile(`/(\d*)\z`)
 // 		redis://:6380/0 => connects to localhost:6380
 // 		redis:// => connects to localhost:6379 with DB 0
 // 		redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0
-func parseRedisURL(raw string) (address, password string, db int64, err error) {
+func ParseURL(raw string) (address, password string, db int64, err error) {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return "", "", 0, fmt.Errorf("[url.ParseRedis] url.Parse: %s", err)
+		return "", "", 0, errors.Errorf("[esiredis] url.Parse: %s", err)
 	}
 
 	if u.Scheme != "redis" {
-		return "", "", 0, fmt.Errorf("[url.ParseRedis] Invalid Redis URL scheme: %q", u.Scheme)
+		return "", "", 0, errors.Errorf("[esiredis] Invalid Redis URL scheme: %q", u.Scheme)
 	}
 
 	// As per the IANA draft spec, the host defaults to localhost and
 	// the port defaults to 6379.
 	host, port, err := net.SplitHostPort(u.Host)
 	if sErr, ok := err.(*net.AddrError); ok && sErr != nil && sErr.Err == "too many colons in address" {
-		return "", "", 0, fmt.Errorf("[url.ParseRedis] SplitHostPort: %s", err)
+		return "", "", 0, errors.Errorf("[esiredis] SplitHostPort: %s", err)
 	}
 	if err != nil {
 		// assume port is missing
@@ -85,11 +80,11 @@ func parseRedisURL(raw string) (address, password string, db int64, err error) {
 		if len(match[1]) > 0 {
 			db, err = strconv.ParseInt(match[1], 10, 64)
 			if err != nil {
-				return "", "", 0, fmt.Errorf("[url.ParseRedis] Invalid database: %q in %q", u.Path[1:], match[1])
+				return "", "", 0, errors.Errorf("[esiredis] Invalid database: %q in %q", u.Path[1:], match[1])
 			}
 		}
 	} else if u.Path != "" {
-		return "", "", 0, fmt.Errorf("[url.ParseRedis] Invalid database: %q", u.Path[1:])
+		return "", "", 0, errors.Errorf("[esiredis] Invalid database: %q", u.Path[1:])
 	}
 	return
 }
