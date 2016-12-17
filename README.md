@@ -18,7 +18,7 @@ https://cyrillschumacher.local:2718 {
     esi [/path_optional] {
         timeout 5ms|100us|1m|...
         ttl 5ms|100us|1m|...
-        [request_id_hash [host,path,query_string,ip]]
+        [request_id_source [host,path,query_string,ip]]
         [allowed_methods [GET,POST,DELETE]]
         [cache redis://localhost:6379/0]
         [cache redis://localhost:6380/0]
@@ -43,7 +43,7 @@ Time when a request to a source should be canceled. Can only occur one time.
 - `ttl`, global time-to-live in the cache for ESI data. Defaults to
 zero, caching disabled. Can only occur one time.
 - `cache` defines a cache service which stores the retrieved data from a e.g. micro service but only when the ttl (within an ESI tag) has been set. Can only occur multiple times.
-- `request_id_hash` optional and special directive on how to identify a request to the same page. More information will be soon available.
+- `request_id_source` optional and special directive on how to identify a request to the same page. More information will be soon available.
 - `allowed_methods` optional, defaults to GET only.
 - ... ?
 

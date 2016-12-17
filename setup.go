@@ -117,7 +117,7 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 		}
 		pc.Caches = append(pc.Caches, cchr)
 
-	case "request_id_hash":
+	case "request_id_source":
 		if !c.NextArg() {
 			return c.ArgErr()
 		}

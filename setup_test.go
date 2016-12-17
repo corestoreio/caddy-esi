@@ -34,20 +34,27 @@ func TestSetup(t *testing.T) {
 			}
 			assert.Exactly(ts, len(wantPC), len(myHandler.PathConfigs))
 			for j, wantC := range wantPC {
+				haveC := myHandler.PathConfigs[j]
 
-				assert.Len(ts, myHandler.PathConfigs[j].KVServices, len(wantC.KVServices), "Index %d", j)
+				assert.Exactly(ts, wantC.Scope, haveC.Scope, "Scope (Path)")
+				assert.Exactly(ts, wantC.Timeout, haveC.Timeout, "Timeout")
+				assert.Exactly(ts, wantC.TTL, haveC.TTL, "TTL")
+				assert.Exactly(ts, wantC.RequestIDSource, haveC.RequestIDSource, "RequestIDSource")
+				assert.Exactly(ts, wantC.AllowedMethods, haveC.AllowedMethods, "AllowedMethods")
+
+				assert.Len(ts, haveC.KVServices, len(wantC.KVServices), "Index %d", j)
 				for key := range wantC.KVServices {
-					_, ok := myHandler.PathConfigs[j].KVServices[key]
+					_, ok := haveC.KVServices[key]
 					assert.True(ts, ok, "Index %d", j)
 				}
 
-				assert.Len(ts, myHandler.PathConfigs[j].Resources, len(wantC.Resources), "Index  %d", j)
+				assert.Len(ts, haveC.Resources, len(wantC.Resources), "Index  %d", j)
 				for key := range wantC.Resources {
-					_, ok := myHandler.PathConfigs[j].Resources[key]
+					_, ok := haveC.Resources[key]
 					assert.True(ts, ok, "Index %d", j)
 				}
 
-				assert.Len(ts, myHandler.PathConfigs[j].Caches, len(wantC.Caches), "Index  %d", j)
+				assert.Len(ts, haveC.Caches, len(wantC.Caches), "Index  %d", j)
 			}
 		}
 	}
@@ -57,7 +64,7 @@ func TestSetup(t *testing.T) {
 		PathConfigs{
 			&PathConfig{
 				Scope:   "/",
-				Timeout: 0,
+				Timeout: DefaultTimeOut,
 				TTL:     0,
 			},
 		},
@@ -121,6 +128,42 @@ func TestSetup(t *testing.T) {
 			},
 		},
 		"",
+	))
+
+	t.Run("config with allowed_methods", runner(
+		`esi {
+			allowed_methods "GET,pUT , POsT"
+		}`,
+		PathConfigs{
+			&PathConfig{
+				Scope:          "/",
+				Timeout:        DefaultTimeOut,
+				AllowedMethods: []string{"GET", "PUT", "POST"},
+			},
+		},
+		"",
+	))
+
+	t.Run("config with request_id_source", runner(
+		`esi {
+			request_id_source "path,host , ip"
+		}`,
+		PathConfigs{
+			&PathConfig{
+				Scope:           "/",
+				Timeout:         DefaultTimeOut,
+				RequestIDSource: []string{"path", "host", "ip"},
+			},
+		},
+		"",
+	))
+
+	t.Run("config with request_id_source but errors", runner(
+		`esi {
+			request_id_source "path,host , ip
+		}`,
+		nil,
+		`Wrong argument count or unexpected line ending after 'path,host , ip`,
 	))
 
 	t.Run("Parse timeout fails", runner(
@@ -188,12 +231,12 @@ func TestSetup(t *testing.T) {
 		PathConfigs{
 			&PathConfig{
 				Scope:   "/blog",
-				Timeout: 0,
+				Timeout: DefaultTimeOut,
 				TTL:     0,
 			},
 			&PathConfig{
 				Scope:   "/guestbook",
-				Timeout: 0,
+				Timeout: DefaultTimeOut,
 				TTL:     0,
 			},
 		},
