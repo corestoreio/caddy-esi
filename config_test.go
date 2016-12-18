@@ -13,11 +13,11 @@ import (
 const weirdLongUrl = `https://app.usunu.com/-/login?u=https%3A%2F%2Fapp.usunu.com%2F0%2Fsearch%2F2385944396396%2F81453167684176&e=emailaddress%40gmail.com&passive=1`
 
 func TestPathConfig_RequestID(t *testing.T) {
-	// t.Parallel()
+	t.Parallel()
 
 	runner := func(requestIDSource []string, r *http.Request, wantSum uint64) func(*testing.T) {
 		return func(t *testing.T) {
-			//t.Parallel()
+			t.Parallel()
 
 			pc := NewPathConfig()
 			pc.RequestIDSource = requestIDSource
@@ -171,6 +171,8 @@ func BenchmarkRequestID_Cookie(b *testing.B) {
 }
 
 func TestParseBackendUrl(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Redis", func(t *testing.T) {
 		be, err := newKVFetcher("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0")
 		assert.NoError(t, err)
@@ -192,8 +194,11 @@ func TestParseBackendUrl(t *testing.T) {
 }
 
 func TestPathConfig_isRequestAllowed(t *testing.T) {
+	t.Parallel()
 	runner := func(allowedMethods []string, r *http.Request, want bool) func(*testing.T) {
 		return func(t *testing.T) {
+			t.Parallel()
+
 			pc := NewPathConfig()
 			pc.AllowedMethods = allowedMethods
 			assert.Exactly(t, want, pc.isRequestAllowed(r))
@@ -213,5 +218,94 @@ func TestPathConfig_isRequestAllowed(t *testing.T) {
 		[]string{"POST"},
 		httptest.NewRequest("POST", "/test", nil),
 		true,
+	))
+}
+
+func TestPathConfigs_ConfigForPath(t *testing.T) {
+	runner := func(pc PathConfigs, r *http.Request, want string) func(*testing.T) {
+		return func(t *testing.T) {
+			c := pc.ConfigForPath(r)
+			if want == "" {
+				assert.Nil(t, c)
+				return
+			}
+			if c == nil {
+				t.Errorf("c should not be nil! Request Path %q; want %q", r.URL.Path, want)
+			} else {
+				assert.Exactly(t, want, c.Scope)
+			}
+		}
+	}
+	t.Run("/catalog/product config found", runner(
+		PathConfigs{
+			&PathConfig{
+				Scope: "/catalog/product",
+			},
+			&PathConfig{
+				Scope: "/checkout/cart",
+			},
+		},
+		httptest.NewRequest("GET", "/catalog/product", nil),
+		"/catalog/product",
+	))
+	t.Run("/catalog/product/view?a=b config found", runner(
+		PathConfigs{
+			&PathConfig{
+				Scope: "/catalog/product",
+			},
+			&PathConfig{
+				Scope: "/checkout/cart",
+			},
+		},
+		httptest.NewRequest("GET", "/catalog/product/view?a=b", nil),
+		"/catalog/product",
+	))
+	t.Run("/checkout/cart config found", runner(
+		PathConfigs{
+			&PathConfig{
+				Scope: "/catalog/product",
+			},
+			&PathConfig{
+				Scope: "/checkout/cart",
+			},
+		},
+		httptest.NewRequest("GET", "/checkout/cart", nil),
+		"/checkout/cart",
+	))
+	t.Run("/ no ESI config found, path does not match", runner(
+		PathConfigs{
+			&PathConfig{
+				Scope: "/catalog/product",
+			},
+			&PathConfig{
+				Scope: "/checkout/cart",
+			},
+		},
+		httptest.NewRequest("GET", "/", nil),
+		"",
+	))
+	t.Run("/ config found in /", runner(
+		PathConfigs{
+			&PathConfig{
+				Scope: "/catalog/product",
+			},
+			&PathConfig{
+				Scope: "/",
+			},
+		},
+		httptest.NewRequest("GET", "/checkout/cart", nil),
+		"/",
+	))
+	t.Run("/checkout/cart config found in /", runner(
+		PathConfigs{
+			&PathConfig{
+				Scope: "/catalog/product",
+			},
+			&PathConfig{
+				Scope: "/",
+			},
+		},
+		httptest.NewRequest("GET", "/checkout/cart", nil),
+		"/",
 	))
 }
