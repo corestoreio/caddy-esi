@@ -189,5 +189,29 @@ func TestParseBackendUrl(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), `Unknown URL: "mysql://localhost". No driver defined for scheme: "mysql"`)
 	})
+}
 
+func TestPathConfig_isRequestAllowed(t *testing.T) {
+	runner := func(allowedMethods []string, r *http.Request, want bool) func(*testing.T) {
+		return func(t *testing.T) {
+			pc := NewPathConfig()
+			pc.AllowedMethods = allowedMethods
+			assert.Exactly(t, want, pc.isRequestAllowed(r))
+		}
+	}
+	t.Run("Default GET allowed", runner(
+		nil,
+		httptest.NewRequest("GET", "/test", nil),
+		true,
+	))
+	t.Run("DELETE not allowed", runner(
+		nil,
+		httptest.NewRequest("DELETE", "/test", nil),
+		false,
+	))
+	t.Run("POST allowed", runner(
+		[]string{"POST"},
+		httptest.NewRequest("POST", "/test", nil),
+		true,
+	))
 }
