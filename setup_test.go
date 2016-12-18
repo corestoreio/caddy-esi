@@ -146,13 +146,13 @@ func TestSetup(t *testing.T) {
 
 	t.Run("config with request_id_source", runner(
 		`esi {
-			request_id_source "path,host , ip"
+			request_id_source "pAth,host , IP, header-X-GitHub-Request-Id, header-Server, cookie-__Host-user_session_same_site"
 		}`,
 		PathConfigs{
 			&PathConfig{
 				Scope:           "/",
 				Timeout:         DefaultTimeOut,
-				RequestIDSource: []string{"path", "host", "ip"},
+				RequestIDSource: []string{"pAth", "host", "IP", "header-X-GitHub-Request-Id", "header-Server", "cookie-__Host-user_session_same_site"},
 			},
 		},
 		"",

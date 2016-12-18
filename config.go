@@ -5,7 +5,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/esitag"
+	"github.com/SchumacherFM/caddyesi/helpers"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
 	"github.com/pierrec/xxHash/xxHash64"
 )
@@ -62,8 +64,9 @@ type PathConfig struct {
 	Resources map[string]ResourceFetcher
 
 	muESI sync.RWMutex
-	// esiCache identifies all parsed ESI tags in a page for specific path prefix.
-	// uint64 represents the hash for the current request.
+	// esiCache identifies all parsed ESI tags in a page for specific path
+	// prefix. uint64 represents the hash for the current request calculated byt
+	// requestID function,
 	esiCache map[uint64]esitag.Entities
 }
 
@@ -95,16 +98,79 @@ func (pc *PathConfig) isRequestAllowed(r *http.Request) bool {
 	return r.Method == http.MethodGet
 }
 
+var defaultRequestIDSource = [...]string{"host", "path"}
+
 // requestID uses configs to extract certain parameters from the request
 func (pc *PathConfig) requestID(r *http.Request) uint64 {
-	// for now this should be enough, we can optimize it later or add more stuff, like headers
+	src := pc.RequestIDSource
+	if len(src) == 0 {
+		src = defaultRequestIDSource[:]
+	}
 
-	// pc.RequestIDSource
+	h, ok := requestID(src, r)
+	if !ok {
+		h, _ = requestID(defaultRequestIDSource[:], r)
+	}
+	return h
+}
 
-	l := len(r.URL.Host) + len(r.URL.Path)
-	buf := make([]byte, l)
-	n := copy(buf, r.URL.Host)
-	n += copy(buf[n:], r.URL.Path)
-	buf = buf[:n]
-	return xxHash64.Checksum(buf, uint64(l))
+func requestID(source []string, r *http.Request) (_ uint64, ok bool) {
+	const (
+		requestIDHeader = `header`
+		requestIDCookie = `cookie`
+	)
+
+	buf := bufpool.Get()
+	defer bufpool.Put(buf)
+
+	for _, key := range source {
+		{
+			var keyPrefix string
+			var keySuffix string
+			if len(key) > 7 {
+				// "Header" and "Cookie" are equally long which makes things easier
+				// Cookie-__Host-user_session_same_site
+				// Header-Server
+				keyPrefix = key[:6] // Contains e.g. "header" or "cookie"
+				keySuffix = key[7:] // Contains e.g. "__Host-user_session_same_site" or "Server"
+			}
+
+			switch keyPrefix {
+			case requestIDCookie:
+				if keks, _ := r.Cookie(keySuffix); keks != nil {
+					_, _ = buf.WriteString(keks.Value)
+				}
+			case requestIDHeader:
+				if v := r.Header.Get(keySuffix); v != "" {
+					_, _ = buf.WriteString(v)
+				}
+			}
+		}
+
+		switch key {
+		case "remoteaddr":
+			_, _ = buf.WriteString(r.RemoteAddr)
+		case "realip":
+			_, _ = buf.Write(helpers.RealIP(r))
+		case "scheme":
+			_, _ = buf.WriteString(r.URL.Scheme)
+		case "host":
+			_, _ = buf.WriteString(r.URL.Host)
+		case "path":
+			_, _ = buf.WriteString(r.URL.Path)
+		case "rawpath":
+			_, _ = buf.WriteString(r.URL.RawPath)
+		case "rawquery":
+			_, _ = buf.WriteString(r.URL.RawQuery)
+		case "url":
+			_, _ = buf.WriteString(r.URL.String())
+
+		}
+	}
+
+	l := uint64(buf.Len())
+	if l == 0 {
+		return 0, false
+	}
+	return xxHash64.Checksum(buf.Bytes(), l), true
 }

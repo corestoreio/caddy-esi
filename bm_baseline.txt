@@ -1,0 +1,32 @@
+BenchmarkRequestID-4           	10000000	       214 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRequestID-4           	10000000	       217 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRequestID-4           	10000000	       217 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRequestID-4           	10000000	       216 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRequestID-4           	10000000	       216 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRequestID-4           	10000000	       216 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRequestID-4           	10000000	       217 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRequestID-4           	10000000	       218 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRequestID-4           	10000000	       214 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRequestID-4           	10000000	       214 ns/op	       0 B/op	       0 allocs/op
+BenchmarkRequestID_FullURL-4   	 2000000	       798 ns/op	     496 B/op	       3 allocs/op
+BenchmarkRequestID_FullURL-4   	 2000000	       809 ns/op	     496 B/op	       3 allocs/op
+BenchmarkRequestID_FullURL-4   	 2000000	       797 ns/op	     496 B/op	       3 allocs/op
+BenchmarkRequestID_FullURL-4   	 2000000	       811 ns/op	     496 B/op	       3 allocs/op
+BenchmarkRequestID_FullURL-4   	 2000000	       796 ns/op	     496 B/op	       3 allocs/op
+BenchmarkRequestID_FullURL-4   	 2000000	       834 ns/op	     496 B/op	       3 allocs/op
+BenchmarkRequestID_FullURL-4   	 2000000	       794 ns/op	     496 B/op	       3 allocs/op
+BenchmarkRequestID_FullURL-4   	 2000000	       794 ns/op	     496 B/op	       3 allocs/op
+BenchmarkRequestID_FullURL-4   	 2000000	       792 ns/op	     496 B/op	       3 allocs/op
+BenchmarkRequestID_FullURL-4   	 2000000	       823 ns/op	     496 B/op	       3 allocs/op
+BenchmarkRequestID_Cookie-4    	 3000000	       506 ns/op	     184 B/op	       3 allocs/op
+BenchmarkRequestID_Cookie-4    	 3000000	       506 ns/op	     184 B/op	       3 allocs/op
+BenchmarkRequestID_Cookie-4    	 3000000	       509 ns/op	     184 B/op	       3 allocs/op
+BenchmarkRequestID_Cookie-4    	 3000000	       504 ns/op	     184 B/op	       3 allocs/op
+BenchmarkRequestID_Cookie-4    	 3000000	       560 ns/op	     184 B/op	       3 allocs/op
+BenchmarkRequestID_Cookie-4    	 3000000	       573 ns/op	     184 B/op	       3 allocs/op
+BenchmarkRequestID_Cookie-4    	 2000000	       601 ns/op	     184 B/op	       3 allocs/op
+BenchmarkRequestID_Cookie-4    	 3000000	       508 ns/op	     184 B/op	       3 allocs/op
+BenchmarkRequestID_Cookie-4    	 3000000	       506 ns/op	     184 B/op	       3 allocs/op
+BenchmarkRequestID_Cookie-4    	 3000000	       509 ns/op	     184 B/op	       3 allocs/op
+PASS
+ok  	github.com/SchumacherFM/caddyesi	68.698s
