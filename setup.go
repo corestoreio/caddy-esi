@@ -14,12 +14,12 @@ import (
 func init() {
 	caddy.RegisterPlugin("esi", caddy.Plugin{
 		ServerType: "http",
-		Action:     setup,
+		Action:     PluginSetup,
 	})
 }
 
-// setup used internally by Caddy to set up this middleware
-func setup(c *caddy.Controller) error {
+// PluginSetup used internally by Caddy to set up this middleware
+func PluginSetup(c *caddy.Controller) error {
 	pcs, err := configEsiParse(c)
 	if err != nil {
 		return err

@@ -82,14 +82,24 @@ func NewPathConfig() *PathConfig {
 
 // ESITagsByRequest selects in the ServeHTTP function all ESITags identified byt
 // its requestID.
-func (pc *PathConfig) ESITagsByRequest(r *http.Request) (t esitag.Entities) {
+func (pc *PathConfig) ESITagsByRequest(r *http.Request) (requestID uint64, t esitag.Entities) {
+	requestID = pc.requestID(r)
 	pc.muESI.RLock()
-	t = pc.esiCache[pc.requestID(r)]
+	t = pc.esiCache[requestID]
 	pc.muESI.RUnlock()
 	return
 }
 
-func (pc *PathConfig) isRequestAllowed(r *http.Request) bool {
+// StoreESITags as an ESI tag slice with its associated request ID to the
+// internal ESI cache and maybe overwrites an existing entry.
+func (pc *PathConfig) StoreESITags(requestID uint64, t esitag.Entities) {
+	pc.muESI.Lock()
+	defer pc.muESI.Unlock()
+	pc.esiCache[requestID] = t
+}
+
+// IsRequestAllowed decides if a request should be processed.
+func (pc *PathConfig) IsRequestAllowed(r *http.Request) bool {
 	for _, m := range pc.AllowedMethods {
 		if r.Method == m {
 			return true

@@ -201,7 +201,7 @@ func TestPathConfig_isRequestAllowed(t *testing.T) {
 
 			pc := NewPathConfig()
 			pc.AllowedMethods = allowedMethods
-			assert.Exactly(t, want, pc.isRequestAllowed(r))
+			assert.Exactly(t, want, pc.IsRequestAllowed(r))
 		}
 	}
 	t.Run("Default GET allowed", runner(
@@ -222,8 +222,12 @@ func TestPathConfig_isRequestAllowed(t *testing.T) {
 }
 
 func TestPathConfigs_ConfigForPath(t *testing.T) {
+	t.Parallel()
+
 	runner := func(pc PathConfigs, r *http.Request, want string) func(*testing.T) {
 		return func(t *testing.T) {
+			t.Parallel()
+
 			c := pc.ConfigForPath(r)
 			if want == "" {
 				assert.Nil(t, c)

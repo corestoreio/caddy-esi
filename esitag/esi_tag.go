@@ -2,12 +2,14 @@ package esitag
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
 	"text/template"
 	"time"
 
+	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/helpers"
 	"github.com/pkg/errors"
 )
@@ -216,4 +218,18 @@ func (et Entities) ParseRaw() error {
 		}
 	}
 	return nil
+}
+
+// String for debugging only!
+func (et Entities) String() string {
+	buf := bufpool.Get()
+	defer bufpool.Put(buf)
+
+	for i, e := range et {
+		raw := e.RawTag
+		e.RawTag = nil
+		fmt.Fprintf(buf, "%d: %#v\n", i, e)
+		fmt.Fprintf(buf, "%d: RawTag: %q\n\n", i, raw)
+	}
+	return buf.String()
 }

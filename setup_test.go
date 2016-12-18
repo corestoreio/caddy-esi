@@ -15,7 +15,7 @@ func TestSetup(t *testing.T) {
 	runner := func(config string, wantPC PathConfigs, wantErr string) func(*testing.T) {
 		return func(ts *testing.T) {
 			c := caddy.NewTestController("http", config)
-			err := setup(c)
+			err := PluginSetup(c)
 			if wantErr != "" {
 				assert.Contains(ts, err.Error(), wantErr)
 				return
