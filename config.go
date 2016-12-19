@@ -39,11 +39,11 @@ type PathConfig struct {
 	// zero, caching globally disabled until an ESI tag contains the TTL
 	// attribute.
 	TTL time.Duration
-	// RequestIDSource defines a slice of possible parameters which gets
-	// extracted from the http.Request object. All these parameters will be used
-	// to extract the values and calculate a unique hash for the current request
-	// to identify the request in the cache.
-	RequestIDSource []string
+	// PageIDSource defines a slice of possible parameters which gets extracted
+	// from the http.Request object. All these parameters will be used to
+	// extract the values and calculate a unique hash for the current requested
+	// page to identify the already parsed ESI tags in the cache.
+	PageIDSource []string
 	// AllowedMethods list of all allowed methods, defaults to GET
 	AllowedMethods []string
 
@@ -66,7 +66,7 @@ type PathConfig struct {
 	muESI sync.RWMutex
 	// esiCache identifies all parsed ESI tags in a page for specific path
 	// prefix. uint64 represents the hash for the current request calculated byt
-	// requestID function,
+	// pageID function,
 	esiCache map[uint64]esitag.Entities
 }
 
@@ -80,22 +80,22 @@ func NewPathConfig() *PathConfig {
 	}
 }
 
-// ESITagsByRequest selects in the ServeHTTP function all ESITags identified byt
-// its requestID.
-func (pc *PathConfig) ESITagsByRequest(r *http.Request) (requestID uint64, t esitag.Entities) {
-	requestID = pc.requestID(r)
+// ESITagsByRequest selects in the ServeHTTP function all ESITags identified by
+// their pageIDs.
+func (pc *PathConfig) ESITagsByRequest(r *http.Request) (pageID uint64, t esitag.Entities) {
+	pageID = pc.pageID(r)
 	pc.muESI.RLock()
-	t = pc.esiCache[requestID]
+	t = pc.esiCache[pageID]
 	pc.muESI.RUnlock()
 	return
 }
 
 // StoreESITags as an ESI tag slice with its associated request ID to the
 // internal ESI cache and maybe overwrites an existing entry.
-func (pc *PathConfig) StoreESITags(requestID uint64, t esitag.Entities) {
+func (pc *PathConfig) StoreESITags(pageID uint64, t esitag.Entities) {
 	pc.muESI.Lock()
 	defer pc.muESI.Unlock()
-	pc.esiCache[requestID] = t
+	pc.esiCache[pageID] = t
 }
 
 // IsRequestAllowed decides if a request should be processed.
@@ -108,26 +108,27 @@ func (pc *PathConfig) IsRequestAllowed(r *http.Request) bool {
 	return r.Method == http.MethodGet
 }
 
-var defaultRequestIDSource = [...]string{"host", "path"}
+var defaultPageIDSource = [...]string{"host", "path"}
 
-// requestID uses configs to extract certain parameters from the request
-func (pc *PathConfig) requestID(r *http.Request) uint64 {
-	src := pc.RequestIDSource
+// pageID uses the configuration to extract certain parameters from the request
+// to generate a hash to identify a page.
+func (pc *PathConfig) pageID(r *http.Request) uint64 {
+	src := pc.PageIDSource
 	if len(src) == 0 {
-		src = defaultRequestIDSource[:]
+		src = defaultPageIDSource[:]
 	}
 
-	h, ok := requestID(src, r)
+	h, ok := pageID(src, r)
 	if !ok {
-		h, _ = requestID(defaultRequestIDSource[:], r)
+		h, _ = pageID(defaultPageIDSource[:], r)
 	}
 	return h
 }
 
-func requestID(source []string, r *http.Request) (_ uint64, ok bool) {
+func pageID(source []string, r *http.Request) (_ uint64, ok bool) {
 	const (
-		requestIDHeader = `header`
-		requestIDCookie = `cookie`
+		pageIDConfigHeader = `header`
+		pageIDConfigCookie = `cookie`
 	)
 
 	buf := bufpool.Get()
@@ -146,11 +147,11 @@ func requestID(source []string, r *http.Request) (_ uint64, ok bool) {
 			}
 
 			switch keyPrefix {
-			case requestIDCookie:
+			case pageIDConfigCookie:
 				if keks, _ := r.Cookie(keySuffix); keks != nil {
 					_, _ = buf.WriteString(keks.Value)
 				}
-			case requestIDHeader:
+			case pageIDConfigHeader:
 				if v := r.Header.Get(keySuffix); v != "" {
 					_, _ = buf.WriteString(v)
 				}

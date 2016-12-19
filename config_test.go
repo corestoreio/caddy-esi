@@ -12,17 +12,17 @@ import (
 
 const weirdLongUrl = `https://app.usunu.com/-/login?u=https%3A%2F%2Fapp.usunu.com%2F0%2Fsearch%2F2385944396396%2F81453167684176&e=emailaddress%40gmail.com&passive=1`
 
-func TestPathConfig_RequestID(t *testing.T) {
+func TestPathConfig_PageID(t *testing.T) {
 	t.Parallel()
 
-	runner := func(requestIDSource []string, r *http.Request, wantSum uint64) func(*testing.T) {
+	runner := func(pageIDSource []string, r *http.Request, wantSum uint64) func(*testing.T) {
 		return func(t *testing.T) {
 			t.Parallel()
 
 			pc := NewPathConfig()
-			pc.RequestIDSource = requestIDSource
+			pc.PageIDSource = pageIDSource
 
-			if have, want := pc.requestID(r), wantSum; have != want {
+			if have, want := pc.pageID(r), wantSum; have != want {
 				t.Errorf("Have: %x Want: %x", have, want)
 			}
 		}
@@ -131,42 +131,42 @@ func TestPathConfig_RequestID(t *testing.T) {
 
 }
 
-var benchmarkRequestID uint64
+var benchmarkPageID uint64
 
-func BenchmarkRequestID(b *testing.B) {
+func BenchmarkPageID(b *testing.B) {
 	r := httptest.NewRequest("GET", "/catalog/product/id/42342342/price/134.231/stock/1/camera.html", nil)
 	pc := NewPathConfig()
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		benchmarkRequestID = pc.requestID(r)
+		benchmarkPageID = pc.pageID(r)
 	}
 }
 
-func BenchmarkRequestID_FullURL(b *testing.B) {
+func BenchmarkPageID_FullURL(b *testing.B) {
 	r := httptest.NewRequest("GET", weirdLongUrl, nil)
 
 	pc := NewPathConfig()
-	pc.RequestIDSource = []string{"url"}
+	pc.PageIDSource = []string{"url"}
 
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		benchmarkRequestID = pc.requestID(r)
+		benchmarkPageID = pc.pageID(r)
 	}
 }
 
-func BenchmarkRequestID_Cookie(b *testing.B) {
+func BenchmarkPageID_Cookie(b *testing.B) {
 	r := httptest.NewRequest("GET", weirdLongUrl, nil)
 	r.AddCookie(&http.Cookie{Name: "xtestKeks", Value: "xVal"})
 
 	pc := NewPathConfig()
-	pc.RequestIDSource = []string{"cookie-xtestKeks"}
+	pc.PageIDSource = []string{"cookie-xtestKeks"}
 
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		benchmarkRequestID = pc.requestID(r)
+		benchmarkPageID = pc.pageID(r)
 	}
 }
 

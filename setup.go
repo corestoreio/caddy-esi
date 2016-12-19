@@ -117,11 +117,11 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 		}
 		pc.Caches = append(pc.Caches, cchr)
 
-	case "request_id_source":
+	case "page_id_source":
 		if !c.NextArg() {
 			return c.ArgErr()
 		}
-		pc.RequestIDSource = helpers.CommaListToSlice(c.Val())
+		pc.PageIDSource = helpers.CommaListToSlice(c.Val())
 
 	case "allowed_methods":
 		if !c.NextArg() {

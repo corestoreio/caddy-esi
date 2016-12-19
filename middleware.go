@@ -53,7 +53,7 @@ func (mw Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, err
 		return 0, err
 	}
 
-	requestID, tags := cfg.ESITagsByRequest(r)
+	pageID, tags := cfg.ESITagsByRequest(r)
 	if len(tags) == 0 {
 		var err2 error
 		tags, err2 = esitag.Parse(bytes.NewReader(buf.Bytes())) // for now a NewReader, might be removed
@@ -61,8 +61,8 @@ func (mw Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, err
 			return http.StatusInternalServerError, err2
 		}
 
-		log.Printf("[DEBUG] ESI requestID %d", requestID)
-		cfg.StoreESITags(requestID, tags)
+		log.Printf("[DEBUG] ESI pageID %d", pageID)
+		cfg.StoreESITags(pageID, tags)
 	}
 
 	// now we have here our parsed ESI tags ...

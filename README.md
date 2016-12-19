@@ -18,7 +18,7 @@ https://cyrillschumacher.local:2718 {
     esi [/path_optional] {
         timeout 5ms|100us|1m|...
         ttl 5ms|100us|1m|...
-        [request_id_source [host,path,ip, etc]]
+        [page_id_source [host,path,ip, etc]]
         [allowed_methods [GET,POST,DELETE]]
         [cache redis://localhost:6379/0]
         [cache redis://localhost:6380/0]
@@ -45,7 +45,7 @@ zero, caching disabled. Can only occur one time.
 - `cache` defines a cache service which stores the retrieved data from a e.g.
 micro service but only when the ttl (within an ESI tag) has been set. Can only
 occur multiple times.
-- `request_id_source` optional and special directive on how to identify a
+- `page_id_source` optional and special directive on how to identify a
 request to the same page. The following settings can be used to calculate the
 hash value. Available settings: `remoteaddr`, `realip`, `scheme`, `host`,
 `path`, `rawpath`, `rawquery` and `url`. Special feature to access cookies and

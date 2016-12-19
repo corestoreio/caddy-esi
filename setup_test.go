@@ -39,7 +39,7 @@ func TestSetup(t *testing.T) {
 				assert.Exactly(ts, wantC.Scope, haveC.Scope, "Scope (Path)")
 				assert.Exactly(ts, wantC.Timeout, haveC.Timeout, "Timeout")
 				assert.Exactly(ts, wantC.TTL, haveC.TTL, "TTL")
-				assert.Exactly(ts, wantC.RequestIDSource, haveC.RequestIDSource, "RequestIDSource")
+				assert.Exactly(ts, wantC.PageIDSource, haveC.PageIDSource, "PageIDSource")
 				assert.Exactly(ts, wantC.AllowedMethods, haveC.AllowedMethods, "AllowedMethods")
 
 				assert.Len(ts, haveC.KVServices, len(wantC.KVServices), "Index %d", j)
@@ -144,23 +144,23 @@ func TestSetup(t *testing.T) {
 		"",
 	))
 
-	t.Run("config with request_id_source", runner(
+	t.Run("config with page_id_source", runner(
 		`esi {
-			request_id_source "pAth,host , IP, header-X-GitHub-Request-Id, header-Server, cookie-__Host-user_session_same_site"
+			page_id_source "pAth,host , IP, header-X-GitHub-Request-Id, header-Server, cookie-__Host-user_session_same_site"
 		}`,
 		PathConfigs{
 			&PathConfig{
-				Scope:           "/",
-				Timeout:         DefaultTimeOut,
-				RequestIDSource: []string{"pAth", "host", "IP", "header-X-GitHub-Request-Id", "header-Server", "cookie-__Host-user_session_same_site"},
+				Scope:        "/",
+				Timeout:      DefaultTimeOut,
+				PageIDSource: []string{"pAth", "host", "IP", "header-X-GitHub-Request-Id", "header-Server", "cookie-__Host-user_session_same_site"},
 			},
 		},
 		"",
 	))
 
-	t.Run("config with request_id_source but errors", runner(
+	t.Run("config with page_id_source but errors", runner(
 		`esi {
-			request_id_source "path,host , ip
+			page_id_source "path,host , ip
 		}`,
 		nil,
 		`Wrong argument count or unexpected line ending after 'path,host , ip`,
