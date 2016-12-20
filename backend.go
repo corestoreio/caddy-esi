@@ -38,7 +38,7 @@ func (c Caches) Get(key string) ([]byte, error) {
 
 // ResourceFetcher fetches content from a micro service
 type ResourceFetcher interface {
-	Get(*http.Request) ([]byte, error)
+	DoRequest(timeout time.Duration, externalReq *http.Request) ([]byte, error)
 	Close() error
 }
 

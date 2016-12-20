@@ -1,6 +1,7 @@
 package caddyesi
 
 import (
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -27,7 +28,8 @@ func PluginSetup(c *caddy.Controller) error {
 
 	cfg := httpserver.GetConfig(c)
 
-	mw := Middleware{
+	mw := &Middleware{
+		Logf:        log.Printf,
 		Root:        cfg.Root,
 		FileSys:     http.Dir(cfg.Root),
 		PathConfigs: pcs,

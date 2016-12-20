@@ -28,7 +28,7 @@ func TestSetup(t *testing.T) {
 				ts.Fatalf("Expected one middleware, got %d instead", len(mids))
 			}
 			handler := mids[0](httpserver.EmptyNext)
-			myHandler, ok := handler.(Middleware)
+			myHandler, ok := handler.(*Middleware)
 			if !ok {
 				ts.Fatalf("Expected handler to be type ESI, got: %#v", handler)
 			}

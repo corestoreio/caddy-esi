@@ -30,13 +30,13 @@ func (kv kvFetchMock) Get(ctx context.Context, key []byte) ([]byte, error) {
 }
 
 type resourceMock struct {
-	getFn   func(*http.Request) ([]byte, error)
+	getFn   func(timeout time.Duration, externalReq *http.Request) ([]byte, error)
 	closeFn func() error
 }
 
-func (rm resourceMock) Get(r *http.Request) ([]byte, error) {
+func (rm resourceMock) DoRequest(timeout time.Duration, externalReq *http.Request) ([]byte, error) {
 	if rm.getFn != nil {
-		return rm.getFn(r)
+		return rm.getFn(timeout, externalReq)
 	}
 	return nil, nil
 }

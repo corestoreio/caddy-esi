@@ -2,6 +2,7 @@ package caddyesi
 
 import (
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -109,6 +110,13 @@ func (pc *PathConfig) IsRequestAllowed(r *http.Request) bool {
 }
 
 var defaultPageIDSource = [...]string{"host", "path"}
+
+// PageID returns a unique identifier for a requested page. Mostly used in a
+// singleflight.Group to coalesc multiple requests to the same page into just
+// one working and parsing goroutine.
+func (pc *PathConfig) PageID(r *http.Request) string {
+	return strconv.FormatUint(pc.pageID(r), 10)
+}
 
 // pageID uses the configuration to extract certain parameters from the request
 // to generate a hash to identify a page.
