@@ -24,14 +24,14 @@ func TestEntity_ParseRaw_Src_Template(t *testing.T) {
 	}
 	assert.Exactly(t, time.Millisecond*9, et.TTL)
 	assert.Len(t, et.Resources, 2)
-	assert.Exactly(t, `resource_tpl`, et.Resources[0].Template.ParseName)
-	assert.Exactly(t, `resource_tpl`, et.Resources[1].Template.ParseName)
+	assert.Exactly(t, `resource_tpl`, et.Resources.Items[0].Template.ParseName)
+	assert.Exactly(t, `resource_tpl`, et.Resources.Items[1].Template.ParseName)
 
-	assert.Exactly(t, 0, et.Resources[0].Index)
-	assert.Exactly(t, 1, et.Resources[1].Index)
+	assert.Exactly(t, 0, et.Resources.Items[0].Index)
+	assert.Exactly(t, 1, et.Resources.Items[1].Index)
 
-	assert.Empty(t, et.Resources[1].KVNet)
-	assert.Empty(t, et.Resources[1].URL)
+	assert.Empty(t, et.Resources.Items[1].KVNet)
+	assert.Empty(t, et.Resources.Items[1].URL)
 }
 
 func TestESITag_ParseRaw(t *testing.T) {
@@ -72,8 +72,10 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include src="https://micro.service/checkout/cart" timeout="9ms" onerror="nocart.html" forwardheaders="Cookie , Accept-Language, Authorization"`),
 		"",
 		&esitag.Entity{
-			Resources: []esitag.Resource{
-				{URL: "https://micro.service/checkout/cart"},
+			Resources: esitag.Resources{
+				Items: []esitag.Resource{
+					{URL: "https://micro.service/checkout/cart"},
+				},
 			},
 			Timeout:        time.Millisecond * 9,
 			OnError:        "nocart.html",
@@ -85,9 +87,11 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include src="https://micro1.service/checkout/cart" src="https://micro2.service/checkout/cart" ttl="9ms"  returnheaders="Cookie , Accept-Language, Authorization"`),
 		"",
 		&esitag.Entity{
-			Resources: []esitag.Resource{
-				{URL: "https://micro1.service/checkout/cart", Index: 0},
-				{URL: "https://micro2.service/checkout/cart", Index: 1},
+			Resources: esitag.Resources{
+				Items: []esitag.Resource{
+					{URL: "https://micro1.service/checkout/cart", Index: 0},
+					{URL: "https://micro2.service/checkout/cart", Index: 1},
+				},
 			},
 			TTL:           time.Millisecond * 9,
 			ReturnHeaders: []string{"Cookie", "Accept-Language", "Authorization"},

@@ -3,6 +3,7 @@ package esitag
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -12,38 +13,13 @@ import (
 	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/helpers"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
 
 // TemplateIdentifier if some strings contain these characters then a
 // template.Template will be created. For now a resource key or an URL is
 // supported.
 const TemplateIdentifier = "{{"
-
-// Resource specifies the location to a 3rd party remote system
-type Resource struct {
-	// Index specifies the number of occurrence within the include tag to allowing
-	// sorting and hence having a priority list.
-	Index int
-	// URL location to make a network request
-	URL string
-	// KVNet defines a variable to a resource which has been defined once at the
-	// top of the Caddyfile config. This prevents duplicated code to a resource.
-	KVNet string
-	// Template gets reated when the URL contains the template identifiers.
-	Template *template.Template
-}
-
-// Resources contains multiple unique Resource entries, aka backend systems
-// likes redis instances.
-type Resources []Resource
-
-// ResourceKey contains the key for a lookup in a 3rd party system, for example
-// in Redis this key will be used to retrieve the value.
-type ResourceKey struct {
-	Key string
-	// Template gets created when the Key contains the template identifiers.
-	Template *template.Template
-}
 
 // Conditioner does not represent your favorite shampoo but it gives you the
 // possibility to define an expression which gets executed for every request to
@@ -61,13 +37,21 @@ func (c condition) OK(r *http.Request) bool {
 	return false
 }
 
+// Tag identifies an ESI tag by its start and end position in the HTML byte
+// stream for replacing. If the HTML changes there needs to be a refresh call to
+// re-parse the HTML.
+type Tag struct {
+	// Data from the micro service gathered in a goroutine.
+	Data  []byte
+	Start int // start position in the stream
+	End   int // end position in the stream
+}
+
 // Entity represents a single fully parsed ESI tag
 type Entity struct {
 	RawTag            []byte
-	TagStart          int // start position in the stream
-	TagEnd            int // end position in the stream
-	Resources             // creates an URL to fetch data from
-	ResourceKey           // use for lookup in key/value storages to fetch data from
+	Tag               Tag
+	Resources         // Any 3rd party servers
 	TTL               time.Duration
 	Timeout           time.Duration
 	OnError           string
@@ -75,9 +59,10 @@ type Entity struct {
 	ForwardHeadersAll bool
 	ReturnHeaders     []string
 	ReturnHeadersAll  bool
-	Conditioner
+	Conditioner       // todo
 }
 
+// todo split into two regexs for better performance and use the single quote regex only then when the first one returns nothing
 var regexESITagDouble = regexp.MustCompile(`([a-z]+)="([^"\r\n]+)"|([a-z]+)='([^'\r\n]+)'`)
 
 // ParseRaw parses the RawTag field and fills the remaining fields of the
@@ -86,6 +71,7 @@ func (et *Entity) ParseRaw() error {
 	if len(et.RawTag) == 0 {
 		return nil
 	}
+	et.Resources.Logf = log.Printf
 
 	// it's kinda ridiculous because the ESI tag parser uses even sync.Pool to
 	// reduce allocs and speed up processing and here we're relying on regex.
@@ -105,32 +91,33 @@ func (et *Entity) ParseRaw() error {
 			return errors.Errorf("[caddyesi] ESITag.ParseRaw: Incorrect number of regex matches: %q => All matches: %#v\nTag: %q", bufSubs, matches, et.RawTag)
 		}
 		// 1+2 defines the double quotes: key="product_234234"
-		subsKey := subs[1]
+		subsAttr := subs[1]
 		subsVal := subs[2]
-		if len(subsKey) == 0 {
+		if len(subsAttr) == 0 {
 			// fall back to enclosed in single quotes: key='product_234234_{{ .r.Header.Get "myHeaderKey" }}'
-			subsKey = subs[3]
+			subsAttr = subs[3]
 			subsVal = subs[4]
 		}
-		key := string(subsKey)
+		attr := string(bytes.ToLower(subsAttr)) // must be lower because we use lower case here
 		value := string(bytes.TrimSpace(subsVal))
 
-		switch key {
+		switch attr {
 		case "src":
-			if err := et.parseResource(srcCounter, value); err != nil {
+			if err := et.parseResource(attr, srcCounter, value); err != nil {
 				return errors.Errorf("[caddyesi] Failed to parse src %q in tag %q with error:\n%+v", value, et.RawTag, err)
 			}
 			srcCounter++
-		case "onerror":
-			et.OnError = value
 		case "key":
-			if err := et.parseKey(value); err != nil {
+			if err := et.parseResource(attr, srcCounter, value); err != nil {
 				return errors.Errorf("[caddyesi] Failed to parse key %q in tag %q with error:\n%+v", value, et.RawTag, err)
 			}
+			// do not increment srcCounter because we might have already added the src
 		case "condition":
 			if err := et.parseCondition(value); err != nil {
 				return errors.Errorf("[caddyesi] Failed to parse condition %q in tag %q with error:\n%+v", value, et.RawTag, err)
 			}
+		case "onerror":
+			et.OnError = value
 		case "timeout":
 			var err error
 			et.Timeout, err = time.ParseDuration(value)
@@ -158,22 +145,8 @@ func (et *Entity) ParseRaw() error {
 			// default: ignore all other tags
 		}
 	}
-	if len(et.Resources) == 0 {
+	if len(et.Resources.Items) == 0 || srcCounter == 0 {
 		return errors.Errorf("[caddyesi] ESITag.ParseRaw. src cannot be empty in Tag which requires at least one resource: %q", et.RawTag)
-	}
-	return nil
-}
-
-func (et *Entity) parseKey(s string) error {
-	if strings.Contains(s, TemplateIdentifier) {
-		var err error
-		et.ResourceKey.Template, err = template.New("key_tpl").Parse(s)
-		if err != nil {
-			return errors.Errorf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", s, err, et.RawTag)
-		}
-	} else {
-		// Key can only be set when there is no template because we have to distinguish when to use the key and when to render one
-		et.ResourceKey.Key = s
 	}
 	return nil
 }
@@ -187,30 +160,55 @@ func (et *Entity) parseCondition(s string) error {
 	return nil
 }
 
-func (et *Entity) parseResource(idx int, s string) error {
-	var r Resource
-	isURL := strings.Contains(s, "://")
-	switch {
-	case isURL && strings.Contains(s, TemplateIdentifier):
-		tpl, err := template.New("resource_tpl").Parse(s)
-		if err != nil {
-			return errors.Errorf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", s, err, et.RawTag)
+func (et *Entity) parseResource(attr string, idx int, val string) error {
+	// check if the idx has already been added to the Items slice.
+	itemsIndexIdx := -1
+	for i, r := range et.Resources.Items {
+		if r.Index == idx {
+			itemsIndexIdx = i
+			break
 		}
-		r = Resource{Template: tpl}
-	case isURL:
-		r = Resource{URL: s}
-	default:
-		r = Resource{KVNet: s}
+	}
+	// case src already added and now processing the key attribute
+	if attr == "key" && itemsIndexIdx >= 0 {
+		// r represents a pointer
+		r := et.Resources.Items[itemsIndexIdx] // it must panic if wrong
+		if err := r.applyKey(val); err != nil {
+			return errors.Errorf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", val, err, et.RawTag)
+		}
+		return nil
+	}
+
+	// new resource pointer
+	r := NewResource()
+	if itemsIndexIdx >= 0 {
+		r = et.Resources.Items[itemsIndexIdx] // it must panic if wrong
+	}
+
+	r.IsURL = attr == "src" && strings.Contains(val, "://")
+	switch {
+	case r.IsURL && strings.Contains(val, TemplateIdentifier):
+		var err error
+		r.URLTemplate, err = template.New("resource_tpl").Parse(val)
+		if err != nil {
+			return errors.Errorf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", val, err, et.RawTag)
+		}
+	case attr == "src":
+		r.URL = val
+	case attr == "key":
+		if err := r.applyKey(val); err != nil {
+			return errors.Errorf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", val, err, et.RawTag)
+		}
 	}
 	r.Index = idx
-	et.Resources = append(et.Resources, r)
+	et.Resources.Items = append(et.Resources.Items, r)
 	return nil
 }
 
-// Entities represents a list of ESI tags
+// Entities represents a list of ESI tags found in one HTML page.
 type Entities []*Entity
 
-// ParseRaw all ESI tags
+// ParseRaw parses all ESI tags
 func (et Entities) ParseRaw() error {
 	for i := range et {
 		if err := et[i].ParseRaw(); err != nil {
@@ -228,8 +226,53 @@ func (et Entities) String() string {
 	for i, e := range et {
 		raw := e.RawTag
 		e.RawTag = nil
-		fmt.Fprintf(buf, "%d: %#v\n", i, e)
-		fmt.Fprintf(buf, "%d: RawTag: %q\n\n", i, raw)
+		_, _ = fmt.Fprintf(buf, "%d: %#v\n", i, e)
+		_, _ = fmt.Fprintf(buf, "%d: RawTag: %q\n\n", i, raw)
 	}
 	return buf.String()
+}
+
+// QueryResources runs in parallel to query all available backend services /
+// resources which are available in the current page. The returned Tag slice
+// does not guarantee to be ordered.
+func (et Entities) QueryResources(r *http.Request) ([]Tag, error) {
+
+	tags := make([]Tag, 0, len(et))
+	g, ctx := errgroup.WithContext(r.Context())
+	cTag := make(chan Tag)
+	for _, e := range et {
+		e := e
+		g.Go(func() error {
+			data, err := e.Resources.DoRequest(e.Timeout, r)
+			if err != nil {
+				return errors.Wrapf(err, "[esitag] QueryResources.Resources.DoRequest failed for Tag %q", e.RawTag)
+			}
+			t := e.Tag
+			t.Data = data
+
+			select {
+			case cTag <- t:
+			case <-ctx.Done():
+				return errors.Wrap(ctx.Err(), "[esitag] Context Done!")
+			}
+			return nil
+		})
+	}
+	go func() {
+		g.Wait()
+		close(cTag)
+	}()
+
+	for t := range cTag {
+		tags = append(tags, t)
+	}
+
+	// Check whether any of the goroutines failed. Since g is accumulating the
+	// errors, we don't need to send them (or check for them) in the individual
+	// results sent on the channel.
+	if err := g.Wait(); err != nil {
+		return nil, errors.Wrap(err, "[esitag]")
+	}
+
+	return tags, nil
 }

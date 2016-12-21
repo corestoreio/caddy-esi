@@ -13,8 +13,8 @@ import (
 const maxSizeESITag = 4096
 
 // Parse parses a stream of data to extract ESI Tags.
-func Parse(r io.Reader) (ret Entities, _ error) {
-	ret = make(Entities, 0, 5) // avg 5 tags per parse ...
+func Parse(r io.Reader) (Entities, error) {
+	ret := make(Entities, 0, 5) // avg 5 tags per parse ...
 
 	sc := bufio.NewScanner(r)
 	buf := bufpool.Get()
@@ -33,12 +33,18 @@ func Parse(r io.Reader) (ret Entities, _ error) {
 		tag := sc.Bytes()
 
 		ret = append(ret, &Entity{
-			RawTag:   make([]byte, len(tag)),
-			TagStart: fdr.begin,
-			TagEnd:   fdr.end,
+			RawTag: make([]byte, len(tag)),
+			Tag: Tag{
+				Start: fdr.begin,
+				End:   fdr.end,
+			},
 		})
 		copy(ret[tagIndex].RawTag, tag)
 		tagIndex++
+	}
+
+	if err := ret.ParseRaw(); err != nil {
+		return nil, errors.Wrap(err, "[esitag] Slice.ParseRaw")
 	}
 	return ret, nil
 }
@@ -98,7 +104,7 @@ func (e *finder) split(data []byte, atEOF bool) (advance int, token []byte, err 
 	for i, b := range data {
 		ok, err := e.scan(b)
 		if err != nil {
-			return 0, nil, errors.Wrap(err, "finder split scan failed")
+			return 0, nil, errors.Wrap(err, "[esitag] finder split scan failed")
 		}
 		if ok {
 			return i, e.data(), nil
@@ -111,6 +117,7 @@ func (e *finder) split(data []byte, atEOF bool) (advance int, token []byte, err 
 // /> tag was found in which case a call to data() reveals the what the ...
 // matched.
 func (e *finder) scan(b byte) (bool, error) {
+	// todo remove else
 	switch e.tagState {
 	case stateStart, stateFound:
 		if b == '<' {

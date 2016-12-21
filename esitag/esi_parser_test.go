@@ -43,8 +43,8 @@ var testRunner = func(rc io.ReadCloser, wantTags esitag.Entities, wantErr string
 
 		for i, tg := range wantTags {
 			assert.Exactly(t, string(tg.RawTag), string(haveTags[i].RawTag))
-			assert.Exactly(t, tg.TagStart, haveTags[i].TagStart)
-			assert.Exactly(t, tg.TagEnd, haveTags[i].TagEnd)
+			assert.Exactly(t, tg.Tag.Start, haveTags[i].Tag.Start)
+			assert.Exactly(t, tg.Tag.End, haveTags[i].Tag.End)
 		}
 	}
 }
@@ -52,19 +52,25 @@ var testRunner = func(rc io.ReadCloser, wantTags esitag.Entities, wantErr string
 // page3Results used in test and in benchmark; relates to file testdata/page3.html
 var page3Results = esitag.Entities{
 	&esitag.Entity{
-		RawTag:   []byte(`include src="https://micr1.service/customer/account" timeout="18ms" onerror="accountNotAvailable.html"`),
-		TagStart: 2009,
-		TagEnd:   2118,
+		RawTag: []byte(`include src="https://micr1.service/customer/account" timeout="18ms" onerror="accountNotAvailable.html"`),
+		Tag: esitag.Tag{
+			Start: 2009,
+			End:   2118,
+		},
 	},
 	&esitag.Entity{
-		RawTag:   []byte(`include src="https://micr2.service/checkout/cart" timeout="19ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"`),
-		TagStart: 4043,
-		TagEnd:   4190,
+		RawTag: []byte(`include src="https://micr2.service/checkout/cart" timeout="19ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"`),
+		Tag: esitag.Tag{
+			Start: 4043,
+			End:   4190,
+		},
 	},
 	&esitag.Entity{
-		RawTag:   []byte("include src=\"https://micr3.service/page/lastviewed\" timeout=\"20ms\" onerror=\"nofooter.html\" forwardheaders=\"Cookie,Accept-Language,Authorization\""),
-		TagStart: 4455,
-		TagEnd:   4606,
+		RawTag: []byte("include src=\"https://micr3.service/page/lastviewed\" timeout=\"20ms\" onerror=\"nofooter.html\" forwardheaders=\"Cookie,Accept-Language,Authorization\""),
+		Tag: esitag.Tag{
+			Start: 4455,
+			End:   4606,
+		},
 	},
 }
 
@@ -73,9 +79,11 @@ func TestParseESITags_File(t *testing.T) {
 		mustOpenFile("page0.html"),
 		esitag.Entities{
 			&esitag.Entity{
-				RawTag:   []byte("include   src=\"https://micro.service/esi/foo\"\n                                            "),
-				TagStart: 196,
-				TagEnd:   293,
+				RawTag: []byte("include   src=\"https://micro.service/esi/foo\"\n                                            "),
+				Tag: esitag.Tag{
+					Start: 196,
+					End:   293,
+				},
 			},
 		},
 		"",
@@ -84,9 +92,11 @@ func TestParseESITags_File(t *testing.T) {
 		mustOpenFile("page1.html"),
 		esitag.Entities{
 			&esitag.Entity{
-				RawTag:   []byte("include src=\"https://micro.service/esi/foo\" timeout=\"8ms\" onerror=\"mylocalFile.html\""),
-				TagStart: 20644,
-				TagEnd:   20735,
+				RawTag: []byte("include src=\"https://micro.service/esi/foo\" timeout=\"8ms\" onerror=\"mylocalFile.html\""),
+				Tag: esitag.Tag{
+					Start: 20644,
+					End:   20735,
+				},
 			},
 		},
 		"",
@@ -95,14 +105,18 @@ func TestParseESITags_File(t *testing.T) {
 		mustOpenFile("page2.html"),
 		esitag.Entities{
 			&esitag.Entity{
-				RawTag:   []byte("include src=\"https://micro.service/customer/account\" timeout=\"8ms\" onerror=\"accountNotAvailable.html\""),
-				TagStart: 6280,
-				TagEnd:   6388,
+				RawTag: []byte("include src=\"https://micro.service/customer/account\" timeout=\"8ms\" onerror=\"accountNotAvailable.html\""),
+				Tag: esitag.Tag{
+					Start: 6280,
+					End:   6388,
+				},
 			},
 			&esitag.Entity{
-				RawTag:   []byte(`include src="https://micro.service/checkout/cart" timeout="9ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"`),
-				TagStart: 7104,
-				TagEnd:   7250,
+				RawTag: []byte(`include src="https://micro.service/checkout/cart" timeout="9ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"`),
+				Tag: esitag.Tag{
+					Start: 7104,
+					End:   7250,
+				},
 			},
 		},
 		"",
@@ -162,9 +176,11 @@ func TestParseESITags_String(t *testing.T) {
 		strReader("x \x00 <i>x</i>          \x00<esi:include\x00 src=\"https:...\" />\x00"),
 		esitag.Entities{
 			&esitag.Entity{
-				RawTag:   []byte("include\x00 src=\"https:...\" "),
-				TagStart: 23,
-				TagEnd:   55,
+				RawTag: []byte("include\x00 src=\"https:...\" "),
+				Tag: esitag.Tag{
+					Start: 23,
+					End:   55,
+				},
 			},
 		},
 		"",
@@ -179,14 +195,18 @@ func TestParseESITags_String(t *testing.T) {
 		strReader(`abcdefg<esi:include src="url1"/>u p<esi:include src="url2" />k`),
 		esitag.Entities{
 			&esitag.Entity{
-				RawTag:   []byte("include src=\"url1\""),
-				TagStart: 7,
-				TagEnd:   32,
+				RawTag: []byte("include src=\"url1\""),
+				Tag: esitag.Tag{
+					Start: 7,
+					End:   32,
+				},
 			},
 			&esitag.Entity{
-				RawTag:   []byte("include src=\"url2\" "),
-				TagStart: 36,
-				TagEnd:   62,
+				RawTag: []byte("include src=\"url2\" "),
+				Tag: esitag.Tag{
+					Start: 36,
+					End:   62,
+				},
 			},
 		},
 		"",
