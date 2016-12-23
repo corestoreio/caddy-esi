@@ -2,12 +2,12 @@ package caddyesi
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/SchumacherFM/caddyesi/esiredis"
+	"github.com/corestoreio/errors"
 )
 
 // Cacher used to cache the response of a micro service as found in the src
@@ -39,7 +39,6 @@ func (c Caches) Get(key string) ([]byte, error) {
 // ResourceFetcher fetches content from a micro service
 type ResourceFetcher interface {
 	DoRequest(timeout time.Duration, externalReq *http.Request) ([]byte, error)
-	Close() error
 }
 
 // KVFetcher represents a KeyValue fetching service which can query a remote
@@ -54,7 +53,7 @@ type KVFetcher interface {
 func newKVFetcher(url string) (KVFetcher, error) {
 	idx := strings.Index(url, "://")
 	if idx < 0 {
-		return nil, fmt.Errorf("[caddyesi] Unknown URL: %q. Does not contain ://", url)
+		return nil, errors.NewNotValidf("[caddyesi] Unknown URL: %q. Does not contain ://", url)
 	}
 	scheme := url[:idx]
 
@@ -62,7 +61,7 @@ func newKVFetcher(url string) (KVFetcher, error) {
 	case "redis":
 		r, err := esiredis.New(url)
 		if err != nil {
-			return nil, fmt.Errorf("[caddyesi] Failed to parse Backend Redis URL: %q with Error %s", url, err)
+			return nil, errors.Wrapf(err, "[caddyesi] Failed to create new Redis object: %q", url)
 		}
 		return r, nil
 		//case "memcache":
@@ -70,5 +69,5 @@ func newKVFetcher(url string) (KVFetcher, error) {
 		//case "pgsql":
 		//case "grpc":
 	}
-	return nil, fmt.Errorf("[caddyesi] Unknown URL: %q. No driver defined for scheme: %q", url, scheme)
+	return nil, errors.NewNotSupportedf("[caddyesi] Unknown URL: %q. No driver defined for scheme: %q", url, scheme)
 }

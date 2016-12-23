@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/SchumacherFM/caddyesi/helpers"
+	"github.com/corestoreio/errors"
 	"github.com/mholt/caddy"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
-	"github.com/pkg/errors"
 )
 
 func init() {
@@ -23,7 +23,7 @@ func init() {
 func PluginSetup(c *caddy.Controller) error {
 	pcs, err := configEsiParse(c)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "[caddyesi] Failed to parse configuration")
 	}
 
 	cfg := httpserver.GetConfig(c)
@@ -77,7 +77,7 @@ func configEsiParse(c *caddy.Controller) (PathConfigs, error) {
 		// Load any other configuration parameters
 		for c.NextBlock() {
 			if err := configLoadParams(c, pc); err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "[caddyesi] Failed to load params")
 			}
 		}
 		pcs = append(pcs, pc)
@@ -90,51 +90,51 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 
 	case "timeout":
 		if !c.NextArg() {
-			return c.ArgErr()
+			return errors.NewNotValidf("[caddyesi] timeout: %s", c.ArgErr())
 		}
 		d, err := time.ParseDuration(c.Val())
 		if err != nil {
-			return errors.Errorf("[caddyesi] Invalid duration in timeout configuration: %q", c.Val())
+			return errors.NewNotValidf("[caddyesi] Invalid duration in timeout configuration: %q Error: %s", c.Val(), err)
 		}
 		pc.Timeout = d
 
 	case "ttl":
 		if !c.NextArg() {
-			return c.ArgErr()
+			return errors.NewNotValidf("[caddyesi] ttl: %s", c.ArgErr())
 		}
 		d, err := time.ParseDuration(c.Val())
 		if err != nil {
-			return errors.Errorf("[caddyesi] Invalid duration in ttl configuration: %q", c.Val())
+			return errors.NewNotValidf("[caddyesi] Invalid duration in ttl configuration: %q Error: %s", c.Val(), err)
 		}
 		pc.TTL = d
 
 	case "cache":
 		if !c.NextArg() {
-			return c.ArgErr()
+			return errors.NewNotValidf("[caddyesi] cache: %s", c.ArgErr())
 		}
 
 		cchr, err := newCacher(c.Val())
 		if err != nil {
-			return errors.Errorf("[caddyesi] Failed to instantiate a new cache object for %q with URL: %q", key, c.Val())
+			return errors.Wrapf(err, "[caddyesi] Failed to instantiate a new cache object for %q with URL: %q", key, c.Val())
 		}
 		pc.Caches = append(pc.Caches, cchr)
 
 	case "page_id_source":
 		if !c.NextArg() {
-			return c.ArgErr()
+			return errors.NewNotValidf("[caddyesi] page_id_source: %s", c.ArgErr())
 		}
 		pc.PageIDSource = helpers.CommaListToSlice(c.Val())
 
 	case "allowed_methods":
 		if !c.NextArg() {
-			return c.ArgErr()
+			return errors.NewNotValidf("[caddyesi] allowed_methods: %s", c.ArgErr())
 		}
 		pc.AllowedMethods = helpers.CommaListToSlice(strings.ToUpper(c.Val()))
 
 	default:
 		//catch all
 		if !c.NextArg() {
-			return c.ArgErr()
+			return errors.NewNotValidf("[caddyesi] any key: %s", c.ArgErr())
 		}
 		if key == "" || c.Val() == "" {
 			return nil // continue
@@ -144,7 +144,7 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 		}
 		kvf, err := newKVFetcher(c.Val())
 		if err != nil {
-			return errors.Wrapf(err, "[caddyesi] configLoadParams for Key %q and Value %q", key, c.Val())
+			return errors.Wrapf(err, "[caddyesi] newKVFetcher failed for Key %q and Value %q", key, c.Val())
 		}
 		pc.KVServices[key] = kvf
 	}

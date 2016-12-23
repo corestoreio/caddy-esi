@@ -4,25 +4,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/corestoreio/errors"
 	"github.com/mholt/caddy"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSetup(t *testing.T) {
+func TestPluginSetup(t *testing.T) {
 	t.Parallel()
 
-	runner := func(config string, wantPC PathConfigs, wantErr string) func(*testing.T) {
+	runner := func(config string, wantPC PathConfigs, wantErrBhf errors.BehaviourFunc) func(*testing.T) {
 		return func(ts *testing.T) {
 			c := caddy.NewTestController("http", config)
-			err := PluginSetup(c)
-			if wantErr != "" {
-				assert.Contains(ts, err.Error(), wantErr)
+
+			if err := PluginSetup(c); wantErrBhf != nil {
+				assert.True(ts, wantErrBhf(err), "%+v", err)
 				return
+			} else if err != nil {
+				ts.Fatalf("Expected no errors, got: %+v", err)
 			}
-			if err != nil {
-				ts.Errorf("Expected no errors, got: %v", err)
-			}
+
 			mids := httpserver.GetConfig(c).Middleware()
 			if len(mids) != 1 {
 				ts.Fatalf("Expected one middleware, got %d instead", len(mids))
@@ -68,7 +69,7 @@ func TestSetup(t *testing.T) {
 				TTL:     0,
 			},
 		},
-		"",
+		nil,
 	))
 
 	t.Run("With timeout, ttl and 1x Cacher", runner(
@@ -87,7 +88,7 @@ func TestSetup(t *testing.T) {
 				},
 			},
 		},
-		"",
+		nil,
 	))
 
 	t.Run("With timeout, ttl and 2x Cacher", runner(
@@ -108,7 +109,7 @@ func TestSetup(t *testing.T) {
 				},
 			},
 		},
-		"",
+		nil,
 	))
 
 	t.Run("With timeout, ttl and KVService", runner(
@@ -127,7 +128,7 @@ func TestSetup(t *testing.T) {
 				},
 			},
 		},
-		"",
+		nil,
 	))
 
 	t.Run("config with allowed_methods", runner(
@@ -141,7 +142,7 @@ func TestSetup(t *testing.T) {
 				AllowedMethods: []string{"GET", "PUT", "POST"},
 			},
 		},
-		"",
+		nil,
 	))
 
 	t.Run("config with page_id_source", runner(
@@ -155,7 +156,7 @@ func TestSetup(t *testing.T) {
 				PageIDSource: []string{"pAth", "host", "IP", "header-X-GitHub-Request-Id", "header-Server", "cookie-__Host-user_session_same_site"},
 			},
 		},
-		"",
+		nil,
 	))
 
 	t.Run("config with page_id_source but errors", runner(
@@ -163,7 +164,7 @@ func TestSetup(t *testing.T) {
 			page_id_source "path,host , ip
 		}`,
 		nil,
-		`Wrong argument count or unexpected line ending after 'path,host , ip`,
+		errors.IsNotValid,
 	))
 
 	t.Run("Parse timeout fails", runner(
@@ -171,7 +172,7 @@ func TestSetup(t *testing.T) {
 			timeout Dms
 		}`,
 		nil,
-		`[caddyesi] Invalid duration in timeout configuration: "Dms"`,
+		errors.IsNotValid,
 	))
 
 	t.Run("Invalid KVService URL", runner(
@@ -181,7 +182,7 @@ func TestSetup(t *testing.T) {
 			backend redis//localhost:6379/0
 		}`,
 		nil,
-		`Unknown URL: "redis//localhost:6379/0". Does not contain ://`,
+		errors.IsNotValid,
 	))
 
 	t.Run("Overwrite duplicate key in KVServices", runner(
@@ -201,7 +202,7 @@ func TestSetup(t *testing.T) {
 				},
 			},
 		},
-		"",
+		nil,
 	))
 
 	t.Run("Create two KVServices", runner(
@@ -222,7 +223,7 @@ func TestSetup(t *testing.T) {
 				},
 			},
 		},
-		"",
+		nil,
 	))
 
 	t.Run("esi with path to /blog and /guestbook", runner(
@@ -240,7 +241,7 @@ func TestSetup(t *testing.T) {
 				TTL:     0,
 			},
 		},
-		"",
+		nil,
 	))
 
 	t.Run("2x esi directives with different KVServices", runner(
@@ -279,6 +280,6 @@ func TestSetup(t *testing.T) {
 				},
 			},
 		},
-		"",
+		nil,
 	))
 }

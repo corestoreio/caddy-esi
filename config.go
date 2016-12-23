@@ -22,7 +22,7 @@ type PathConfigs []*PathConfig
 func (pc PathConfigs) ConfigForPath(r *http.Request) *PathConfig {
 	for _, c := range pc {
 		if httpserver.Path(r.URL.Path).Matches(c.Scope) { // not negated
-			// match also all sub paths ... ?
+			// match also all sub paths ...
 			return c
 		}
 	}
