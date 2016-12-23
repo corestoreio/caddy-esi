@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/pkg/errors"
+	"github.com/corestoreio/errors"
 )
 
 // PipedWriter is a proxy around an http.ResponseWriter that allows you write
