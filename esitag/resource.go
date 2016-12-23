@@ -1,25 +1,26 @@
 package esitag
 
 import (
-	"bytes"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"text/template"
 	"time"
 
-	"strings"
-
-	"github.com/pkg/errors"
+	"github.com/SchumacherFM/caddyesi/bufpool"
+	"github.com/corestoreio/errors"
 )
 
-const DefaultTimeOut = 30 * time.Second
+const (
+	DefaultMaxBodySize int64 = 5 << 20 // 5 MB is a lot of text.
+	DefaultTimeOut           = 30 * time.Second
+)
 
 // MaxBackOffs allow up to (1<<12)/60 minutes (68min) of back off time
 const MaxBackOffs = 12
 
 // DefaultClientTransport our own transport for all ESI tag resources instead of
-// relying on net/http.DefaultTransport.
+// relying on net/http.DefaultTransport. This transport gets also mocked for
+// tests.
 var DefaultClientTransport http.RoundTripper = &http.Transport{
 	Proxy: http.ProxyFromEnvironment,
 	DialContext: (&net.Dialer{
@@ -32,6 +33,10 @@ var DefaultClientTransport http.RoundTripper = &http.Transport{
 	TLSHandshakeTimeout:   10 * time.Second,
 	ExpectContinueTimeout: 1 * time.Second,
 }
+
+// ResourceRequestFunc performs a request to a backend service via a specific
+// protocol.
+type ResourceRequestFunc func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error)
 
 // Resource specifies the location to a 3rd party remote system within an ESI
 // tag. A resource attribute (src="") can occur n-times.
@@ -50,74 +55,47 @@ type Resource struct {
 	// http.Client. If false we know that the URL field relates to a configured
 	// resource in the Caddyfile, for example an alias to a Redis instance.
 	IsURL bool
-	// Key defines a key in a KeyValue server to fetch the value from.
-	Key string
-	// KeyTemplate gets created when the Key field contains the template
-	// identifier. Then the Key field would be empty.
-	KeyTemplate *template.Template
 	// backOff exponentially calculated
 	backOff    uint
 	backedOff  int // number of calls to continue
 	lastFailed time.Time
 }
 
-func NewResource() *Resource {
-	return &Resource{}
-}
-
-func (r *Resource) applyKey(val string) error {
-	r.Key = val
-	if strings.Contains(val, TemplateIdentifier) {
-		var err error
-		r.KeyTemplate, err = template.New("resource_tpl").Parse(val)
-		if err != nil {
-			return errors.Errorf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nResource: %#v", val, err, r)
-		}
-		r.Key = "" // unset Key because we have a template
-	}
-	return nil
-}
-
 // Resources contains multiple unique Resource entries, aka backend systems
 // likes redis instances. Resources occur within one single ESI tag. The
-// resource attribute (src="") can occurr multiple times.
+// resource attribute (src="") can occur multiple times. The first item which
+// successfully returns data gets its content used in the response. If one item
+// fails and we have multiple resources, the next resource gets tried.
 type Resources struct {
-	Logf   func(format string, v ...interface{})
-	Client *http.Client
-	Items  []*Resource
-}
-
-func (r Resources) initClient() {
-	if r.Client != nil {
-		return
-	}
-	r.Client = &http.Client{
-		Transport: DefaultClientTransport,
-		Timeout:   DefaultTimeOut,
-	}
+	ResourceRequestFunc
+	MaxBodySize int64 // DefaultMaxBodySize; TODO(CyS) implement in ESI tag
+	Logf        func(format string, v ...interface{})
+	// Items multiple URLs to different resources but all share the same protocol.
+	Items []*Resource
 }
 
 // DoRequest iterates over the resources and executes http requests. If one
 // resource fails it will be marked as timed out and the next resource gets
 // tried. The exponential back-off stops when MaxBackOffs have been reached and
 // then tries again.
-func (rs Resources) DoRequest(timeout time.Duration, externalReq *http.Request) ([]byte, error) {
-	rs.initClient()
+func (rs *Resources) DoRequest(timeout time.Duration, externalReq *http.Request) ([]byte, error) {
 
-	if timeout < 1 {
-		timeout = DefaultTimeOut
+	maxBodySize := DefaultMaxBodySize
+	if rs.MaxBodySize > 0 {
+		maxBodySize = rs.MaxBodySize
 	}
-	rs.Client.Timeout = timeout
 
 	for i, r := range rs.Items {
 
 		url := r.URL
 		if r.URLTemplate != nil {
-			var buf bytes.Buffer
-			if err := r.URLTemplate.Execute(&buf, externalReq); err != nil {
+			buf := bufpool.Get()
+			if err := r.URLTemplate.Execute(buf, externalReq); err != nil {
+				bufpool.Put(buf)
 				return nil, errors.Wrapf(err, "[esitag] Index %d Resource %#v Template error", i, r)
 			}
 			url = buf.String()
+			bufpool.Put(buf)
 		}
 
 		if r.lastFailed.After(time.Now()) {
@@ -129,18 +107,13 @@ func (rs Resources) DoRequest(timeout time.Duration, externalReq *http.Request) 
 			continue
 		}
 
-		resp, err := rs.Client.Get(url)
+		data, err := rs.ResourceRequestFunc(url, timeout, maxBodySize)
 		if err != nil {
 			rs.Logf("[esitag] Index (%d/%d) DoRequest for URL %q failed. Continuing", i, len(rs.Items), url)
 			r.backOff++
 			var dur time.Duration = 1 << r.backOff // exponentially calculated
 			r.lastFailed = time.Now().Add(dur * time.Second)
 			continue
-		}
-		defer resp.Body.Close()
-		data, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, errors.Wrapf(err, "[esitag] Index %d DoRequest.ioutil.ReadAll for URL %q failed", i, url)
 		}
 
 		return data, nil

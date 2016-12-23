@@ -12,7 +12,7 @@ import (
 
 	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/helpers"
-	"github.com/pkg/errors"
+	"github.com/corestoreio/errors"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -59,7 +59,12 @@ type Entity struct {
 	ForwardHeadersAll bool
 	ReturnHeaders     []string
 	ReturnHeadersAll  bool
-	Conditioner       // todo
+	// Key defines a key in a KeyValue server to fetch the value from.
+	Key string
+	// KeyTemplate gets created when the Key field contains the template
+	// identifier. Then the Key field would be empty.
+	KeyTemplate *template.Template
+	Conditioner // todo
 }
 
 // todo split into two regexs for better performance and use the single quote regex only then when the first one returns nothing
@@ -81,15 +86,7 @@ func (et *Entity) ParseRaw() error {
 
 	srcCounter := 0
 	for _, subs := range matches {
-		if len(subs) != 5 {
-			var bufSubs bytes.Buffer
-			for _, s := range subs {
-				bufSubs.Write(s)
-				bufSubs.WriteRune('\n')
-			}
 
-			return errors.Errorf("[caddyesi] ESITag.ParseRaw: Incorrect number of regex matches: %q => All matches: %#v\nTag: %q", bufSubs, matches, et.RawTag)
-		}
 		// 1+2 defines the double quotes: key="product_234234"
 		subsAttr := subs[1]
 		subsVal := subs[2]
@@ -103,18 +100,17 @@ func (et *Entity) ParseRaw() error {
 
 		switch attr {
 		case "src":
-			if err := et.parseResource(attr, srcCounter, value); err != nil {
-				return errors.Errorf("[caddyesi] Failed to parse src %q in tag %q with error:\n%+v", value, et.RawTag, err)
+			if err := et.parseResource(srcCounter, value); err != nil {
+				return errors.Wrapf(err, "[caddyesi] Failed to parse src %q in tag %q", value, et.RawTag)
 			}
 			srcCounter++
 		case "key":
-			if err := et.parseResource(attr, srcCounter, value); err != nil {
-				return errors.Errorf("[caddyesi] Failed to parse key %q in tag %q with error:\n%+v", value, et.RawTag, err)
+			if err := et.parseKey(value); err != nil {
+				return errors.Wrapf(err, "[caddyesi] Failed to parse src %q in tag %q", value, et.RawTag)
 			}
-			// do not increment srcCounter because we might have already added the src
 		case "condition":
 			if err := et.parseCondition(value); err != nil {
-				return errors.Errorf("[caddyesi] Failed to parse condition %q in tag %q with error:\n%+v", value, et.RawTag, err)
+				return errors.Wrapf(err, "[caddyesi] Failed to parse condition %q in tag %q", value, et.RawTag)
 			}
 		case "onerror":
 			et.OnError = value
@@ -122,13 +118,13 @@ func (et *Entity) ParseRaw() error {
 			var err error
 			et.Timeout, err = time.ParseDuration(value)
 			if err != nil {
-				return errors.Errorf("[caddyesi] ESITag.ParseRaw. Cannot parse duration in timeout: %s => %q\nTag: %q", err, value, et.RawTag)
+				return errors.NewNotValidf("[caddyesi] ESITag.ParseRaw. Cannot parse duration in timeout: %s => %q\nTag: %q", err, value, et.RawTag)
 			}
 		case "ttl":
 			var err error
 			et.TTL, err = time.ParseDuration(value)
 			if err != nil {
-				return errors.Errorf("[caddyesi] ESITag.ParseRaw. Cannot parse duration in ttl: %s => %q\nTag: %q", err, value, et.RawTag)
+				return errors.NewNotValidf("[caddyesi] ESITag.ParseRaw. Cannot parse duration in ttl: %s => %q\nTag: %q", err, value, et.RawTag)
 			}
 		case "forwardheaders":
 			if value == "all" {
@@ -146,62 +142,46 @@ func (et *Entity) ParseRaw() error {
 		}
 	}
 	if len(et.Resources.Items) == 0 || srcCounter == 0 {
-		return errors.Errorf("[caddyesi] ESITag.ParseRaw. src cannot be empty in Tag which requires at least one resource: %q", et.RawTag)
+		return errors.NewEmptyf("[caddyesi] ESITag.ParseRaw. src (Items: %d/Src: %d) cannot be empty in Tag which requires at least one resource: %q", len(et.Resources.Items), srcCounter, et.RawTag)
 	}
 	return nil
 }
 
 func (et *Entity) parseCondition(s string) error {
-	tpl, err := template.New("condition").Parse(s)
+	tpl, err := template.New("condition_tpl").Parse(s)
 	if err != nil {
-		errors.Errorf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", s, err, et.RawTag)
+		return errors.NewFatalf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", s, err, et.RawTag)
 	}
 	et.Conditioner = condition{Template: tpl}
 	return nil
 }
 
-func (et *Entity) parseResource(attr string, idx int, val string) error {
-	// check if the idx has already been added to the Items slice.
-	itemsIndexIdx := -1
-	for i, r := range et.Resources.Items {
-		if r.Index == idx {
-			itemsIndexIdx = i
-			break
-		}
+func (et *Entity) parseResource(idx int, val string) (err error) {
+	r := &Resource{
+		Index: idx,
+		URL:   val,
+		IsURL: strings.Contains(val, "://"),
 	}
-	// case src already added and now processing the key attribute
-	if attr == "key" && itemsIndexIdx >= 0 {
-		// r represents a pointer
-		r := et.Resources.Items[itemsIndexIdx] // it must panic if wrong
-		if err := r.applyKey(val); err != nil {
-			return errors.Errorf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", val, err, et.RawTag)
-		}
-		return nil
-	}
-
-	// new resource pointer
-	r := NewResource()
-	if itemsIndexIdx >= 0 {
-		r = et.Resources.Items[itemsIndexIdx] // it must panic if wrong
-	}
-
-	r.IsURL = attr == "src" && strings.Contains(val, "://")
-	switch {
-	case r.IsURL && strings.Contains(val, TemplateIdentifier):
-		var err error
+	if r.IsURL && strings.Contains(val, TemplateIdentifier) {
 		r.URLTemplate, err = template.New("resource_tpl").Parse(val)
 		if err != nil {
-			return errors.Errorf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", val, err, et.RawTag)
+			return errors.NewFatalf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", val, err, et.RawTag)
 		}
-	case attr == "src":
-		r.URL = val
-	case attr == "key":
-		if err := r.applyKey(val); err != nil {
-			return errors.Errorf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", val, err, et.RawTag)
-		}
+		r.URL = ""
 	}
-	r.Index = idx
-	et.Resources.Items = append(et.Resources.Items, r)
+	et.Items = append(et.Items, r)
+	return nil
+}
+
+func (et *Entity) parseKey(val string) (err error) {
+	et.Key = val
+	if strings.Contains(val, TemplateIdentifier) {
+		et.KeyTemplate, err = template.New("key_tpl").Parse(val)
+		if err != nil {
+			return errors.NewFatalf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", val, err, et.RawTag)
+		}
+		et.Key = "" // unset Key because we have a template
+	}
 	return nil
 }
 
@@ -234,7 +214,8 @@ func (et Entities) String() string {
 
 // QueryResources runs in parallel to query all available backend services /
 // resources which are available in the current page. The returned Tag slice
-// does not guarantee to be ordered.
+// does not guarantee to be ordered. If the request gets canceled via its
+// context then all resource requests gets canceled too.
 func (et Entities) QueryResources(r *http.Request) ([]Tag, error) {
 
 	tags := make([]Tag, 0, len(et))

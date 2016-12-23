@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/SchumacherFM/caddyesi/bufpool"
-	"github.com/pkg/errors"
+	"github.com/corestoreio/errors"
 )
 
 const maxSizeESITag = 4096
