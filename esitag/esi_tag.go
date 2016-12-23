@@ -1,7 +1,6 @@
 package esitag
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"net/http"
@@ -82,7 +81,7 @@ func (et *Entity) ParseRaw() error {
 	// reduce allocs and speed up processing and here we're relying on regex.
 	// Usually those function for ESI tag parsing will only be called once and
 	// then cached. we can optimize it later.
-	matches := regexESITagDouble.FindAllSubmatch(et.RawTag, -1)
+	matches := regexESITagDouble.FindAllStringSubmatch(string(et.RawTag), -1)
 
 	srcCounter := 0
 	for _, subs := range matches {
@@ -90,13 +89,13 @@ func (et *Entity) ParseRaw() error {
 		// 1+2 defines the double quotes: key="product_234234"
 		subsAttr := subs[1]
 		subsVal := subs[2]
-		if len(subsAttr) == 0 {
+		if subsAttr == "" {
 			// fall back to enclosed in single quotes: key='product_234234_{{ .r.Header.Get "myHeaderKey" }}'
 			subsAttr = subs[3]
 			subsVal = subs[4]
 		}
-		attr := string(bytes.ToLower(subsAttr)) // must be lower because we use lower case here
-		value := string(bytes.TrimSpace(subsVal))
+		attr := strings.ToLower(subsAttr) // must be lower because we use lower case here
+		value := strings.TrimSpace(subsVal)
 
 		switch attr {
 		case "src":
