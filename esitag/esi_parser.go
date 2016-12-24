@@ -125,29 +125,25 @@ func (e *finder) scan(b byte) (bool, error) {
 			e.begin = e.n
 		}
 	case stateTag:
+		e.tagState = stateStart
 		if b == 'e' {
 			e.tagState = stateTagE
-		} else {
-			e.tagState = stateStart
 		}
 	case stateTagE:
+		e.tagState = stateStart
 		if b == 's' {
 			e.tagState = stateTagES
-		} else {
-			e.tagState = stateStart
 		}
 	case stateTagES:
+		e.tagState = stateStart
 		if b == 'i' {
 			e.tagState = stateTagESI
-		} else {
-			e.tagState = stateStart
 		}
 	case stateTagESI:
+		e.tagState = stateStart
 		if b == ':' {
 			e.tagState = stateData
 			e.buf.Reset()
-		} else {
-			e.tagState = stateStart
 		}
 	case stateData:
 		e.buf.WriteByte(b)
