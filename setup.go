@@ -1,13 +1,16 @@
 package caddyesi
 
 import (
-	"log"
+	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/SchumacherFM/caddyesi/helpers"
 	"github.com/corestoreio/errors"
+	"github.com/corestoreio/log"
+	"github.com/corestoreio/log/logw"
 	"github.com/mholt/caddy"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
 )
@@ -29,7 +32,6 @@ func PluginSetup(c *caddy.Controller) error {
 	cfg := httpserver.GetConfig(c)
 
 	mw := &Middleware{
-		Logf:        log.Printf,
 		Root:        cfg.Root,
 		FileSys:     http.Dir(cfg.Root),
 		PathConfigs: pcs,
@@ -80,9 +82,54 @@ func configEsiParse(c *caddy.Controller) (PathConfigs, error) {
 				return nil, errors.Wrap(err, "[caddyesi] Failed to load params")
 			}
 		}
+		if err := setupLogger(pc); err != nil {
+			return nil, errors.Wrap(err, "[caddyesi] Failed to setup Logger")
+		}
 		pcs = append(pcs, pc)
 	}
 	return pcs, nil
+}
+
+// mocked out for testing
+var osStdErr io.Writer = os.Stderr
+var osStdOut io.Writer = os.Stdout
+
+func setupLogger(pc *PathConfig) error {
+	pc.Log = log.BlackHole{}
+	lvl := 0
+	switch pc.LogLevel {
+	case "debug":
+		lvl = logw.LevelDebug
+	case "info":
+		lvl = logw.LevelInfo
+	case "fatal":
+		lvl = logw.LevelFatal
+	}
+	if lvl == 0 {
+		// logging disabled
+		return nil
+	}
+
+	var w io.Writer
+	switch pc.LogFile {
+	case "stderr":
+		w = osStdErr
+	case "stdout":
+		w = osStdOut
+	case "":
+		// logging disabled
+		return nil
+	default:
+		var err error
+		w, err = os.OpenFile(pc.LogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		// todo handle file close on server restart or shutdown
+		if err != nil {
+			return errors.NewFatalf("[caddyesi] Failed to open file %q with error: %s", pc.LogFile, err)
+		}
+	}
+
+	pc.Log = logw.NewLog(logw.WithWriter(w), logw.WithLevel(lvl))
+	return nil
 }
 
 func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
@@ -130,6 +177,16 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 			return errors.NewNotValidf("[caddyesi] allowed_methods: %s", c.ArgErr())
 		}
 		pc.AllowedMethods = helpers.CommaListToSlice(strings.ToUpper(c.Val()))
+	case "log_file":
+		if !c.NextArg() {
+			return errors.NewNotValidf("[caddyesi] log_file: %s", c.ArgErr())
+		}
+		pc.LogFile = c.Val()
+	case "log_level":
+		if !c.NextArg() {
+			return errors.NewNotValidf("[caddyesi] log_level: %s", c.ArgErr())
+		}
+		pc.LogFile = strings.ToLower(c.Val())
 
 	default:
 		//catch all

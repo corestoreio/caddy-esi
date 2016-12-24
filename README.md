@@ -24,6 +24,8 @@ https://cyrillschumacher.local:2718 {
         [cache redis://localhost:6380/0]
         [cache memcache://localhost:11211/2]
         [cache inmemory]
+        [log_file (filename|stdout|stderr)]
+        [log_level (fatal|info|debug)]
 
         # next 3 are used for ESI includes
         redisAWS1 redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0
@@ -53,6 +55,12 @@ headers: Prefix with `cookie-` or `header-` to access the appropriate value.
 Default setting: `host` and `path`. Attention: The more granular you define the
 more possibility occurs that your RAM will be filled up (will be fixed ...).
 - `allowed_methods` optional, defaults to GET only.
+- `log_file` optional, default logging disabled. Put in here either a file name
+or the wordings stderr or stdout to write to those file descriptors. If empty,
+logging is disabled.
+- `log_level` optional, default logging disabled. Debug is most verbose.  If
+empty or unknown, logging is disabled.
+- `log_format` not yet supported. Ideas?
 - ... ?
 
 ## Supported ESI Tags

@@ -7,13 +7,14 @@ import (
 	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/SchumacherFM/caddyesi/responseproxy"
+	"github.com/corestoreio/log"
+	loghttp "github.com/corestoreio/log/http"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
 	"golang.org/x/sync/singleflight"
 )
 
 // Middleware implements the ESI tag middleware
 type Middleware struct {
-	Logf  func(format string, v ...interface{})
 	Group singleflight.Group
 	// Root the Server root
 	Root string
@@ -33,12 +34,15 @@ func (mw *Middleware) selectTags(r *http.Request) {} // wtf?
 func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
 	cfg := mw.PathConfigs.ConfigForPath(r)
 	if cfg == nil {
-		mw.Logf("[DEBUG] ESI Not config found") // only during dev
-		return mw.Next.ServeHTTP(w, r)          // exit early
+		return mw.Next.ServeHTTP(w, r) // exit early
 	}
 	if !cfg.IsRequestAllowed(r) {
-		mw.Logf("[DEBUG] ESI request not allowed") // only during dev
-		return mw.Next.ServeHTTP(w, r)             // go on ...
+		if cfg.Log.IsDebug() {
+			cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.IsRequestAllowed",
+				log.Bool("allowed", false), loghttp.Request("request", r), log.Stringer("config", cfg),
+			)
+		}
+		return mw.Next.ServeHTTP(w, r) // go on ...
 	}
 
 	// maybe use a hashing function to check if content changes ...
@@ -55,8 +59,9 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 	buf := bufpool.Get()
 	defer bufpool.Put(buf)
 
-	// responseproxy should be a pipe writer to avoid blowing up the memory by writing everything into a buffer
-	// continue serving and gather the content into a buffer for later analyses.
+	// responseproxy should be a pipe writer to avoid blowing up the memory by
+	// writing everything into a buffer continue serving and gather the content
+	// into a buffer for later analyses.
 	code, err := mw.Next.ServeHTTP(responseproxy.WrapBuffered(buf, w), r)
 	if err != nil {
 		return 0, err
@@ -71,7 +76,11 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 			return http.StatusInternalServerError, err2
 		}
 
-		mw.Logf("[DEBUG] ESI pageID %d", pageID)
+		if cfg.Log.IsDebug() {
+			cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse",
+				log.Uint64("page_id", pageID), loghttp.Request("request", r),
+			)
+		}
 		cfg.StoreESITags(pageID, tags)
 	}
 

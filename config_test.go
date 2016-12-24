@@ -5,10 +5,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"fmt"
+
 	"github.com/SchumacherFM/caddyesi/esiredis"
 	"github.com/SchumacherFM/caddyesi/helpers"
 	"github.com/stretchr/testify/assert"
 )
+
+var _ fmt.Stringer = (*PathConfig)(nil)
 
 const weirdLongUrl = `https://app.usunu.com/-/login?u=https%3A%2F%2Fapp.usunu.com%2F0%2Fsearch%2F2385944396396%2F81453167684176&e=emailaddress%40gmail.com&passive=1`
 

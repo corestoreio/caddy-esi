@@ -1,6 +1,7 @@
 package caddyesi
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"sync"
@@ -9,6 +10,7 @@ import (
 	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/SchumacherFM/caddyesi/helpers"
+	"github.com/corestoreio/log"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
 	"github.com/pierrec/xxHash/xxHash64"
 )
@@ -47,6 +49,13 @@ type PathConfig struct {
 	PageIDSource []string
 	// AllowedMethods list of all allowed methods, defaults to GET
 	AllowedMethods []string
+	// LogFile where to write the log output? Either any file name or stderr or
+	// stdout. If empty logging disabled.
+	LogFile string
+	// LogLevel can have the values info, debug, fatal. If empty logging disabled.
+	LogLevel string
+	// Log gets set up during setup
+	Log log.Logger
 
 	// Caches stores content from a e.g. micro service but only when the TTL has
 	// been set within an ESI tag. Caches gets set during configuration parsing.
@@ -192,4 +201,9 @@ func pageID(source []string, r *http.Request) (_ uint64, ok bool) {
 		return 0, false
 	}
 	return xxHash64.Checksum(buf.Bytes(), l), true
+}
+
+// String used for log information output
+func (pc *PathConfig) String() string {
+	return fmt.Sprintf("TODO(CyS) Nicer debug: %#v\n", pc)
 }

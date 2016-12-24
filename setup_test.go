@@ -1,10 +1,14 @@
 package caddyesi
 
 import (
+	"bytes"
+	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/corestoreio/errors"
+	"github.com/corestoreio/log"
 	"github.com/mholt/caddy"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
 	"github.com/stretchr/testify/assert"
@@ -248,6 +252,8 @@ func TestPluginSetup(t *testing.T) {
 		`esi /catalog/product {
 		   timeout 122ms
 		   ttl 123ms
+		   log_file stderr
+		   log_level debug
 
 		   redisAWS1 redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0
 		   redisLocal1 redis://localhost:6379/3
@@ -270,6 +276,8 @@ func TestPluginSetup(t *testing.T) {
 					"redisLocal1": kvFetchMock{},
 					"redisLocal2": kvFetchMock{},
 				},
+				LogFile:  "stderr",
+				LogLevel: "debug",
 			},
 			&PathConfig{
 				Scope:   "/checkout/cart",
@@ -282,4 +290,108 @@ func TestPluginSetup(t *testing.T) {
 		},
 		nil,
 	))
+}
+
+func TestSetupLogger(t *testing.T) {
+
+	buf := new(bytes.Buffer)
+	osStdOut = buf
+	osStdErr = buf
+	defer func() {
+		osStdOut = os.Stdout
+		osStdErr = os.Stderr
+	}()
+
+	runner := func(pc *PathConfig, wantErrBhf errors.BehaviourFunc) func(*testing.T) {
+		return func(t *testing.T) {
+			haveErr := setupLogger(pc)
+			if wantErrBhf != nil {
+				assert.True(t, wantErrBhf(haveErr), "%+v", haveErr)
+			} else {
+				assert.NoError(t, haveErr, "%+v", haveErr)
+			}
+		}
+	}
+	pc := &PathConfig{
+		LogLevel: "debug",
+		LogFile:  "stderr",
+	}
+	t.Run("Debug Stderr", runner(pc, nil))
+	assert.True(t, pc.Log.IsDebug())
+	pc.Log.Debug("DebugStdErr", log.String("debug01", "stderr01"))
+	assert.Contains(t, buf.String(), `DebugStdErr debug01: "stderr01"`)
+
+	pc = &PathConfig{
+		LogLevel: "info",
+		LogFile:  "stdout",
+	}
+	t.Run("Info Stdout", runner(pc, nil))
+	assert.True(t, pc.Log.IsInfo())
+	pc.Log.Info("InfoStdOut", log.String("info01", "stdout01"))
+	assert.Contains(t, buf.String(), `InfoStdOut info01: "stdout01"`)
+
+	pc = &PathConfig{
+		LogLevel: "",
+		LogFile:  "stdout",
+	}
+	t.Run("No Log Level, Blackhole", runner(pc, nil))
+	assert.False(t, pc.Log.IsInfo())
+	assert.False(t, pc.Log.IsDebug())
+	pc.Log.Info("NoLogLevelStdOut", log.String("info01", "noLogLevelstdout01"))
+	assert.NotContains(t, buf.String(), `NoLogLevelStdOut`)
+
+	pc = &PathConfig{
+		LogLevel: "debug",
+		LogFile:  "",
+	}
+	t.Run("No Log File, Blackhole", runner(pc, nil))
+	assert.False(t, pc.Log.IsInfo())
+	assert.False(t, pc.Log.IsDebug())
+	pc.Log.Info("NoLogFileStdOut", log.String("info01", "noLogFilestdout01"))
+	assert.NotContains(t, buf.String(), `NoLogFileStdOut`)
+
+	pc = &PathConfig{
+		LogLevel: "debug",
+		LogFile:  "/root",
+	}
+	t.Run("Log File open fails", runner(pc, errors.IsFatal))
+	assert.Exactly(t, pc.Log.(log.BlackHole), log.BlackHole{})
+
+	tmpFile := tempfile(t)
+	defer func() {
+		if err := os.Remove(tmpFile); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	pc = &PathConfig{
+		LogLevel: "debug",
+		LogFile:  tmpFile,
+	}
+	t.Run("Log File open success write", runner(pc, nil))
+	assert.True(t, pc.Log.IsInfo())
+	assert.True(t, pc.Log.IsDebug())
+	pc.Log.Info("InfoWriteToTempFile", log.Int("info03", 2412))
+	pc.Log.Debug("DebugWriteToTempFile", log.Int("debugo04", 2512))
+
+	tmpFileContent, err := ioutil.ReadFile(tmpFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Contains(t, string(tmpFileContent), `InfoWriteToTempFile info03: 2412`)
+	assert.Contains(t, string(tmpFileContent), `DebugWriteToTempFile debugo04: 2512`)
+}
+
+// tempfile returns a temporary file path.
+func tempfile(t *testing.T) string {
+	f, err := ioutil.TempFile("", "caddyesi-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(f.Name()); err != nil {
+		t.Fatal(err)
+	}
+	return f.Name()
 }
