@@ -133,6 +133,9 @@ var benchmarkParseESITags esitag.Entities
 // BenchmarkParseESITags-4   	   50000	     32894 ns/op	 139.99 MB/s	    9392 B/op	      12 allocs/op
 // BenchmarkParseESITags-4   	   50000	     31768 ns/op	 144.95 MB/s	    5137 B/op	       9 allocs/op <= sync.Pool Finder
 // BenchmarkParseESITags-4   	   50000	     30989 ns/op	 148.60 MB/s	    1041 B/op	       8 allocs/op <= additional sync.Pool Scanner
+// new features ...
+// BenchmarkParseESITags-4         30000	     52291 ns/op	  88.06 MB/s	    3794 B/op	      44 allocs/op <= regex
+// BenchmarkParseESITags-4         30000	     44564 ns/op	 103.33 MB/s	    2417 B/op	      22 allocs/op <= strings.FieldFunc
 func BenchmarkParseESITags(b *testing.B) {
 	f := mustOpenFile("page3.html")
 	defer f.Close()

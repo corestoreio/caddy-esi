@@ -197,6 +197,26 @@ func TestESITag_ParseRaw(t *testing.T) {
 		},
 	))
 
+	t.Run("ignore attribute starting with x", runner(
+		[]byte(`include xkey='product_234234_{{ .r.Header.Get "myHeaderKey" }}' src="awsRedis2"  returnheaders=" all  " forwardheaders=" all  "`),
+		nil,
+		&esitag.Entity{
+			Resources: esitag.Resources{
+				Items: []*esitag.Resource{
+					{URL: "awsRedis2", IsURL: false, Index: 0},
+				},
+			},
+			ReturnHeadersAll:  true,
+			ForwardHeadersAll: true,
+		},
+	))
+
+	t.Run("show not supported unknown attribute", runner(
+		[]byte(`include ykey='product_234234_{{ .r.Header.Get "myHeaderKey" }}' src="awsRedis2"  returnheaders=" all  " forwardheaders=" all  "`),
+		errors.IsNotSupported,
+		nil,
+	))
+
 	t.Run("timeout parsing failed", runner(
 		[]byte(`include timeout="9a"`),
 		errors.IsNotValid,
@@ -211,13 +231,25 @@ func TestESITag_ParseRaw(t *testing.T) {
 
 	t.Run("key template parsing failed", runner(
 		[]byte(`include key='product_234234_{{ .r.Header.Get 'myHeaderKey" }}' returnheaders=" all  " forwardheaders=" all  "`),
-		errors.IsFatal,
+		errors.IsNotSupported,
+		nil,
+	))
+
+	t.Run("key only one quotation mark and fails", runner(
+		[]byte(`include key='`),
+		errors.IsEmpty,
 		nil,
 	))
 
 	t.Run("failed to parse src", runner(
 		[]byte(`include src='https://catalog.corestore.io/product={{ $r. }'`),
 		errors.IsFatal,
+		nil,
+	))
+
+	t.Run("failed to balanced pairs", runner(
+		[]byte(`src='https://catalog.corestore.io/product='`),
+		errors.IsNotValid,
 		nil,
 	))
 
@@ -229,7 +261,6 @@ func TestESITag_ParseRaw(t *testing.T) {
 
 }
 
-// 100000	     15671 ns/op	    1810 B/op	      28 allocs/op
 func BenchmarkESITag_ParseRaw_MicroServicse(b *testing.B) {
 	et := &esitag.Entity{
 		RawTag: []byte(`include
@@ -246,4 +277,61 @@ func BenchmarkESITag_ParseRaw_MicroServicse(b *testing.B) {
 	if have, want := et.OnError, "nocart.html"; have != want {
 		b.Errorf("Have: %v Want: %v", have, want)
 	}
+}
+
+func TestSplitAttributes(t *testing.T) {
+
+	runner := func(in string, want []string, wantErrBhf errors.BehaviourFunc) func(*testing.T) {
+		return func(t *testing.T) {
+			have, haveErr := esitag.SplitAttributes(in)
+			if wantErrBhf != nil {
+				assert.True(t, wantErrBhf(haveErr), "%+v", haveErr)
+			} else if haveErr != nil {
+				t.Errorf("Error not expected: %+v", haveErr)
+			}
+			assert.Exactly(t, want, have)
+		}
+	}
+
+	t.Run("Split without errors", runner(
+		`include
+	 src='https://micro1.service/product/id={{ .r.Header.Get "myHeaderKey" }}'
+	 	src="https://micro2.service/checkout/cart" ttl=" 19ms"  timeout="9ms" onerror='nocart.html'
+	forwardheaders=" Cookie , Accept-Language, Authorization" returnheaders="Set-Cookie , Authorization "`,
+		[]string{
+			"src", "https://micro1.service/product/id={{ .r.Header.Get \"myHeaderKey\" }}",
+			"src", "https://micro2.service/checkout/cart",
+			"ttl", "19ms",
+			"timeout", "9ms",
+			"onerror", "nocart.html",
+			"forwardheaders", "Cookie , Accept-Language, Authorization",
+			"returnheaders", "Set-Cookie , Authorization",
+		},
+		nil,
+	))
+
+	t.Run("Split imbalanced", runner(
+		`src="https://micro2.service/checkout/cart" ttl=" 19ms"`,
+		nil,
+		errors.IsNotValid,
+	))
+
+	t.Run("Unicode correct", runner(
+		`include src="https://.Ø/checkout/cart" ttl="€"`,
+		[]string{"src", "https://\uf8ff.Ø/checkout/cart", "ttl", "€"},
+		nil,
+	))
+
+	t.Run("Whitespace", runner(
+		` `,
+		[]string{},
+		nil,
+	))
+
+	t.Run("Empty", runner(
+		``,
+		[]string{},
+		nil,
+	))
+
 }

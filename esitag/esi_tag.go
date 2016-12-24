@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"regexp"
 	"strings"
 	"text/template"
 	"time"
+	"unicode"
 
 	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/helpers"
@@ -66,8 +66,46 @@ type Entity struct {
 	Conditioner // todo
 }
 
-// todo split into two regexs for better performance and use the single quote regex only then when the first one returns nothing
-var regexESITagDouble = regexp.MustCompile(`([a-z]+)="([^"\r\n]+)"|([a-z]+)='([^'\r\n]+)'`)
+// SplitAttributes splits an ESI tag by its attributes
+func SplitAttributes(raw string) ([]string, error) {
+	// include src='https://micro.service/checkout/cart={{ .r "x"}}' timeout="9ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"
+
+	var lastQuote rune
+	f := func(c rune) bool {
+		// I have no idea why my code is working ;-|
+		switch {
+		case c == lastQuote:
+			lastQuote = 0
+			return false
+		case lastQuote != 0:
+			return false
+		case unicode.In(c, unicode.Quotation_Mark):
+			lastQuote = c
+			return false
+		default:
+			return unicode.IsSpace(c) || c == '='
+		}
+	}
+
+	ret := strings.FieldsFunc(raw, f)
+	if len(ret) == 0 {
+		return []string{}, nil
+	}
+
+	ret = ret[1:] // first index is always the word "include", so drop it
+	if len(ret)%2 == 1 {
+		return nil, errors.NewNotValidf("[esitag] Imbalanced attributes in %#v", ret)
+	}
+	for i := 0; i < len(ret); i = i + 2 {
+		val := ret[i+1]
+		if l := len(val); l-1 > 1 {
+			val = val[1 : len(val)-1] // drop first and last character, should be a quotation mark
+		}
+		ret[i+1] = strings.TrimSpace(val)
+	}
+
+	return ret, nil
+}
 
 // ParseRaw parses the RawTag field and fills the remaining fields of the
 // struct.
@@ -76,26 +114,18 @@ func (et *Entity) ParseRaw() error {
 		return nil
 	}
 	et.Resources.Logf = log.Printf
+	et.Resources.Items = make([]*Resource, 0, 2)
 
-	// it's kinda ridiculous because the ESI tag parser uses even sync.Pool to
-	// reduce allocs and speed up processing and here we're relying on regex.
-	// Usually those function for ESI tag parsing will only be called once and
-	// then cached. we can optimize it later.
-	matches := regexESITagDouble.FindAllStringSubmatch(string(et.RawTag), -1)
+	matches, err := SplitAttributes(string(et.RawTag))
+	if err != nil {
+		return errors.Wrap(err, "[esitag] Parse SplitAttributes")
+	}
 
 	srcCounter := 0
-	for _, subs := range matches {
+	for j := 0; j < len(matches); j = j + 2 {
 
-		// 1+2 defines the double quotes: key="product_234234"
-		subsAttr := subs[1]
-		subsVal := subs[2]
-		if subsAttr == "" {
-			// fall back to enclosed in single quotes: key='product_234234_{{ .r.Header.Get "myHeaderKey" }}'
-			subsAttr = subs[3]
-			subsVal = subs[4]
-		}
-		attr := strings.ToLower(subsAttr) // must be lower because we use lower case here
-		value := strings.TrimSpace(subsVal)
+		attr := matches[j]
+		value := matches[j+1]
 
 		switch attr {
 		case "src":
@@ -137,7 +167,12 @@ func (et *Entity) ParseRaw() error {
 			} else {
 				et.ReturnHeaders = helpers.CommaListToSlice(value)
 			}
-			// default: ignore all other tags
+		default:
+			// if an attribute starts with x we'll ignore it because the
+			// developer might want to temporarily disable an attribute.
+			if len(attr) > 1 && attr[0] != 'x' {
+				return errors.NewNotSupportedf("[esitag] Unsupported attribute name %q with value %q", attr, value)
+			}
 		}
 	}
 	if len(et.Resources.Items) == 0 || srcCounter == 0 {
@@ -158,8 +193,8 @@ func (et *Entity) parseCondition(s string) error {
 func (et *Entity) parseResource(idx int, val string) (err error) {
 	r := &Resource{
 		Index: idx,
-		URL:   val,
 		IsURL: strings.Contains(val, "://"),
+		URL:   val,
 	}
 	if r.IsURL && strings.Contains(val, TemplateIdentifier) {
 		r.URLTemplate, err = template.New("resource_tpl").Parse(val)

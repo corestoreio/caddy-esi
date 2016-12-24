@@ -1,22 +1,22 @@
-BenchmarkParseESITags-4                    	   50000	     29594 ns/op	 155.60 MB/s	    1089 B/op	       8 allocs/op
-BenchmarkParseESITags-4                    	   50000	     29487 ns/op	 156.17 MB/s	    1089 B/op	       8 allocs/op
-BenchmarkParseESITags-4                    	   50000	     29854 ns/op	 154.25 MB/s	    1088 B/op	       8 allocs/op
-BenchmarkParseESITags-4                    	   50000	     29809 ns/op	 154.48 MB/s	    1089 B/op	       8 allocs/op
-BenchmarkParseESITags-4                    	   50000	     29474 ns/op	 156.24 MB/s	    1089 B/op	       8 allocs/op
-BenchmarkParseESITags-4                    	   50000	     28686 ns/op	 160.53 MB/s	    1089 B/op	       8 allocs/op
-BenchmarkParseESITags-4                    	   50000	     29106 ns/op	 158.21 MB/s	    1089 B/op	       8 allocs/op
-BenchmarkParseESITags-4                    	   50000	     29211 ns/op	 157.64 MB/s	    1089 B/op	       8 allocs/op
-BenchmarkParseESITags-4                    	   50000	     29845 ns/op	 154.30 MB/s	    1089 B/op	       8 allocs/op
-BenchmarkParseESITags-4                    	   50000	     29120 ns/op	 158.14 MB/s	    1089 B/op	       8 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  100000	     16469 ns/op	    2635 B/op	      34 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  100000	     16479 ns/op	    2635 B/op	      34 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  100000	     16350 ns/op	    2635 B/op	      34 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  100000	     16683 ns/op	    2635 B/op	      34 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  100000	     16713 ns/op	    2635 B/op	      34 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  100000	     16871 ns/op	    2635 B/op	      34 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  100000	     16350 ns/op	    2635 B/op	      34 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  100000	     16174 ns/op	    2635 B/op	      34 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  100000	     17068 ns/op	    2635 B/op	      34 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  100000	     16683 ns/op	    2635 B/op	      34 allocs/op
+BenchmarkParseESITags-4                    	   30000	     40663 ns/op	 113.25 MB/s	    2417 B/op	      22 allocs/op
+BenchmarkParseESITags-4                    	   30000	     40842 ns/op	 112.75 MB/s	    2418 B/op	      22 allocs/op
+BenchmarkParseESITags-4                    	   30000	     41661 ns/op	 110.53 MB/s	    2417 B/op	      22 allocs/op
+BenchmarkParseESITags-4                    	   30000	     41227 ns/op	 111.70 MB/s	    2418 B/op	      22 allocs/op
+BenchmarkParseESITags-4                    	   30000	     41655 ns/op	 110.55 MB/s	    2417 B/op	      22 allocs/op
+BenchmarkParseESITags-4                    	   30000	     41699 ns/op	 110.43 MB/s	    2417 B/op	      22 allocs/op
+BenchmarkParseESITags-4                    	   30000	     41033 ns/op	 112.23 MB/s	    2418 B/op	      22 allocs/op
+BenchmarkParseESITags-4                    	   30000	     40756 ns/op	 112.99 MB/s	    2417 B/op	      22 allocs/op
+BenchmarkParseESITags-4                    	   30000	     41111 ns/op	 112.01 MB/s	    2417 B/op	      22 allocs/op
+BenchmarkParseESITags-4                    	   30000	     41333 ns/op	 111.41 MB/s	    2418 B/op	      22 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7985 ns/op	     896 B/op	      17 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7961 ns/op	     896 B/op	      17 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      8038 ns/op	     896 B/op	      17 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7988 ns/op	     896 B/op	      17 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      8043 ns/op	     896 B/op	      17 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      8007 ns/op	     896 B/op	      17 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7946 ns/op	     896 B/op	      17 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      8021 ns/op	     896 B/op	      17 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      8068 ns/op	     896 B/op	      17 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7925 ns/op	     896 B/op	      17 allocs/op
 PASS
-ok  	github.com/SchumacherFM/caddyesi/esitag	35.985s
+ok  	github.com/SchumacherFM/caddyesi/esitag	33.338s
