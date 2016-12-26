@@ -50,6 +50,8 @@ type KVFetcher interface {
 	Close() error // Closes the connection during server restart
 }
 
+// newKVFetcher a given URL gets checked which service it should instantiate and
+// connect to. Supported schemes: redis:// for now.
 func newKVFetcher(url string) (KVFetcher, error) {
 	idx := strings.Index(url, "://")
 	if idx < 0 {

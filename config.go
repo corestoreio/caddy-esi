@@ -3,7 +3,6 @@ package caddyesi
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"sync"
 	"time"
 
@@ -59,19 +58,13 @@ type PathConfig struct {
 
 	// Caches stores content from a e.g. micro service but only when the TTL has
 	// been set within an ESI tag. Caches gets set during configuration parsing.
-	Caches
+	Caches Caches
 
 	// KVFetchers the map key is the alias name in the CaddyFile for a Key-Value
 	// service. The value is the already instantiated object but with a lazy
 	// connection initialization. This map gets created during configuration
 	// parsing and the default value is nil.
 	KVServices map[string]KVFetcher
-
-	muRes sync.RWMutex
-	// Resources used in ESI:Include to fetch data from a e.g. micro service.
-	// string is the src attribute in an ESI tag to identify a resource.
-	// These entries gets set during parsing a HTML page.
-	Resources map[string]ResourceFetcher
 
 	muESI sync.RWMutex
 	// esiCache identifies all parsed ESI tags in a page for specific path
@@ -84,9 +77,8 @@ type PathConfig struct {
 // initializes the internal maps.
 func NewPathConfig() *PathConfig {
 	return &PathConfig{
-		Timeout:   DefaultTimeOut,
-		Resources: make(map[string]ResourceFetcher),
-		esiCache:  make(map[uint64]esitag.Entities),
+		Timeout:  DefaultTimeOut,
+		esiCache: make(map[uint64]esitag.Entities),
 	}
 }
 
@@ -119,13 +111,6 @@ func (pc *PathConfig) IsRequestAllowed(r *http.Request) bool {
 }
 
 var defaultPageIDSource = [...]string{"host", "path"}
-
-// PageID returns a unique identifier for a requested page. Mostly used in a
-// singleflight.Group to coalesc multiple requests to the same page into just
-// one working and parsing goroutine.
-func (pc *PathConfig) PageID(r *http.Request) string {
-	return strconv.FormatUint(pc.pageID(r), 10)
-}
 
 // pageID uses the configuration to extract certain parameters from the request
 // to generate a hash to identify a page.

@@ -1,12 +1,13 @@
 package caddyesi
 
 import (
-	"bytes"
 	"net/http"
+	"strconv"
 
 	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/SchumacherFM/caddyesi/responseproxy"
+	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	loghttp "github.com/corestoreio/log/http"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
@@ -28,8 +29,6 @@ type Middleware struct {
 	PathConfigs
 }
 
-func (mw *Middleware) selectTags(r *http.Request) {} // wtf?
-
 // ServeHTTP implements the http.Handler interface.
 func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
 	cfg := mw.PathConfigs.ConfigForPath(r)
@@ -50,46 +49,79 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 	// todo: we must wrap the ResponseWriter to provide stream parsing and replacement other handlers
 	// parse the stream ... build the cache of ESI tags.
 
-	pageIDStr := cfg.PageID(r)
-	mw.Group.Do(pageIDStr, func() (interface{}, error) {
-
-		return nil, nil
-	})
-
-	buf := bufpool.Get()
-	defer bufpool.Put(buf)
+	fullRespBuf := bufpool.Get()
+	defer bufpool.Put(fullRespBuf)
 
 	// responseproxy should be a pipe writer to avoid blowing up the memory by
 	// writing everything into a buffer continue serving and gather the content
 	// into a buffer for later analyses.
-	code, err := mw.Next.ServeHTTP(responseproxy.WrapBuffered(buf, w), r)
+	code, err := mw.Next.ServeHTTP(responseproxy.WrapBuffered(fullRespBuf, w), r)
 	if err != nil {
 		return 0, err
 	}
 
-	pageID, tags := cfg.ESITagsByRequest(r)
-	if len(tags) == 0 {
+	pageID, esiEntities := cfg.ESITagsByRequest(r)
+	if len(esiEntities) == 0 {
+		// does the following code even work?
 
-		var err2 error
-		tags, err2 = esitag.Parse(bytes.NewReader(buf.Bytes())) // for now a NewReader, might be removed
-		if err2 != nil {
-			return http.StatusInternalServerError, err2
-		}
+		// within this IF block we make sure with the Group.Do call that ESI
+		// tags to a specific page get only parsed once even if multiple
+		// requests are coming in to the same page. therefore make sure your
+		// pageID has been calculated correctly.
 
-		if cfg.Log.IsDebug() {
-			cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse",
-				log.Uint64("page_id", pageID), loghttp.Request("request", r),
-			)
+		result, err, shared := mw.Group.Do(strconv.FormatUint(pageID, 10), func() (interface{}, error) {
+
+			newTags, err := esitag.Parse(fullRespBuf) // for now a NewReader, might be removed
+			if cfg.Log.IsDebug() {
+				cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse",
+					log.Err(err), log.Uint64("page_id", pageID), loghttp.Request("request", r),
+					log.Stringer("response_content", fullRespBuf), // lots of data here ...
+				)
+			}
+			if err != nil {
+				return nil, errors.Wrapf(err, "[caddyesi] Grouped parsing failed ID %d", pageID)
+			}
+
+			cfg.StoreESITags(pageID, newTags)
+
+			return newTags, nil
+		})
+		if err != nil {
+			if cfg.Log.IsDebug() {
+				cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.Group.Do",
+					log.Err(err), loghttp.Request("request", r), log.Stringer("config", cfg),
+					log.Bool("shared", shared), log.Uint64("page_id", pageID),
+				)
+			}
+			return http.StatusInternalServerError, err
 		}
-		cfg.StoreESITags(pageID, tags)
+		var ok bool
+		esiEntities, ok = result.(esitag.Entities)
+		if !ok {
+			return http.StatusInternalServerError, errors.NewFatalf("[caddyesi] A programmer made a terrible mistake: %#v", result)
+		}
 	}
 
-	// now we have here our parsed ESI tags ...
-	println(tags.String())
+	// trigger the DoRequests and query all backend resources in parallel
+	tags, err := esiEntities.QueryResources(r)
+	if err != nil {
+		if err != nil {
+			if cfg.Log.IsDebug() {
+				cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.esiEntities.QueryResources",
+					log.Err(err), loghttp.Request("request", r), log.Stringer("config", cfg),
+					log.Uint64("page_id", pageID),
+				)
+			}
+			return http.StatusInternalServerError, err
+		}
+	}
 
+	// fullRespBuf maybe the reader needs to be reset
+
+	// replace the esi tags with the content from the resources
 	// after finishing the parsing and replacing we dump the output to the client.
-	if _, err := w.Write(buf.Bytes()); err != nil {
-		return 0, err
+	if err := tags.InjectContent(fullRespBuf, w); err != nil {
+		return http.StatusInternalServerError, err
 	}
 
 	return code, nil

@@ -53,12 +53,6 @@ func TestPluginSetup(t *testing.T) {
 					assert.True(ts, ok, "Index %d", j)
 				}
 
-				assert.Len(ts, haveC.Resources, len(wantC.Resources), "Index  %d", j)
-				for key := range wantC.Resources {
-					_, ok := haveC.Resources[key]
-					assert.True(ts, ok, "Index %d", j)
-				}
-
 				assert.Len(ts, haveC.Caches, len(wantC.Caches), "Index  %d", j)
 			}
 		}
