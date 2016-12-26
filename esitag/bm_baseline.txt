@@ -1,22 +1,62 @@
-BenchmarkParseESITags-4                    	   30000	     40614 ns/op	 113.38 MB/s	    2418 B/op	      22 allocs/op
-BenchmarkParseESITags-4                    	   30000	     41036 ns/op	 112.22 MB/s	    2417 B/op	      22 allocs/op
-BenchmarkParseESITags-4                    	   30000	     41553 ns/op	 110.82 MB/s	    2417 B/op	      22 allocs/op
-BenchmarkParseESITags-4                    	   30000	     40605 ns/op	 113.41 MB/s	    2417 B/op	      22 allocs/op
-BenchmarkParseESITags-4                    	   30000	     40312 ns/op	 114.23 MB/s	    2417 B/op	      22 allocs/op
-BenchmarkParseESITags-4                    	   50000	     41140 ns/op	 111.93 MB/s	    2417 B/op	      22 allocs/op
-BenchmarkParseESITags-4                    	   30000	     40565 ns/op	 113.52 MB/s	    2417 B/op	      22 allocs/op
-BenchmarkParseESITags-4                    	   30000	     41791 ns/op	 110.19 MB/s	    2417 B/op	      22 allocs/op
-BenchmarkParseESITags-4                    	   50000	     40854 ns/op	 112.72 MB/s	    2417 B/op	      22 allocs/op
-BenchmarkParseESITags-4                    	   30000	     40598 ns/op	 113.43 MB/s	    2418 B/op	      22 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7843 ns/op	     896 B/op	      17 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      8043 ns/op	     896 B/op	      17 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      8313 ns/op	     896 B/op	      17 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7982 ns/op	     896 B/op	      17 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7980 ns/op	     896 B/op	      17 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7802 ns/op	     896 B/op	      17 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7857 ns/op	     896 B/op	      17 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7898 ns/op	     896 B/op	      17 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      8053 ns/op	     895 B/op	      17 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7830 ns/op	     896 B/op	      17 allocs/op
+BenchmarkParseESITags-4                    	   30000	     40340 ns/op	 114.15 MB/s	    2417 B/op	      22 allocs/op
+BenchmarkParseESITags-4                    	   30000	     41739 ns/op	 110.33 MB/s	    2418 B/op	      22 allocs/op
+BenchmarkParseESITags-4                    	   30000	     40394 ns/op	 114.00 MB/s	    2418 B/op	      22 allocs/op
+BenchmarkParseESITags-4                    	   30000	     40802 ns/op	 112.86 MB/s	    2417 B/op	      22 allocs/op
+BenchmarkParseESITags-4                    	   30000	     40432 ns/op	 113.89 MB/s	    2418 B/op	      22 allocs/op
+BenchmarkParseESITags-4                    	   30000	     40535 ns/op	 113.61 MB/s	    2418 B/op	      22 allocs/op
+BenchmarkParseESITags-4                    	   30000	     40567 ns/op	 113.51 MB/s	    2417 B/op	      22 allocs/op
+BenchmarkParseESITags-4                    	   30000	     40545 ns/op	 113.58 MB/s	    2418 B/op	      22 allocs/op
+BenchmarkParseESITags-4                    	   50000	     40529 ns/op	 113.62 MB/s	    2418 B/op	      22 allocs/op
+BenchmarkParseESITags-4                    	   30000	     40572 ns/op	 113.50 MB/s	    2418 B/op	      22 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7912 ns/op	     896 B/op	      17 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7970 ns/op	     896 B/op	      17 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      8176 ns/op	     896 B/op	      17 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7950 ns/op	     896 B/op	      17 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      8103 ns/op	     895 B/op	      17 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7927 ns/op	     896 B/op	      17 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7932 ns/op	     896 B/op	      17 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7830 ns/op	     895 B/op	      17 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7935 ns/op	     896 B/op	      17 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7962 ns/op	     895 B/op	      17 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4    	   30000	     51099 ns/op	  182784 B/op	       4 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4    	   30000	     52714 ns/op	  182784 B/op	       4 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4    	   30000	     54031 ns/op	  182784 B/op	       4 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4    	   30000	     52901 ns/op	  182784 B/op	       4 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4    	   30000	     51245 ns/op	  182784 B/op	       4 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4    	   30000	     51917 ns/op	  182784 B/op	       4 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4    	   30000	     51869 ns/op	  182784 B/op	       4 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4    	   30000	     52845 ns/op	  182784 B/op	       4 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4    	   30000	     52436 ns/op	  182784 B/op	       4 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4    	   30000	     53511 ns/op	  182784 B/op	       4 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4    	   10000	    191151 ns/op	  857600 B/op	       9 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4    	   10000	    189482 ns/op	  857600 B/op	       9 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4    	   10000	    190091 ns/op	  857600 B/op	       9 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4    	   10000	    189850 ns/op	  857600 B/op	       9 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4    	   10000	    190816 ns/op	  857600 B/op	       9 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4    	   10000	    191025 ns/op	  857600 B/op	       9 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4    	   10000	    189671 ns/op	  857600 B/op	       9 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4    	   10000	    192013 ns/op	  857600 B/op	       9 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4    	   10000	    189372 ns/op	  857600 B/op	       9 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4    	   10000	    189147 ns/op	  857600 B/op	       9 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4    	  100000	     14098 ns/op	   20640 B/op	       6 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4    	  100000	     13710 ns/op	   20640 B/op	       6 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4    	  100000	     13607 ns/op	   20640 B/op	       6 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4    	  100000	     13698 ns/op	   20640 B/op	       6 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4    	  100000	     14702 ns/op	   20640 B/op	       6 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4    	  100000	     13839 ns/op	   20640 B/op	       6 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4    	  100000	     13853 ns/op	   20640 B/op	       6 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4    	  100000	     13754 ns/op	   20640 B/op	       6 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4    	  100000	     14033 ns/op	   20640 B/op	       6 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4    	  100000	     13449 ns/op	   20640 B/op	       6 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4    	  100000	     12557 ns/op	    2384 B/op	       8 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4    	  100000	     12449 ns/op	    2384 B/op	       8 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4    	  100000	     12725 ns/op	    2384 B/op	       8 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4    	  100000	     12474 ns/op	    2384 B/op	       8 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4    	  100000	     12809 ns/op	    2384 B/op	       8 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4    	  100000	     12984 ns/op	    2384 B/op	       8 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4    	  100000	     12462 ns/op	    2384 B/op	       8 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4    	  200000	     12572 ns/op	    2384 B/op	       8 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4    	  100000	     12622 ns/op	    2384 B/op	       8 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4    	  100000	     12614 ns/op	    2384 B/op	       8 allocs/op
 PASS
-ok  	github.com/SchumacherFM/caddyesi/esitag	34.813s
+ok  	github.com/SchumacherFM/caddyesi/esitag	291.134s
