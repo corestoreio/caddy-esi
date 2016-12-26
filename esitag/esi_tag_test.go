@@ -5,6 +5,9 @@ import (
 	"text/template"
 	"time"
 
+	"bytes"
+	"os"
+
 	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/corestoreio/errors"
 	"github.com/stretchr/testify/assert"
@@ -84,7 +87,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 				require.NoError(t, haveErr)
 			}
 
-			assert.Exactly(t, wantET.Tag, haveET.Tag, "Tag")
+			assert.Exactly(t, wantET.DataTag, haveET.DataTag, "Tag")
 			assert.Exactly(t, len(wantET.Resources.Items), len(haveET.Resources.Items), "Len Resource Items")
 			assert.Exactly(t, wantET.Resources.MaxBodySize, haveET.Resources.MaxBodySize)
 
@@ -332,6 +335,144 @@ func TestSplitAttributes(t *testing.T) {
 		``,
 		[]string{},
 		nil,
+	))
+
+}
+
+func TestDataTags_InjectContent(t *testing.T) {
+	t.Parallel()
+
+	runner := func(fileName string, content [][]byte) func(*testing.T) {
+		return func(t *testing.T) {
+			t.Parallel()
+
+			page3F, err := os.Open(fileName)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ets, err := esitag.Parse(page3F)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var tags = make(esitag.DataTags, len(ets))
+			for k := 0; k < len(ets); k++ {
+				ets[k].DataTag.Data = content[k]
+				tags = append(tags, ets[k].DataTag)
+			}
+
+			w := new(bytes.Buffer)
+			if _, err := page3F.Seek(0, 0); err != nil {
+				t.Fatal(err)
+			}
+			if err := tags.InjectContent(page3F, w); err != nil {
+				t.Fatalf("%+v", err)
+			}
+
+			for k := 0; k < len(content); k++ {
+				assert.Contains(t, w.String(), string(content[k]))
+			}
+		}
+	}
+	t.Run("Page1", runner("testdata/page1.html",
+		[][]byte{
+			[]byte(`<p>Hello Jonathan Gopher. You're logged in.</p>`),
+		},
+	))
+	t.Run("Page2", runner("testdata/page2.html",
+		[][]byte{
+			[]byte(`<p>Hello John Gopher. You're logged in.</p>`),
+			[]byte(`<h1>You have 4 items in your shopping cart.</h1>`),
+		},
+	))
+	t.Run("Page3", runner("testdata/page3.html",
+		[][]byte{
+			[]byte(`<p>This microservice generates content one. </p>`),
+			[]byte(`<h1>This microservice generates content two. </h1>`),
+			[]byte(`<script> alert('This microservice generates content three. ');</script>`),
+		},
+	))
+	t.Run("Page4", runner("testdata/page4.html",
+		[][]byte{
+			[]byte(`<p>This microservice generates content one. </p>`),
+			[]byte(`<h1>This microservice generates content two. @</h1>`),
+			[]byte(`<h1>This microservice generates content three. €</h1>`),
+			[]byte(`<h1>This microservice generates content four. 4</h1>`),
+			[]byte(`<h1>This microservice generates content five. 5</h1>`),
+		},
+	))
+
+}
+
+func BenchmarkDataTags_InjectContent(b *testing.B) {
+
+	runner := func(fileName string, content [][]byte) func(*testing.B) {
+		return func(b *testing.B) {
+
+			page3F, err := os.Open(fileName)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			ets, err := esitag.Parse(page3F)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			var tags = make(esitag.DataTags, len(ets))
+			for k := 0; k < len(ets); k++ {
+				ets[k].DataTag.Data = content[k]
+				tags = append(tags, ets[k].DataTag)
+			}
+
+			b.ResetTimer()
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				b.StopTimer()
+				w := new(bytes.Buffer)
+				if _, err := page3F.Seek(0, 0); err != nil {
+					b.Fatal(err)
+				}
+				b.StartTimer()
+
+				if err := tags.InjectContent(page3F, w); err != nil {
+					b.Fatalf("%+v", err)
+				}
+
+				b.StopTimer()
+				for k := 0; k < len(content); k++ {
+					assert.Contains(b, w.String(), string(content[k]))
+				}
+				b.StartTimer()
+			}
+		}
+	}
+	b.Run("Page1", runner("testdata/page1.html",
+		[][]byte{
+			[]byte(`<p>Hello Jonathan Gopher. You're logged in.</p>`),
+		},
+	))
+	b.Run("Page2", runner("testdata/page2.html",
+		[][]byte{
+			[]byte(`<p>Hello John Gopher. You're logged in.</p>`),
+			[]byte(`<h1>You have 4 items in your shopping cart.</h1>`),
+		},
+	))
+	b.Run("Page3", runner("testdata/page3.html",
+		[][]byte{
+			[]byte(`<p>This microservice generates content one. </p>`),
+			[]byte(`<h1>This microservice generates content two. </h1>`),
+			[]byte(`<script> alert('This microservice generates content three. ');</script>`),
+		},
+	))
+	b.Run("Page4", runner("testdata/page4.html",
+		[][]byte{
+			[]byte(`<p>This microservice generates content one. </p>`),
+			[]byte(`<h1>This microservice generates content two. @</h1>`),
+			[]byte(`<h1>This microservice generates content three. €</h1>`),
+			[]byte(`<h1>This microservice generates content four. 4</h1>`),
+			[]byte(`<h1>This microservice generates content five. 5</h1>`),
+		},
 	))
 
 }

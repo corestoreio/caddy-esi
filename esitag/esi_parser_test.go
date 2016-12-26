@@ -1,6 +1,7 @@
 package esitag_test
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -8,14 +9,14 @@ import (
 	"strings"
 	"testing"
 
-	"bytes"
-
 	"github.com/SchumacherFM/caddyesi/esitag"
+	"github.com/corestoreio/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func mustOpenFile(file string) *os.File {
-	f, err := os.Open("testdata/" + file)
+	f, err := os.Open(file)
 	if err != nil {
 		panic(fmt.Sprintf("%s => %s", file, err))
 	}
@@ -26,25 +27,42 @@ func strReader(s string) io.ReadCloser {
 	return ioutil.NopCloser(strings.NewReader(s))
 }
 
-var testRunner = func(rc io.ReadCloser, wantTags esitag.Entities, wantErr string) func(*testing.T) {
+func testRunner(fileOrContent string, wantTags esitag.Entities, wantErrBhf errors.BehaviourFunc) func(*testing.T) {
+	var rc io.ReadCloser
+	isFile := strings.HasSuffix(fileOrContent, ".html")
+	if isFile {
+		rc = mustOpenFile("testdata/" + fileOrContent)
+		fc, err := ioutil.ReadFile("testdata/" + fileOrContent)
+		if err != nil {
+			panic(err)
+		}
+		fileOrContent = string(fc)
+	} else {
+		rc = strReader(fileOrContent)
+	}
+
 	return func(t *testing.T) {
 		defer rc.Close()
 		haveTags, err := esitag.Parse(rc)
-		if wantErr != "" {
+		if wantErrBhf != nil {
 			assert.Nil(t, haveTags)
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), wantErr)
+			assert.True(t, wantErrBhf(err), "%+v", err)
 			return
 		}
-		assert.NoError(t, err)
+		require.NoError(t, err)
+
 		if have, want := len(haveTags), len(wantTags); have != want {
 			t.Errorf("esitag.ESITags Count does not match: Have: %v Want: %v", have, want)
 		}
 
 		for i, tg := range wantTags {
-			assert.Exactly(t, string(tg.RawTag), string(haveTags[i].RawTag))
-			assert.Exactly(t, tg.Tag.Start, haveTags[i].Tag.Start)
-			assert.Exactly(t, tg.Tag.End, haveTags[i].Tag.End)
+			assert.Exactly(t, string(tg.RawTag), string(haveTags[i].RawTag), "RawTag Index %d", i)
+			assert.Exactly(t, tg.DataTag.Start, haveTags[i].DataTag.Start, "Start Index %d", i)
+			assert.Exactly(t, tg.DataTag.End, haveTags[i].DataTag.End, "End Index %d", i)
+			if haveEnd, wantEnd := haveTags[i].DataTag.End, len(fileOrContent); haveEnd > wantEnd {
+				t.Fatalf("For DataTag index %d the end %d is greater than the content length %d", i, haveEnd, wantEnd)
+			}
+			assert.Exactly(t, "<esi:"+string(tg.RawTag)+"/>", fileOrContent[haveTags[i].DataTag.Start:haveTags[i].DataTag.End], "Index %d", i)
 		}
 	}
 }
@@ -53,78 +71,78 @@ var testRunner = func(rc io.ReadCloser, wantTags esitag.Entities, wantErr string
 var page3Results = esitag.Entities{
 	&esitag.Entity{
 		RawTag: []byte(`include src="https://micr1.service/customer/account" timeout="18ms" onerror="accountNotAvailable.html"`),
-		Tag: esitag.Tag{
+		DataTag: esitag.DataTag{
 			Start: 2009,
 			End:   2118,
 		},
 	},
 	&esitag.Entity{
 		RawTag: []byte(`include src="https://micr2.service/checkout/cart" timeout="19ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"`),
-		Tag: esitag.Tag{
-			Start: 4043,
-			End:   4190,
+		DataTag: esitag.DataTag{
+			Start: 4042,
+			End:   4189,
 		},
 	},
 	&esitag.Entity{
 		RawTag: []byte("include src=\"https://micr3.service/page/lastviewed\" timeout=\"20ms\" onerror=\"nofooter.html\" forwardheaders=\"Cookie,Accept-Language,Authorization\""),
-		Tag: esitag.Tag{
-			Start: 4455,
-			End:   4606,
+		DataTag: esitag.DataTag{
+			Start: 4453,
+			End:   4604,
 		},
 	},
 }
 
 func TestParseESITags_File(t *testing.T) {
 	t.Run("Page0", testRunner(
-		mustOpenFile("page0.html"),
+		("page0.html"),
 		esitag.Entities{
 			&esitag.Entity{
 				RawTag: []byte("include   src=\"https://micro.service/esi/foo\"\n                                            "),
-				Tag: esitag.Tag{
+				DataTag: esitag.DataTag{
 					Start: 196,
 					End:   293,
 				},
 			},
 		},
-		"",
+		nil,
 	))
 	t.Run("Page1", testRunner(
-		mustOpenFile("page1.html"),
+		("page1.html"),
 		esitag.Entities{
 			&esitag.Entity{
 				RawTag: []byte("include src=\"https://micro.service/esi/foo\" timeout=\"8ms\" onerror=\"mylocalFile.html\""),
-				Tag: esitag.Tag{
+				DataTag: esitag.DataTag{
 					Start: 20644,
 					End:   20735,
 				},
 			},
 		},
-		"",
+		nil,
 	))
 	t.Run("Page2", testRunner(
-		mustOpenFile("page2.html"),
+		("page2.html"),
 		esitag.Entities{
 			&esitag.Entity{
 				RawTag: []byte("include src=\"https://micro.service/customer/account\" timeout=\"8ms\" onerror=\"accountNotAvailable.html\""),
-				Tag: esitag.Tag{
+				DataTag: esitag.DataTag{
 					Start: 6280,
 					End:   6388,
 				},
 			},
 			&esitag.Entity{
 				RawTag: []byte(`include src="https://micro.service/checkout/cart" timeout="9ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"`),
-				Tag: esitag.Tag{
-					Start: 7104,
-					End:   7250,
+				DataTag: esitag.DataTag{
+					Start: 7103,
+					End:   7249,
 				},
 			},
 		},
-		"",
+		nil,
 	))
 	t.Run("Page3", testRunner(
-		mustOpenFile("page3.html"),
+		("page3.html"),
 		page3Results,
-		"",
+		nil,
 	))
 }
 
@@ -170,48 +188,97 @@ func BenchmarkParseESITags(b *testing.B) {
 }
 
 func TestParseESITags_String(t *testing.T) {
-	t.Run("Empty", testRunner(
-		strReader(``),
+	t.Run("Five ESI Tags", testRunner(
+		(`@<esi:include   src="https://micro1.service1/esi/foo"
+                                            />@<esi:include   src="https://micro2.service2/esi/foo"
+/>@<esi:include   src="https://micro3.service3/esi/foo"/>@<esi:include
+src="https://micro4.service4/esi/foo"/>@<esi:include src="https://micro5.service5/esi/foo"/>@`),
+		esitag.Entities{
+			&esitag.Entity{
+				RawTag: []byte("include   src=\"https://micro1.service1/esi/foo\"\n                                            "),
+				DataTag: esitag.DataTag{
+					Start: 1,
+					End:   100,
+				},
+			},
+			&esitag.Entity{
+				RawTag: []byte("include   src=\"https://micro2.service2/esi/foo\"\n"),
+				DataTag: esitag.DataTag{
+					Start: 101,
+					End:   156,
+				},
+			},
+			&esitag.Entity{
+				RawTag: []byte("include   src=\"https://micro3.service3/esi/foo\""),
+				DataTag: esitag.DataTag{
+					Start: 157,
+					End:   211,
+				},
+			},
+			&esitag.Entity{
+				RawTag: []byte("include\nsrc=\"https://micro4.service4/esi/foo\""),
+				DataTag: esitag.DataTag{
+					Start: 212,
+					End:   264,
+				},
+			},
+			&esitag.Entity{
+				RawTag: []byte("include src=\"https://micro5.service5/esi/foo\""),
+				DataTag: esitag.DataTag{
+					Start: 265,
+					End:   317,
+				},
+			},
+		},
 		nil,
-		"",
+	))
+
+	t.Run("Empty", testRunner(
+		(``),
+		nil,
+		nil,
 	))
 	t.Run("Null Bytes", testRunner(
-		strReader("x \x00 <i>x</i>          \x00<esi:include\x00 src=\"https:...\" />\x00"),
+		("x \x00 <i>x</i>          \x00<esi:include\x00 src=\"https:...\" />\x00"),
 		esitag.Entities{
 			&esitag.Entity{
 				RawTag: []byte("include\x00 src=\"https:...\" "),
-				Tag: esitag.Tag{
+				DataTag: esitag.DataTag{
 					Start: 23,
 					End:   55,
 				},
 			},
 		},
-		"",
-	))
-	t.Run("Missing EndTag", testRunner(
-		strReader(`<esi:include src="..." <b>`),
 		nil,
-		"",
-		//"[caddyesi] Opening close tag mismatch!\n\"<esi:include src=\\\"...\\\" <b>\"\n",
+	))
+	t.Run("Missing EndTag, returns empty slice", testRunner(
+		(`<esi:include src="..." <b>`),
+		nil,
+		nil,
+	))
+	t.Run("Error when parsing timeout attribute", testRunner(
+		(`<esi:include src="gopher1" timeout="10xyz" />`),
+		nil,
+		errors.IsNotValid,
 	))
 	t.Run("Multitags in Buffer", testRunner(
-		strReader(`abcdefg<esi:include src="url1"/>u p<esi:include src="url2" />k`),
+		(`abcdefg<esi:include src="url1"/>u p<esi:include src="url2" />k`),
 		esitag.Entities{
 			&esitag.Entity{
 				RawTag: []byte("include src=\"url1\""),
-				Tag: esitag.Tag{
+				DataTag: esitag.DataTag{
 					Start: 7,
 					End:   32,
 				},
 			},
 			&esitag.Entity{
 				RawTag: []byte("include src=\"url2\" "),
-				Tag: esitag.Tag{
-					Start: 36,
-					End:   62,
+				DataTag: esitag.DataTag{
+					Start: 35,
+					End:   61,
 				},
 			},
 		},
-		"",
+		nil,
 	))
 }

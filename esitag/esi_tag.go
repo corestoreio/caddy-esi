@@ -2,8 +2,10 @@ package esitag
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"sort"
 	"strings"
 	"text/template"
 	"time"
@@ -36,20 +38,66 @@ func (c condition) OK(r *http.Request) bool {
 	return false
 }
 
-// Tag identifies an ESI tag by its start and end position in the HTML byte
+// DataTag identifies an ESI tag by its start and end position in the HTML byte
 // stream for replacing. If the HTML changes there needs to be a refresh call to
 // re-parse the HTML.
-type Tag struct {
+type DataTag struct {
 	// Data from the micro service gathered in a goroutine.
 	Data  []byte
 	Start int // start position in the stream
 	End   int // end position in the stream
 }
 
+// DataTags a list of tags with their position within a page and the content
+type DataTags []DataTag
+
+// InjectContent reads from r and uses the data in a Tag to get injected a the
+// current position and then writes the output to w. DataTags must be a sorted
+// slice. Usually this function receives the data from Entities.QueryResources()
+func (dts DataTags) InjectContent(r io.Reader, w io.Writer) error {
+	if len(dts) == 0 {
+		return nil
+	}
+
+	var prevBufDataSize int
+	for di, dt := range dts {
+		bufDataSize := dt.End - prevBufDataSize
+
+		data := make([]byte, bufDataSize)
+
+		n, err := r.Read(data)
+		if err != nil && err != io.EOF {
+			return errors.NewFatalf("[esitag] Read failed: %s for tag index %d with start position %d and end position %d", err, di, dt.Start, dt.End)
+		}
+
+		if n > 0 {
+			esiStartPos := n - (dt.End - dt.Start)
+			if _, errW := w.Write(data[:esiStartPos]); errW != nil { // cuts off until End
+				return errors.NewWriteFailedf("[esitag] Failed to write page data to w: %s", errW)
+			}
+			if _, errW := w.Write(dt.Data); errW != nil {
+				return errors.NewWriteFailedf("[esitag] Failed to write ESI data to w: %s", errW)
+			}
+		}
+		prevBufDataSize = dt.End
+	}
+
+	// during copy of the remaining bytes we'll hit EOF
+	if _, err := io.Copy(w, r); err != nil {
+		return errors.NewWriteFailedf("[esitag] Failed to copy remaining data to w: %s", err)
+	}
+
+	return nil
+}
+
+func (dts DataTags) Len() int           { return len(dts) }
+func (dts DataTags) Swap(i, j int)      { dts[i], dts[j] = dts[j], dts[i] }
+func (dts DataTags) Less(i, j int) bool { return dts[i].Start < dts[j].Start }
+
 // Entity represents a single fully parsed ESI tag
 type Entity struct {
 	RawTag            []byte
-	Tag               Tag
+	DataTag           DataTag
 	Resources         // Any 3rd party servers
 	TTL               time.Duration
 	Timeout           time.Duration
@@ -247,14 +295,14 @@ func (et Entities) String() string {
 }
 
 // QueryResources runs in parallel to query all available backend services /
-// resources which are available in the current page. The returned Tag slice
-// does not guarantee to be ordered. If the request gets canceled via its
-// context then all resource requests gets canceled too.
-func (et Entities) QueryResources(r *http.Request) ([]Tag, error) {
+// resources which are available in the current page. The returned Tag slice is
+// guaranteed to be sorted after Start position. If the request gets canceled
+// via its context then all resource requests gets canceled too.
+func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 
-	tags := make([]Tag, 0, len(et))
+	tags := make(DataTags, 0, len(et))
 	g, ctx := errgroup.WithContext(r.Context())
-	cTag := make(chan Tag)
+	cTag := make(chan DataTag)
 	for _, e := range et {
 		e := e
 		g.Go(func() error {
@@ -262,7 +310,7 @@ func (et Entities) QueryResources(r *http.Request) ([]Tag, error) {
 			if err != nil {
 				return errors.Wrapf(err, "[esitag] QueryResources.Resources.DoRequest failed for Tag %q", e.RawTag)
 			}
-			t := e.Tag
+			t := e.DataTag
 			t.Data = data
 
 			select {
@@ -288,6 +336,8 @@ func (et Entities) QueryResources(r *http.Request) ([]Tag, error) {
 	if err := g.Wait(); err != nil {
 		return nil, errors.Wrap(err, "[esitag]")
 	}
+
+	sort.Stable(tags)
 
 	return tags, nil
 }

@@ -12,7 +12,8 @@ import (
 
 const maxSizeESITag = 4096
 
-// Parse parses a stream of data to extract ESI Tags.
+// Parse parses a stream of data to extract ESI Tags. Malformed ESI tags won't
+// trigger any errors, instead the parser skips them.
 func Parse(r io.Reader) (Entities, error) {
 	ret := make(Entities, 0, 5) // avg 5 tags per parse ...
 
@@ -30,16 +31,14 @@ func Parse(r io.Reader) (Entities, error) {
 		if sc.Err() != nil {
 			return nil, errors.Wrap(sc.Err(), "Parse scan failed")
 		}
-		tag := sc.Bytes()
 
 		ret = append(ret, &Entity{
-			RawTag: make([]byte, len(tag)),
-			Tag: Tag{
+			RawTag: sc.Bytes(),
+			DataTag: DataTag{
 				Start: fdr.begin,
 				End:   fdr.end,
 			},
 		})
-		copy(ret[tagIndex].RawTag, tag)
 		tagIndex++
 	}
 
@@ -154,7 +153,6 @@ func (e *finder) scan(b byte) (bool, error) {
 		if b == '>' {
 			e.tagState = stateFound
 			e.end = e.n + 1 // to also exclude the >.
-			e.n++
 			return true, nil
 		}
 		e.buf.WriteByte(b)
@@ -168,11 +166,14 @@ func (e *finder) scan(b byte) (bool, error) {
 
 // Data returns the content of the esi tag <esi:(content)>/> as well
 // as the byte position of the begin and end of the whole tag.
+// The returned slice is safe for further usage.
 func (e *finder) data() []byte {
 	if e.tagState != stateFound {
 		return nil
 	}
 	data := e.buf.Bytes()
-	// trim last /
-	return data[:len(data)-1] //, e.begin, e.end
+
+	ret := make([]byte, len(data)-1)
+	copy(ret, data[:len(data)-1]) // trim last /
+	return ret
 }
