@@ -371,6 +371,10 @@ func TestDataTags_InjectContent(t *testing.T) {
 
 			for k := 0; k < len(content); k++ {
 				assert.Contains(t, w.String(), string(content[k]))
+				if have, want := bytes.Count(w.Bytes(), content[k]), 1; have != want {
+					t.Errorf("Have: %d Want: %d", have, want)
+				}
+
 			}
 		}
 	}

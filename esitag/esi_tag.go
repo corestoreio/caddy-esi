@@ -59,11 +59,19 @@ func (dts DataTags) InjectContent(r io.Reader, w io.Writer) error {
 		return nil
 	}
 
+	dataBuf := bufpool.Get()
+	defer bufpool.Put(dataBuf)
+	data := dataBuf.Bytes()
+
 	var prevBufDataSize int
 	for di, dt := range dts {
 		bufDataSize := dt.End - prevBufDataSize
 
-		data := make([]byte, bufDataSize)
+		if cap(data) < bufDataSize {
+			dataBuf.Grow(bufDataSize - cap(data))
+			data = dataBuf.Bytes()
+		}
+		data = data[:bufDataSize]
 
 		n, err := r.Read(data)
 		if err != nil && err != io.EOF {
