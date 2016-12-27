@@ -8,6 +8,7 @@ import (
 
 	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/corestoreio/errors"
+	"github.com/corestoreio/log"
 )
 
 const maxSizeESITag = 4096
@@ -33,6 +34,7 @@ func Parse(r io.Reader) (Entities, error) {
 		}
 
 		ret = append(ret, &Entity{
+			Log:    log.BlackHole{},
 			RawTag: sc.Bytes(),
 			DataTag: DataTag{
 				Start: fdr.begin,

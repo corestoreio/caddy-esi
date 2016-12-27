@@ -3,7 +3,6 @@ package esitag
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"sort"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/helpers"
 	"github.com/corestoreio/errors"
+	"github.com/corestoreio/log"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -104,9 +104,10 @@ func (dts DataTags) Less(i, j int) bool { return dts[i].Start < dts[j].Start }
 
 // Entity represents a single fully parsed ESI tag
 type Entity struct {
+	Log               log.Logger
 	RawTag            []byte
 	DataTag           DataTag
-	Resources         // Any 3rd party servers
+	Resources         Resources // Any 3rd party servers
 	TTL               time.Duration
 	Timeout           time.Duration
 	OnError           string
@@ -169,7 +170,7 @@ func (et *Entity) ParseRaw() error {
 	if len(et.RawTag) == 0 {
 		return nil
 	}
-	et.Resources.Logf = log.Printf
+	et.Resources.Log = et.Log
 	et.Resources.Items = make([]*Resource, 0, 2)
 
 	matches, err := SplitAttributes(string(et.RawTag))
@@ -234,6 +235,33 @@ func (et *Entity) ParseRaw() error {
 	if len(et.Resources.Items) == 0 || srcCounter == 0 {
 		return errors.NewEmptyf("[caddyesi] ESITag.ParseRaw. src (Items: %d/Src: %d) cannot be empty in Tag which requires at least one resource: %q", len(et.Resources.Items), srcCounter, et.RawTag)
 	}
+	if err := et.setResourceRequestFunc(); err != nil {
+		return errors.Wrap(err, "[caddyesi] Entity.ParseRaw.setResourceRequestFunc failed")
+	}
+	return nil
+}
+
+func (et *Entity) setResourceRequestFunc() error {
+	if len(et.Resources.Items) == 0 {
+		return nil
+	}
+
+	// we only check for the first index URL because sub sequent entries must
+	// use the same protocol to fall back resources.
+
+	idx := strings.Index(et.Resources.Items[0].URL, "://")
+	if idx == -1 {
+		// do nothing because the string points to an alias to a globally
+		// defined URL in the Caddyfile.
+		return nil
+	}
+
+	switch scheme := et.Resources.Items[0].URL[:idx]; scheme {
+	case "http", "https":
+		et.Resources.ResourceRequestFunc = FetchHTTP
+	default:
+		return errors.NewNotSupportedf("[esitag] Resource protocal %q not yet supported in tag %q", scheme, et.RawTag)
+	}
 	return nil
 }
 
@@ -257,9 +285,8 @@ func (et *Entity) parseResource(idx int, val string) (err error) {
 		if err != nil {
 			return errors.NewFatalf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", val, err, et.RawTag)
 		}
-		r.URL = ""
 	}
-	et.Items = append(et.Items, r)
+	et.Resources.Items = append(et.Resources.Items, r)
 	return nil
 }
 
@@ -277,6 +304,13 @@ func (et *Entity) parseKey(val string) (err error) {
 
 // Entities represents a list of ESI tags found in one HTML page.
 type Entities []*Entity
+
+// ApplyLogger sets a logger to each entity.
+func (et Entities) ApplyLogger(l log.Logger) {
+	for _, e := range et {
+		e.Log = l
+	}
+}
 
 // ParseRaw parses all ESI tags
 func (et Entities) ParseRaw() error {

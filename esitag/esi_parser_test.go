@@ -239,17 +239,22 @@ src="https://micro4.service4/esi/foo"/>@<esi:include src="https://micro5.service
 		nil,
 	))
 	t.Run("Null Bytes", testRunner(
-		("x \x00 <i>x</i>          \x00<esi:include\x00 src=\"https:...\" />\x00"),
+		("x \x00 <i>x</i>          \x00<esi:include\x00 src=\"https://...\" />\x00"),
 		esitag.Entities{
 			&esitag.Entity{
-				RawTag: []byte("include\x00 src=\"https:...\" "),
+				RawTag: []byte("include\x00 src=\"https://...\" "),
 				DataTag: esitag.DataTag{
 					Start: 23,
-					End:   55,
+					End:   57,
 				},
 			},
 		},
 		nil,
+	))
+	t.Run("Not supported scheme in src attribute", testRunner(
+		("x \x00 <i>x</i>          \x00<esi:include\x00 src=\"ftp://...\" />\x00"),
+		nil,
+		errors.IsNotSupported,
 	))
 	t.Run("Missing EndTag, returns empty slice", testRunner(
 		(`<esi:include src="..." <b>`),

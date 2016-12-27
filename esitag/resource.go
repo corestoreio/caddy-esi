@@ -8,6 +8,7 @@ import (
 
 	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/corestoreio/errors"
+	"github.com/corestoreio/log"
 )
 
 const (
@@ -69,8 +70,12 @@ type Resource struct {
 type Resources struct {
 	ResourceRequestFunc
 	MaxBodySize int64 // DefaultMaxBodySize; TODO(CyS) implement in ESI tag
-	Logf        func(format string, v ...interface{})
-	// Items multiple URLs to different resources but all share the same protocol.
+	Log         log.Logger
+	// Items define multiple URLs to different resources but all share the same
+	// protocol. For example you have 3 shopping cart micro services which would
+	// be coded as three src="" attributes in the ESI tag. Those three resources
+	// will be used as a fall back whenever the previous queried resource
+	// failed.
 	Items []*Resource
 }
 
@@ -98,10 +103,22 @@ func (rs *Resources) DoRequest(timeout time.Duration, externalReq *http.Request)
 			bufpool.Put(buf)
 		}
 
-		if r.lastFailed.After(time.Now()) {
-			rs.Logf("[esitag] Index (%d/%d) DoRequest for URL %q Skipping due to previous errors", i, len(rs.Items), url)
+		var lFields log.Fields
+		now := time.Now()
+		if rs.Log.IsDebug() {
+			lFields = log.Fields{log.Int("bacled_off", r.backedOff),
+				log.Int("index", i), log.Int("items_length", len(rs.Items)), log.String("url", url), log.Time("last_failed", r.lastFailed), log.Time("now", now),
+			}
+		}
+
+		if r.lastFailed.After(now) {
+			if rs.Log.IsDebug() {
+				rs.Log.Debug("esitag.Resources.DoRequest.lastFailed.After", lFields...)
+			}
 			if r.backedOff >= MaxBackOffs {
-				rs.Logf("[esitag] Index (%d/%d) DoRequest restarted for URL %q", i, len(rs.Items), url)
+				if rs.Log.IsDebug() {
+					rs.Log.Debug("esitag.Resources.DoRequest.backedOff", lFields...)
+				}
 				r.lastFailed = time.Time{} // restart
 			}
 			continue
@@ -109,7 +126,9 @@ func (rs *Resources) DoRequest(timeout time.Duration, externalReq *http.Request)
 
 		data, err := rs.ResourceRequestFunc(url, timeout, maxBodySize)
 		if err != nil {
-			rs.Logf("[esitag] Index (%d/%d) DoRequest for URL %q failed. Continuing", i, len(rs.Items), url)
+			if rs.Log.IsDebug() {
+				rs.Log.Debug("esitag.Resources.DoRequest.ResourceRequestFunc", log.Err(err), lFields.Add())
+			}
 			r.backOff++
 			var dur time.Duration = 1 << r.backOff // exponentially calculated
 			r.lastFailed = time.Now().Add(dur * time.Second)

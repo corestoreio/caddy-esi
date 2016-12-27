@@ -28,7 +28,7 @@ func putHttpClient(c *http.Client) {
 	httpClientPool.Put(c)
 }
 
-// FetchHTTP implements ResourceFetchFunc
+// FetchHTTP implements ResourceRequestFunc
 func FetchHTTP(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
 	c := newHttpClient()
 	defer putHttpClient(c)

@@ -34,8 +34,8 @@ func TestEntity_ParseRaw_Src_Template(t *testing.T) {
 	assert.Exactly(t, 0, et.Resources.Items[0].Index)
 	assert.Exactly(t, 1, et.Resources.Items[1].Index)
 
-	assert.Empty(t, et.Resources.Items[0].URL)
-	assert.Empty(t, et.Resources.Items[1].URL)
+	assert.Exactly(t, `https://micro1.service/checkout/cart/{{ .r.Header.Get "User-Agent" }}`, et.Resources.Items[0].URL)
+	assert.Exactly(t, `https://micro2.service/checkout/cart/{{ .r.Header.Get "User-Agent" }}`, et.Resources.Items[1].URL)
 }
 
 func TestEntity_ParseRaw_Key_Template(t *testing.T) {
@@ -478,5 +478,8 @@ func BenchmarkDataTags_InjectContent(b *testing.B) {
 			[]byte(`<h1>This microservice generates content five. 5</h1>`),
 		},
 	))
+}
 
+func TestEntities_QueryResources(t *testing.T) {
+	t.Skip("TODO")
 }
