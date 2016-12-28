@@ -2,7 +2,6 @@ package caddyesi
 
 import (
 	"context"
-	"net/http"
 	"strings"
 	"time"
 
@@ -34,11 +33,6 @@ func (c Caches) Set(key string, value []byte, expiration time.Duration) error {
 func (c Caches) Get(key string) ([]byte, error) {
 	// race condition which cache returns first
 	return nil, nil
-}
-
-// ResourceFetcher fetches content from a micro service
-type ResourceFetcher interface {
-	DoRequest(timeout time.Duration, externalReq *http.Request) ([]byte, error)
 }
 
 // KVFetcher represents a KeyValue fetching service which can query a remote

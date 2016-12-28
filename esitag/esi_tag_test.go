@@ -27,15 +27,15 @@ func TestEntity_ParseRaw_Src_Template(t *testing.T) {
 		t.Fatalf("%+v", err)
 	}
 	assert.Exactly(t, time.Millisecond*9, et.TTL)
-	assert.Len(t, et.Resources.Items, 2)
-	assert.Exactly(t, `resource_tpl`, et.Resources.Items[0].URLTemplate.ParseName)
-	assert.Exactly(t, `resource_tpl`, et.Resources.Items[1].URLTemplate.ParseName)
+	assert.Len(t, et.Resources, 2)
+	assert.Exactly(t, `resource_tpl`, et.Resources[0].URLTemplate.ParseName)
+	assert.Exactly(t, `resource_tpl`, et.Resources[1].URLTemplate.ParseName)
 
-	assert.Exactly(t, 0, et.Resources.Items[0].Index)
-	assert.Exactly(t, 1, et.Resources.Items[1].Index)
+	assert.Exactly(t, 0, et.Resources[0].Index)
+	assert.Exactly(t, 1, et.Resources[1].Index)
 
-	assert.Exactly(t, `https://micro1.service/checkout/cart/{{ .r.Header.Get "User-Agent" }}`, et.Resources.Items[0].URL)
-	assert.Exactly(t, `https://micro2.service/checkout/cart/{{ .r.Header.Get "User-Agent" }}`, et.Resources.Items[1].URL)
+	assert.Exactly(t, `https://micro1.service/checkout/cart/{{ .r.Header.Get "User-Agent" }}`, et.Resources[0].URL)
+	assert.Exactly(t, `https://micro2.service/checkout/cart/{{ .r.Header.Get "User-Agent" }}`, et.Resources[1].URL)
 }
 
 func TestEntity_ParseRaw_Key_Template(t *testing.T) {
@@ -53,19 +53,19 @@ func TestEntity_ParseRaw_Key_Template(t *testing.T) {
 	}
 	assert.Exactly(t, time.Millisecond*40, et.Timeout)
 
-	assert.Len(t, et.Resources.Items, 2)
+	assert.Len(t, et.Resources, 2)
 	assert.Empty(t, et.Key)
 	assert.Exactly(t, `key_tpl`, et.KeyTemplate.ParseName)
 
-	assert.Exactly(t, `redisAWS1`, et.Resources.Items[0].URL)
-	assert.Nil(t, et.Resources.Items[0].URLTemplate)
-	assert.False(t, et.Resources.Items[0].IsURL)
-	assert.Exactly(t, 0, et.Resources.Items[0].Index)
+	assert.Exactly(t, `redisAWS1`, et.Resources[0].URL)
+	assert.Nil(t, et.Resources[0].URLTemplate)
+	assert.False(t, et.Resources[0].IsURL)
+	assert.Exactly(t, 0, et.Resources[0].Index)
 
-	assert.Exactly(t, `redisAWS2`, et.Resources.Items[1].URL)
-	assert.False(t, et.Resources.Items[1].IsURL)
-	assert.Exactly(t, 1, et.Resources.Items[1].Index)
-	assert.Nil(t, et.Resources.Items[1].URLTemplate)
+	assert.Exactly(t, `redisAWS2`, et.Resources[1].URL)
+	assert.False(t, et.Resources[1].IsURL)
+	assert.Exactly(t, 1, et.Resources[1].Index)
+	assert.Nil(t, et.Resources[1].URLTemplate)
 }
 
 func TestESITag_ParseRaw(t *testing.T) {
@@ -88,12 +88,12 @@ func TestESITag_ParseRaw(t *testing.T) {
 			}
 
 			assert.Exactly(t, wantET.DataTag, haveET.DataTag, "Tag")
-			assert.Exactly(t, len(wantET.Resources.Items), len(haveET.Resources.Items), "Len Resource Items")
-			assert.Exactly(t, wantET.Resources.MaxBodySize, haveET.Resources.MaxBodySize)
+			assert.Exactly(t, len(wantET.Resources), len(haveET.Resources), "Len Resource Items")
+			assert.Exactly(t, wantET.MaxBodySize, haveET.MaxBodySize)
 
-			if wantET.Resources.Items != nil {
-				for i, ri := range wantET.Resources.Items {
-					haveRI := haveET.Resources.Items[i]
+			if wantET.Resources != nil {
+				for i, ri := range wantET.Resources {
+					haveRI := haveET.Resources[i]
 					assert.Exactly(t, ri.Index, haveRI.Index, "Resource Item Index")
 					assert.Exactly(t, ri.IsURL, haveRI.IsURL, "Resource Item IsURL")
 					assert.Exactly(t, ri.URL, haveRI.URL, "Resource Item URL")
@@ -123,10 +123,8 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include src="https://micro.service/checkout/cart" timeout="9ms" onerror="nocart.html" forwardheaders="Cookie , Accept-Language, Authorization"`),
 		nil,
 		&esitag.Entity{
-			Resources: esitag.Resources{
-				Items: []*esitag.Resource{
-					{URL: "https://micro.service/checkout/cart", IsURL: true},
-				},
+			Resources: []*esitag.Resource{
+				{URL: "https://micro.service/checkout/cart", IsURL: true},
 			},
 			Timeout:        time.Millisecond * 9,
 			OnError:        "nocart.html",
@@ -138,11 +136,9 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include src="https://micro1.service/checkout/cart" src="https://micro2.service/checkout/cart" ttl="9ms"  returnheaders="Cookie , Accept-Language, Authorization"`),
 		nil,
 		&esitag.Entity{
-			Resources: esitag.Resources{
-				Items: []*esitag.Resource{
-					{URL: "https://micro1.service/checkout/cart", IsURL: true, Index: 0},
-					{URL: "https://micro2.service/checkout/cart", IsURL: true, Index: 1},
-				},
+			Resources: []*esitag.Resource{
+				{URL: "https://micro1.service/checkout/cart", IsURL: true, Index: 0},
+				{URL: "https://micro2.service/checkout/cart", IsURL: true, Index: 1},
 			},
 			TTL:           time.Millisecond * 9,
 			ReturnHeaders: []string{"Cookie", "Accept-Language", "Authorization"},
@@ -159,10 +155,8 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include key="product_234234" returnheaders=" all  " forwardheaders=" all  " src="awsRedis1"`),
 		nil,
 		&esitag.Entity{
-			Resources: esitag.Resources{
-				Items: []*esitag.Resource{
-					{URL: "awsRedis1", IsURL: false, Index: 0},
-				},
+			Resources: []*esitag.Resource{
+				{URL: "awsRedis1", IsURL: false, Index: 0},
 			},
 			Key:               "product_234234",
 			ReturnHeadersAll:  true,
@@ -174,10 +168,8 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include key="product_4711" returnheaders='all' forwardheaders="all	" src="awsRedis3"`),
 		nil,
 		&esitag.Entity{
-			Resources: esitag.Resources{
-				Items: []*esitag.Resource{
-					{URL: "awsRedis3", IsURL: false, Index: 0},
-				},
+			Resources: []*esitag.Resource{
+				{URL: "awsRedis3", IsURL: false, Index: 0},
 			},
 			Key:               "product_4711",
 			ReturnHeadersAll:  true,
@@ -189,10 +181,8 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include key='product_234234_{{ .r.Header.Get "myHeaderKey" }}' src="awsRedis2"  returnheaders=" all  " forwardheaders=" all  "`),
 		nil,
 		&esitag.Entity{
-			Resources: esitag.Resources{
-				Items: []*esitag.Resource{
-					{URL: "awsRedis2", IsURL: false, Index: 0},
-				},
+			Resources: []*esitag.Resource{
+				{URL: "awsRedis2", IsURL: false, Index: 0},
 			},
 			KeyTemplate:       template.Must(template.New("key_tpl").Parse("unimportant")),
 			ReturnHeadersAll:  true,
@@ -204,10 +194,8 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include xkey='product_234234_{{ .r.Header.Get "myHeaderKey" }}' src="awsRedis2"  returnheaders=" all  " forwardheaders=" all  "`),
 		nil,
 		&esitag.Entity{
-			Resources: esitag.Resources{
-				Items: []*esitag.Resource{
-					{URL: "awsRedis2", IsURL: false, Index: 0},
-				},
+			Resources: []*esitag.Resource{
+				{URL: "awsRedis2", IsURL: false, Index: 0},
 			},
 			ReturnHeadersAll:  true,
 			ForwardHeadersAll: true,
@@ -478,6 +466,10 @@ func BenchmarkDataTags_InjectContent(b *testing.B) {
 			[]byte(`<h1>This microservice generates content five. 5</h1>`),
 		},
 	))
+}
+
+func TestEntity_QueryResources(t *testing.T) {
+	t.Skip("TODO")
 }
 
 func TestEntities_QueryResources(t *testing.T) {

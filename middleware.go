@@ -71,7 +71,7 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 
 		result, err, shared := mw.Group.Do(strconv.FormatUint(pageID, 10), func() (interface{}, error) {
 
-			newTags, err := esitag.Parse(fullRespBuf) // for now a NewReader, might be removed
+			entities, err := esitag.Parse(fullRespBuf) // for now a NewReader, might be removed
 			if cfg.Log.IsDebug() {
 				cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse",
 					log.Err(err), log.Uint64("page_id", pageID), loghttp.Request("request", r),
@@ -81,10 +81,10 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 			if err != nil {
 				return nil, errors.Wrapf(err, "[caddyesi] Grouped parsing failed ID %d", pageID)
 			}
+			entities.ApplyLogger(cfg.Log)
+			cfg.StoreESITags(pageID, entities)
 
-			cfg.StoreESITags(pageID, newTags)
-
-			return newTags, nil
+			return entities, nil
 		})
 		if err != nil {
 			if cfg.Log.IsDebug() {

@@ -1,39 +1,32 @@
 package esitag
 
 import (
+	"bytes"
+	"io"
 	"net"
 	"net/http"
+	"sync"
 	"text/template"
 	"time"
 
-	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/corestoreio/errors"
-	"github.com/corestoreio/log"
 )
+
+var ResourceRequestRegister = map[string]ResourceRequestFunc{
+	"http":  FetchHTTP,
+	"https": FetchHTTP,
+}
 
 const (
+	// DefaultMaxBodySize the body size of a reuqest which can be received from a
+	// micro service.
 	DefaultMaxBodySize int64 = 5 << 20 // 5 MB is a lot of text.
-	DefaultTimeOut           = 30 * time.Second
+	// DefaultTimeOut time to wait until a request to a micro service gets marked as
+	// failed.
+	DefaultTimeOut = 30 * time.Second
+	// MaxBackOffs allow up to (1<<12)/60 minutes (68min) of back off time
+	MaxBackOffs = 12
 )
-
-// MaxBackOffs allow up to (1<<12)/60 minutes (68min) of back off time
-const MaxBackOffs = 12
-
-// DefaultClientTransport our own transport for all ESI tag resources instead of
-// relying on net/http.DefaultTransport. This transport gets also mocked for
-// tests.
-var DefaultClientTransport http.RoundTripper = &http.Transport{
-	Proxy: http.ProxyFromEnvironment,
-	DialContext: (&net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
-		DualStack: true,
-	}).DialContext,
-	MaxIdleConns:          100,
-	IdleConnTimeout:       90 * time.Second,
-	TLSHandshakeTimeout:   10 * time.Second,
-	ExpectContinueTimeout: 1 * time.Second,
-}
 
 // ResourceRequestFunc performs a request to a backend service via a specific
 // protocol.
@@ -62,81 +55,67 @@ type Resource struct {
 	lastFailed time.Time
 }
 
-// Resources contains multiple unique Resource entries, aka backend systems
-// likes redis instances. Resources occur within one single ESI tag. The
-// resource attribute (src="") can occur multiple times. The first item which
-// successfully returns data gets its content used in the response. If one item
-// fails and we have multiple resources, the next resource gets tried.
-type Resources struct {
-	ResourceRequestFunc
-	MaxBodySize int64 // DefaultMaxBodySize; TODO(CyS) implement in ESI tag
-	Log         log.Logger
-	// Items define multiple URLs to different resources but all share the same
-	// protocol. For example you have 3 shopping cart micro services which would
-	// be coded as three src="" attributes in the ESI tag. Those three resources
-	// will be used as a fall back whenever the previous queried resource
-	// failed.
-	Items []*Resource
+// DefaultClientTransport our own transport for all ESI tag resources instead of
+// relying on net/http.DefaultTransport. This transport gets also mocked for
+// tests.
+var DefaultClientTransport http.RoundTripper = &http.Transport{
+	Proxy: http.ProxyFromEnvironment,
+	DialContext: (&net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+		DualStack: true,
+	}).DialContext,
+	MaxIdleConns:          100,
+	IdleConnTimeout:       90 * time.Second,
+	TLSHandshakeTimeout:   10 * time.Second,
+	ExpectContinueTimeout: 1 * time.Second,
 }
 
-// DoRequest iterates over the resources and executes http requests. If one
-// resource fails it will be marked as timed out and the next resource gets
-// tried. The exponential back-off stops when MaxBackOffs have been reached and
-// then tries again.
-func (rs *Resources) DoRequest(timeout time.Duration, externalReq *http.Request) ([]byte, error) {
+// TestClient mocked out for testing
+var TestClient *http.Client
 
-	maxBodySize := DefaultMaxBodySize
-	if rs.MaxBodySize > 0 {
-		maxBodySize = rs.MaxBodySize
+var httpClientPool = &sync.Pool{
+	New: func() interface{} {
+		return &http.Client{
+			Transport: DefaultClientTransport,
+			Timeout:   DefaultTimeOut,
+		}
+	},
+}
+
+func newHttpClient() *http.Client {
+	return httpClientPool.Get().(*http.Client)
+}
+
+func putHttpClient(c *http.Client) {
+	c.Timeout = DefaultTimeOut
+	httpClientPool.Put(c)
+}
+
+// FetchHTTP implements ResourceRequestFunc and is registered in variable
+// ResourceRequestRegister.
+func FetchHTTP(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
+	var c = TestClient
+	if c == nil {
+		c = newHttpClient()
+		defer putHttpClient(c)
+	}
+	if timeout < 1 {
+		timeout = DefaultTimeOut
+	}
+	c.Timeout = timeout
+
+	resp, err := c.Get(url)
+	if err != nil {
+		return nil, errors.Wrapf(err, "[esitag] FetchHTTP error for URL %q", url)
 	}
 
-	for i, r := range rs.Items {
-
-		url := r.URL
-		if r.URLTemplate != nil {
-			buf := bufpool.Get()
-			if err := r.URLTemplate.Execute(buf, externalReq); err != nil {
-				bufpool.Put(buf)
-				return nil, errors.Wrapf(err, "[esitag] Index %d Resource %#v Template error", i, r)
-			}
-			url = buf.String()
-			bufpool.Put(buf)
-		}
-
-		var lFields log.Fields
-		now := time.Now()
-		if rs.Log.IsDebug() {
-			lFields = log.Fields{log.Int("bacled_off", r.backedOff),
-				log.Int("index", i), log.Int("items_length", len(rs.Items)), log.String("url", url), log.Time("last_failed", r.lastFailed), log.Time("now", now),
-			}
-		}
-
-		if r.lastFailed.After(now) {
-			if rs.Log.IsDebug() {
-				rs.Log.Debug("esitag.Resources.DoRequest.lastFailed.After", lFields...)
-			}
-			if r.backedOff >= MaxBackOffs {
-				if rs.Log.IsDebug() {
-					rs.Log.Debug("esitag.Resources.DoRequest.backedOff", lFields...)
-				}
-				r.lastFailed = time.Time{} // restart
-			}
-			continue
-		}
-
-		data, err := rs.ResourceRequestFunc(url, timeout, maxBodySize)
-		if err != nil {
-			if rs.Log.IsDebug() {
-				rs.Log.Debug("esitag.Resources.DoRequest.ResourceRequestFunc", log.Err(err), lFields.Add())
-			}
-			r.backOff++
-			var dur time.Duration = 1 << r.backOff // exponentially calculated
-			r.lastFailed = time.Now().Add(dur * time.Second)
-			continue
-		}
-
-		return data, nil
+	buf := new(bytes.Buffer)
+	_, err = buf.ReadFrom(io.LimitReader(resp.Body, maxBodySize))
+	// todo log or report when we reach EOF to let the admin know that the content is too large.
+	_ = resp.Body.Close() // for now ignore it ...
+	if err != nil && err != io.EOF {
+		return nil, errors.Wrapf(err, "[esitag] FetchHTTP.ReadFrom Body for URL %q failed", url)
 	}
-
-	return nil, errors.Errorf("[esitag] Should maybe not happen? TODO investigate")
+	return buf.Bytes(), nil
 }

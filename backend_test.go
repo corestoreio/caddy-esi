@@ -2,12 +2,10 @@ package caddyesi
 
 import (
 	"context"
-	"net/http"
 	"time"
 )
 
 var _ KVFetcher = (*kvFetchMock)(nil)
-var _ ResourceFetcher = (*resourceMock)(nil)
 var _ Cacher = (*Caches)(nil)
 
 type kvFetchMock struct {
@@ -29,24 +27,24 @@ func (kv kvFetchMock) Get(ctx context.Context, key []byte) ([]byte, error) {
 	return nil, nil
 }
 
-type resourceMock struct {
-	getFn   func(timeout time.Duration, externalReq *http.Request) ([]byte, error)
-	closeFn func() error
-}
-
-func (rm resourceMock) DoRequest(timeout time.Duration, externalReq *http.Request) ([]byte, error) {
-	if rm.getFn != nil {
-		return rm.getFn(timeout, externalReq)
-	}
-	return nil, nil
-}
-
-func (rm resourceMock) Close() error {
-	if rm.closeFn != nil {
-		return rm.closeFn()
-	}
-	return nil
-}
+//type resourceMock struct {
+//	getFn   func(timeout time.Duration, externalReq *http.Request) ([]byte, error)
+//	closeFn func() error
+//}
+//
+//func (rm resourceMock) DoRequest(timeout time.Duration, externalReq *http.Request) ([]byte, error) {
+//	if rm.getFn != nil {
+//		return rm.getFn(timeout, externalReq)
+//	}
+//	return nil, nil
+//}
+//
+//func (rm resourceMock) Close() error {
+//	if rm.closeFn != nil {
+//		return rm.closeFn()
+//	}
+//	return nil
+//}
 
 type cacherMock struct {
 	setFn func(key string, value []byte, expiration time.Duration) error

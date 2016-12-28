@@ -16,7 +16,9 @@ import (
 
 func mwTestRunner(caddyFile string, r *http.Request) func(*testing.T) {
 
-	// just to see that headers gets passed through our middleware
+	// Add here the middlewares Header and Template just to make sure that
+	// caddyesi middleware processes the other middlewares correctly.
+
 	wantHeaders := http.Header{"X-Esi-Test": []string{"GopherX"}}
 
 	return func(t *testing.T) {
@@ -68,7 +70,7 @@ func mwTestRunner(caddyFile string, r *http.Request) func(*testing.T) {
 		rec := httptest.NewRecorder()
 		code, err := stack.ServeHTTP(rec, r)
 		if err != nil {
-			t.Fatal("Code", code, "Error:", err.Error())
+			t.Fatalf("Code %d\n%+v", code, err)
 		}
 
 		for key := range wantHeaders {
