@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/helpers"
 	"github.com/corestoreio/errors"
@@ -123,7 +124,7 @@ type Entity struct {
 
 	// ResourceRequestFunc performs a request to a backend service via a specific
 	// protocol.
-	ResourceRequestFunc
+	backend.ResourceRequestFunc
 	// Resources contains multiple unique Resource entries, aka backend systems
 	// likes redis instances or other micro services. Resources occur within one
 	// single ESI tag. The resource attribute (src="") can occur multiple times.
@@ -131,7 +132,7 @@ type Entity struct {
 	// the response. If one item fails and we have multiple resources, the next
 	// resource gets queried. All resources share the same scheme/protocol which
 	// must handle the ResourceRequestFunc.
-	Resources []*Resource // Any 3rd party servers
+	Resources []*backend.Resource // Any 3rd party servers
 
 	Conditioner // todo
 }
@@ -183,7 +184,7 @@ func (et *Entity) ParseRaw() error {
 	if len(et.RawTag) == 0 {
 		return nil
 	}
-	et.Resources = make([]*Resource, 0, 2)
+	et.Resources = make([]*backend.Resource, 0, 2)
 
 	matches, err := SplitAttributes(string(et.RawTag))
 	if err != nil {
@@ -270,7 +271,7 @@ func (et *Entity) setResourceRequestFunc() error {
 
 	scheme := strings.ToLower(et.Resources[0].URL[:idx])
 	var ok bool
-	et.ResourceRequestFunc, ok = ResourceRequestRegister[scheme]
+	et.ResourceRequestFunc, ok = backend.ResourceRequestRegister[scheme]
 	if !ok {
 		return errors.NewNotSupportedf("[esitag] Resource protocal %q not yet supported in tag %q", scheme, et.RawTag)
 	}
@@ -287,11 +288,8 @@ func (et *Entity) parseCondition(s string) error {
 }
 
 func (et *Entity) parseResource(idx int, val string) (err error) {
-	r := &Resource{
-		Index: idx,
-		IsURL: strings.Contains(val, "://"),
-		URL:   val,
-	}
+	r := backend.NewResource(idx, val)
+
 	if r.IsURL && strings.Contains(val, TemplateIdentifier) {
 		r.URLTemplate, err = template.New("resource_tpl").Parse(val)
 		if err != nil {
@@ -318,13 +316,16 @@ func (et *Entity) parseKey(val string) (err error) {
 // as defined in the ResourceRequestFunc. If one resource fails it will be
 // marked as timed out and the next resource gets tried. The exponential
 // back-off stops when MaxBackOffs have been reached and then tries again.
+// Returns a Temporary error behaviour when all requests to all resources are
+// failing.
 func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 
-	maxBodySize := DefaultMaxBodySize
+	maxBodySize := backend.DefaultMaxBodySize
 	if et.MaxBodySize > 0 {
 		maxBodySize = et.MaxBodySize
 	}
 
+	mErr := errors.NewMultiErr() // just for collecting errors for informational purposes at the Temporary error at the end.
 	for i, r := range et.Resources {
 
 		url := r.URL
@@ -339,42 +340,44 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 		}
 
 		var lFields log.Fields
-		now := time.Now()
 		if et.Log.IsDebug() {
-			lFields = log.Fields{
-				log.Int("bacled_off", r.backedOff), log.Int("index", i), log.Int("resources_length", len(et.Resources)),
-				log.String("url", url), log.Time("last_failed", r.lastFailed), log.Time("now", now),
-			}
+			lFields = log.Fields{log.Stringer("time_now", time.Now()), log.String("url", url)}
 		}
 
-		if r.lastFailed.After(now) {
-			if et.Log.IsDebug() {
-				et.Log.Debug("esitag.Resources.DoRequest.lastFailed.After", lFields...)
-			}
-			if r.backedOff >= MaxBackOffs {
+		switch state, lastFailure := r.CBState(); state {
+
+		case backend.CBStateHalfOpen, backend.CBStateClosed:
+			data, err := et.ResourceRequestFunc(url, et.Timeout, maxBodySize)
+			if err != nil {
+				mErr.AppendErrors(errors.Errorf("\nIndex %d URL %q with %s\n", i, url, err))
+				lastFailureTime := r.CBRecordFailure()
 				if et.Log.IsDebug() {
-					et.Log.Debug("esitag.Resources.DoRequest.backedOff", lFields...)
+					et.Log.Debug("esitag.Resources.DoRequest.ResourceRequestFunc.Error",
+						log.Err(err), log.Uint64("failure_count", r.CBFailures()), log.UnixNanoHuman("last_failure", lastFailureTime),
+						log.Stringer("time_now", time.Now()), lFields)
 				}
-				r.lastFailed = time.Time{} // restart
+				continue // go to next resource in this loop
 			}
-			continue
-		}
+			if state == backend.CBStateHalfOpen {
+				r.CBReset()
+				if et.Log.IsDebug() {
+					et.Log.Debug("esitag.Resources.DoRequest.ResourceRequestFunc.CBStateHalfOpen",
+						log.Uint64("failure_count", r.CBFailures()), log.Stringer("last_failure", lastFailure), lFields)
+				}
+			}
+			return data, nil
 
-		data, err := et.ResourceRequestFunc(url, et.Timeout, maxBodySize)
-		if err != nil {
+		case backend.CBStateOpen:
 			if et.Log.IsDebug() {
-				et.Log.Debug("esitag.Resources.DoRequest.ResourceRequestFunc", log.Err(err), lFields)
+				et.Log.Debug("esitag.Resources.DoRequest.ResourceRequestFunc.CBStateOpen",
+					log.Uint64("failure_count", r.CBFailures()), log.Stringer("last_failure", lastFailure), lFields)
 			}
-			r.backOff++
-			var dur time.Duration = 1 << r.backOff // exponentially calculated
-			r.lastFailed = time.Now().Add(dur * time.Second)
-			continue
 		}
 
-		return data, nil
+		// go to next resource
 	}
 	// error temporarily timeout so fall back to a maybe provided file.
-	return nil, errors.Errorf("[esitag] Should maybe not happen? TODO investigate")
+	return nil, errors.NewTemporaryf("[esitag] Requests to all resources have temporarily failed: %s", mErr)
 }
 
 // Entities represents a list of ESI tags found in one HTML page.

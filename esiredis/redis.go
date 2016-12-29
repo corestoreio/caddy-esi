@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/pkg/errors"
+	"github.com/corestoreio/errors"
 )
 
 type Redis struct {

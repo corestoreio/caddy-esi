@@ -1,15 +1,19 @@
 package esitag_test
 
 import (
+	"bytes"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
 	"text/template"
 	"time"
 
-	"bytes"
-	"os"
-
+	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/corestoreio/errors"
+	"github.com/corestoreio/log/logw"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -123,7 +127,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include src="https://micro.service/checkout/cart" timeout="9ms" onerror="nocart.html" forwardheaders="Cookie , Accept-Language, Authorization"`),
 		nil,
 		&esitag.Entity{
-			Resources: []*esitag.Resource{
+			Resources: []*backend.Resource{
 				{URL: "https://micro.service/checkout/cart", IsURL: true},
 			},
 			Timeout:        time.Millisecond * 9,
@@ -136,7 +140,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include src="https://micro1.service/checkout/cart" src="https://micro2.service/checkout/cart" ttl="9ms"  returnheaders="Cookie , Accept-Language, Authorization"`),
 		nil,
 		&esitag.Entity{
-			Resources: []*esitag.Resource{
+			Resources: []*backend.Resource{
 				{URL: "https://micro1.service/checkout/cart", IsURL: true, Index: 0},
 				{URL: "https://micro2.service/checkout/cart", IsURL: true, Index: 1},
 			},
@@ -155,7 +159,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include key="product_234234" returnheaders=" all  " forwardheaders=" all  " src="awsRedis1"`),
 		nil,
 		&esitag.Entity{
-			Resources: []*esitag.Resource{
+			Resources: []*backend.Resource{
 				{URL: "awsRedis1", IsURL: false, Index: 0},
 			},
 			Key:               "product_234234",
@@ -168,7 +172,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include key="product_4711" returnheaders='all' forwardheaders="all	" src="awsRedis3"`),
 		nil,
 		&esitag.Entity{
-			Resources: []*esitag.Resource{
+			Resources: []*backend.Resource{
 				{URL: "awsRedis3", IsURL: false, Index: 0},
 			},
 			Key:               "product_4711",
@@ -181,7 +185,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include key='product_234234_{{ .r.Header.Get "myHeaderKey" }}' src="awsRedis2"  returnheaders=" all  " forwardheaders=" all  "`),
 		nil,
 		&esitag.Entity{
-			Resources: []*esitag.Resource{
+			Resources: []*backend.Resource{
 				{URL: "awsRedis2", IsURL: false, Index: 0},
 			},
 			KeyTemplate:       template.Must(template.New("key_tpl").Parse("unimportant")),
@@ -194,7 +198,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include xkey='product_234234_{{ .r.Header.Get "myHeaderKey" }}' src="awsRedis2"  returnheaders=" all  " forwardheaders=" all  "`),
 		nil,
 		&esitag.Entity{
-			Resources: []*esitag.Resource{
+			Resources: []*backend.Resource{
 				{URL: "awsRedis2", IsURL: false, Index: 0},
 			},
 			ReturnHeadersAll:  true,
@@ -469,7 +473,138 @@ func BenchmarkDataTags_InjectContent(b *testing.B) {
 }
 
 func TestEntity_QueryResources(t *testing.T) {
-	t.Skip("TODO")
+
+	// req is the incoming request from outer space. it may contain harmful HTTP
+	// headers (which gets used in the template for key and URL)
+	runner := func(req *http.Request, page string, wantResponse string, wantErrBhf errors.BehaviourFunc) func(*testing.T) {
+		return func(t *testing.T) {
+
+			entities, err := esitag.Parse(strings.NewReader(page))
+			if err != nil {
+				t.Fatalf("%+v", err)
+			}
+			entity := entities[0]
+
+			content, haveErr := entity.QueryResources(req)
+			if wantErrBhf != nil {
+				assert.Empty(t, content)
+				assert.True(t, wantErrBhf(haveErr), "%+v", haveErr)
+				return
+			}
+			assert.Exactly(t, wantResponse, string(content))
+			assert.NoError(t, haveErr, "%+v", haveErr)
+		}
+	}
+
+	backend.ResourceRequestRegister["testa"] = func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
+		switch url {
+		case "testA://micro1":
+			return []byte(`Response from micro1.service1: URL: ` + url), nil
+		case "testA://micro2":
+			t.Errorf("Should not get called: %s", url)
+		}
+
+		t.Fatalf("Not supported: %q", url)
+		return nil, nil
+
+	}
+	t.Run("1st request to first Micro1", runner(
+		httptest.NewRequest("GET", "http://cyrillschumacher.com/esi/endpoint1", nil),
+		`<html><head></head><body>
+			<p><esi:include src="testA://micro1" src="testA://micro2"/></p>
+		</body></html>`,
+		"Response from micro1.service1: URL: testA://micro1",
+		nil,
+	))
+
+	backend.ResourceRequestRegister["testb"] = func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
+		switch url {
+		case "testB://micro1.service1":
+			return nil, errors.NewTimeoutf("Timed out") // this can be any error not timeout only
+		case "testB://micro2.service2":
+			return []byte(`Response from micro2.service2: URL: ` + url), nil
+		}
+		t.Fatalf("Not supported: %q", url)
+		return nil, nil
+	}
+	t.Run("2nd request to 2nd Micro2", runner(
+		httptest.NewRequest("GET", "http://cyrillschumacher.com/esi/endpoint1", nil),
+		`<html><head></head><body>
+			<p><esi:include src="testB://micro1.service1" src="testB://micro2.service2" /></p>
+		</body></html>`,
+		"Response from micro2.service2: URL: testB://micro2.service2",
+		nil,
+	))
+
+	backend.ResourceRequestRegister["testc1"] = func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
+		return nil, errors.NewTimeoutf("Timed out") // this can be any error not timeout only
+	}
+	backend.ResourceRequestRegister["testc2"] = func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
+		t.Fatal("Should not get called because testc1 gets only assigned to type Entity and all other protocoals gets discarded.")
+		return nil, nil
+	}
+	t.Run("2nd request to 2nd Micro2 with different protocol, fails", runner(
+		httptest.NewRequest("GET", "http://cyrillschumacher.com/esi/endpoint1", nil),
+		`<html><head></head><body>
+			<p><esi:include src="testC1://micro1.service1" src="testC2://micro2.service2"  /></p>
+		</body></html>`,
+		"",
+		errors.IsTemporary,
+	))
+}
+
+func TestEntity_QueryResources_Multi_Calls(t *testing.T) {
+
+	backend.CBMaxFailures = 2
+	defer func() {
+		backend.CBMaxFailures = 12
+	}()
+
+	var partialSuccess int
+	backend.ResourceRequestRegister["testd1"] = func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
+		partialSuccess++
+
+		if partialSuccess%2 == 0 {
+			return []byte(`Content`), nil
+		}
+
+		return nil, errors.NewTimeoutf("Timed out") // this can be any error not timeout only
+	}
+
+	entities, err := esitag.Parse(strings.NewReader(`<html><head></head><body>
+			<p><esi:include src="testD1://micro1.service1" src="testD1://micro2.service2"  /></p>
+		</body></html>`))
+	if err != nil {
+		t.Fatalf("%+v", err)
+	}
+
+	buf := new(bytes.Buffer)
+	lg := logw.NewLog(logw.WithLevel(logw.LevelDebug), logw.WithWriter(buf))
+	entities.ApplyLogger(lg)
+	entity := entities[0]
+
+	req := httptest.NewRequest("GET", "https://cyrillschumacher.com/esi/endpoint1", nil)
+
+	var tempErrCount int
+	var contentCount int
+	for i := 0; i < 10; i++ {
+		content, haveErr := entity.QueryResources(req)
+		if haveErr != nil && !errors.IsTemporary(haveErr) {
+			t.Fatalf("%+v", haveErr)
+		}
+		if errors.IsTemporary(haveErr) {
+			tempErrCount++
+		} else if len(content) == 7 {
+			contentCount++
+		}
+
+		time.Sleep(1 * time.Second)
+	}
+	//t.Logf("contentCount %d tempErrCount %d", contentCount, tempErrCount)
+	//t.Log("\n", buf)
+	assert.Exactly(t, 6, contentCount)
+	assert.Exactly(t, 4, tempErrCount)
+
 }
 
 func TestEntities_QueryResources(t *testing.T) {
