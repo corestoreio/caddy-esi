@@ -2,6 +2,7 @@ package esitag_test
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -124,14 +125,14 @@ func TestESITag_ParseRaw(t *testing.T) {
 	}
 
 	t.Run("1x src, timeout, onerror, forwardheaders", runner(
-		[]byte(`include src="https://micro.service/checkout/cart" timeout="9ms" onerror="nocart.html" forwardheaders="Cookie , Accept-Language, Authorization"`),
+		[]byte(`include src="https://micro.service/checkout/cart" timeout="9ms" onerror="testdata/nocart.html" forwardheaders="Cookie , Accept-Language, Authorization"`),
 		nil,
 		&esitag.Entity{
 			Resources: []*backend.Resource{
 				{URL: "https://micro.service/checkout/cart", IsURL: true},
 			},
 			Timeout:        time.Millisecond * 9,
-			OnError:        "nocart.html",
+			OnError:        []byte(`Cart service not available`),
 			ForwardHeaders: []string{"Cookie", "Accept-Language", "Authorization"},
 		},
 	))
@@ -259,7 +260,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 func BenchmarkESITag_ParseRaw_MicroServicse(b *testing.B) {
 	et := &esitag.Entity{
 		RawTag: []byte(`include
-	 src="https://micro1.service/checkout/cart" src="https://micro2.service/checkout/cart" ttl="19ms"  timeout="9ms" onerror="nocart.html"
+	 src="https://micro1.service/checkout/cart" src="https://micro2.service/checkout/cart" ttl="19ms"  timeout="9ms" onerror="Cart not available"
 	forwardheaders="Cookie , Accept-Language, Authorization" returnheaders="Set-Cookie , Authorization"`),
 	}
 	b.ReportAllocs()
@@ -269,7 +270,7 @@ func BenchmarkESITag_ParseRaw_MicroServicse(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
-	if have, want := et.OnError, "nocart.html"; have != want {
+	if have, want := et.OnError, []byte("Cart not available"); !bytes.Equal(have, want) {
 		b.Errorf("Have: %v Want: %v", have, want)
 	}
 }
@@ -555,9 +556,10 @@ func TestEntity_QueryResources(t *testing.T) {
 
 func TestEntity_QueryResources_Multi_Calls(t *testing.T) {
 
+	cbFailOld := backend.CBMaxFailures
 	backend.CBMaxFailures = 2
 	defer func() {
-		backend.CBMaxFailures = 12
+		backend.CBMaxFailures = cbFailOld
 	}()
 
 	var partialSuccess int
@@ -608,5 +610,81 @@ func TestEntity_QueryResources_Multi_Calls(t *testing.T) {
 }
 
 func TestEntities_QueryResources(t *testing.T) {
-	t.Skip("TODO")
+
+	backend.ResourceRequestRegister["teste1"] = func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
+		return []byte(`Content: ` + url), nil
+	}
+	backend.ResourceRequestRegister["teste2"] = func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
+		if url == `testE2://micro2.service2` {
+			return []byte(`Content: ` + url), nil
+		}
+		return nil, errors.NewAlreadyClosedf("Ups already closed")
+	}
+
+	t.Run("QueryResources Request context canceled", func(t *testing.T) {
+		entities, err := esitag.Parse(strings.NewReader(`<html><head></head><body>
+			<p><esi:include src="teste1://micro1.service1" /></p>
+			<p><esi:include src="teste1://micro2.service2" /></p>
+			<p><esi:include src="teste1://micro3.service3" /></p>
+		</body></html>`))
+		if err != nil {
+			t.Fatalf("%+v", err)
+		}
+
+		req := httptest.NewRequest("GET", "https://cyrillschumacher.com/esi/endpoint2", nil)
+
+		ctx, cancel := context.WithCancel(req.Context())
+		req = req.WithContext(ctx)
+		cancel()
+
+		tags, err := entities.QueryResources(req)
+		assert.EqualError(t, errors.Cause(err), context.Canceled.Error())
+		assert.Nil(t, tags)
+	})
+
+	t.Run("QueryResources failed on 2 out of 3 services", func(t *testing.T) {
+		entities, err := esitag.Parse(strings.NewReader(`<html><head></head><body>
+			<p><esi:include src="testE2://micro1.service1" onerror="failed to load service 1" /></p>
+			<p><esi:include src="testE2://micro2.service2"  /></p>
+			<p><esi:include src="testE2://micro3.service3" onerror="failed to load service 3" /></p>
+		</body></html>`))
+		if err != nil {
+			t.Fatalf("%+v", err)
+		}
+
+		req := httptest.NewRequest("GET", "https://cyrillschumacher.com/esi/endpoint1", nil)
+		tags, err := entities.QueryResources(req)
+		if err != nil {
+			t.Fatalf("%+v", err)
+		}
+		assert.Exactly(t, esitag.DataTags{
+			{Data: []byte(`failed to load service 1`), Start: 32, End: 113},
+			{Data: []byte(`Content: testE2://micro2.service2`), Start: 124, End: 171},
+			{Data: []byte(`failed to load service 3`), Start: 182, End: 263},
+		}, tags)
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		entities, err := esitag.Parse(strings.NewReader(`<html><head></head><body>
+			<p><esi:include src="testE1://micro1.service1"  /></p>
+			<p><esi:include src="testE1://micro2.service2"  /></p>
+			<p><esi:include src="testE1://micro3.service3"  /></p>
+		</body></html>`))
+		if err != nil {
+			t.Fatalf("%+v", err)
+		}
+
+		req := httptest.NewRequest("GET", "https://cyrillschumacher.com/esi/endpoint1", nil)
+
+		tags, err := entities.QueryResources(req)
+		if err != nil {
+			t.Fatalf("%+v", err)
+		}
+		assert.Exactly(t, esitag.DataTags{
+			{Data: []byte(`Content: testE1://micro1.service1`), Start: 32, End: 79},
+			{Data: []byte(`Content: testE1://micro2.service2`), Start: 90, End: 137},
+			{Data: []byte(`Content: testE1://micro3.service3`), Start: 148, End: 195},
+		}, tags)
+	})
+
 }

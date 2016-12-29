@@ -3,7 +3,9 @@ package esitag
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"sort"
 	"strings"
 	"text/template"
@@ -105,13 +107,16 @@ func (dts DataTags) Less(i, j int) bool { return dts[i].Start < dts[j].Start }
 
 // Entity represents a single fully parsed ESI tag
 type Entity struct {
-	Log               log.Logger
-	RawTag            []byte
-	DataTag           DataTag
-	MaxBodySize       int64 // DefaultMaxBodySize; TODO(CyS) implement in ESI tag
-	TTL               time.Duration
-	Timeout           time.Duration
-	OnError           string
+	Log         log.Logger
+	RawTag      []byte
+	DataTag     DataTag
+	MaxBodySize int64 // DefaultMaxBodySize; TODO(CyS) implement in ESI tag
+	TTL         time.Duration
+	Timeout     time.Duration
+	// OnError contains the content which gets injected into an erroneous ESI
+	// tag when all reuqests are failing to its backends. If onError in the ESI
+	// tag contains a file name, then that content gets loaded.
+	OnError           []byte
 	ForwardHeaders    []string
 	ForwardHeadersAll bool
 	ReturnHeaders     []string
@@ -212,7 +217,9 @@ func (et *Entity) ParseRaw() error {
 				return errors.Wrapf(err, "[caddyesi] Failed to parse condition %q in tag %q", value, et.RawTag)
 			}
 		case "onerror":
-			et.OnError = value
+			if err := et.parseOnError(value); err != nil {
+				return errors.Wrapf(err, "[caddyesi] Failed to parse onError %q in tag %q", value, et.RawTag)
+			}
 		case "timeout":
 			var err error
 			et.Timeout, err = time.ParseDuration(value)
@@ -275,6 +282,25 @@ func (et *Entity) setResourceRequestFunc() error {
 	if !ok {
 		return errors.NewNotSupportedf("[esitag] Resource protocal %q not yet supported in tag %q", scheme, et.RawTag)
 	}
+	return nil
+}
+
+func (et *Entity) parseOnError(val string) (err error) {
+	var fileExt string
+	if li := strings.LastIndexByte(val, '.'); li > 0 {
+		fileExt = strings.ToLower(val[li+1:])
+	}
+
+	switch fileExt {
+	case "html", "htm", "xml", "txt", "json":
+		et.OnError, err = ioutil.ReadFile(filepath.Clean(val))
+		if err != nil {
+			return errors.NewFatalf("[caddyesi] ESITag.ParseRaw. Failed to process %q as template with error: %s\nTag: %q", val, err, et.RawTag)
+		}
+	default:
+		et.OnError = []byte(val)
+	}
+
 	return nil
 }
 
@@ -427,11 +453,18 @@ func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 		e := e
 		g.Go(func() error {
 			data, err := e.QueryResources(r)
-			if err != nil {
+			isTempErr := errors.IsTemporary(err)
+			if err != nil && !isTempErr {
+				// err should have in most cases temporary error behaviour.
+				// if so fall back to the maybe provided physical file template
 				return errors.Wrapf(err, "[esitag] QueryResources.Resources.DoRequest failed for Tag %q", e.RawTag)
 			}
+
 			t := e.DataTag
 			t.Data = data
+			if isTempErr {
+				t.Data = e.OnError
+			}
 
 			select {
 			case cTag <- t:
@@ -454,7 +487,7 @@ func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 	// errors, we don't need to send them (or check for them) in the individual
 	// results sent on the channel.
 	if err := g.Wait(); err != nil {
-		return nil, errors.Wrap(err, "[esitag]")
+		return nil, errors.Wrap(err, "[esitag] Entities.QueryResources ErrGroup.Error")
 	}
 
 	sort.Stable(tags)

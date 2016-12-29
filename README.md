@@ -146,12 +146,16 @@ disabled.
 ### Load local file after timeout (optional)
 
 The basic tag with the attribute `timeout` waits for the src until the timeout
-occurs. After the timeout, the ESI processor loads the local HTML file from the
-attribute `onerror` and renders it into the page. If the file does not exists an
-ugly error gets shown.
+occurs. After the timeout, the ESI processor loads the local file or text from
+the attribute `onerror` and renders it into the page. If the file does not
+exists an ugly error gets shown.
+
+Supported file extensions: `"html", "htm", "xml", "txt", "json"`
 
 ```
-<esi:include src="https://micro.service/esi/foo" timeout="time.Duration" onerror="mylocalFile.html"/>
+<esi:include src="https://micro.service/esi/foo" timeout="time.Duration" onerror="path/to/mylocalFile.html"/>
+
+<esi:include src="https://micro.service/esi/foo" timeout="time.Duration" onerror="Cannot load weather service"/>
 ```
 
 ### Flip src to AJAX call after timeout (optional)
