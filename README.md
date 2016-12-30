@@ -63,29 +63,29 @@ empty or unknown, logging is disabled.
 - `log_format` not yet supported. Ideas?
 - ... ?
 
-## Supported ESI Tags
+## Supported ESI Tags and their attributes
 
 Implemented:
 
 - [x] Caddy configuration parsing
 - [x] ESI tag parsing
-- [ ] ESI tag replacement
-- [ ] Background Fetcher workers
-- [ ] Basic ESI Tag
+- [x] ESI tag replacement
+- [x] Background Fetcher workers
+- [x] Basic ESI Tag
 - [ ] With timeout
 - [ ] With ttl
-- [ ] Load local file after timeout
+- [x] Load local file after timeout
 - [ ] Flip src to AJAX call after timeout
 - [ ] Forward all headers
 - [ ] Forward some headers
 - [ ] Return all headers
 - [ ] Return some headers
-- [ ] Multiple sources
-- [ ] Dynamic sources
+- [x] Multiple sources
+- [x] Dynamic sources
 - [ ] Conditional tag loading
 - [ ] Redis access
 - [ ] Handle compressed content from backends
-- [ ] Coalesce multiple requests into one backend request
+- [x] Coalesce multiple requests into one backend request
 
 Implementation ideas:
 
