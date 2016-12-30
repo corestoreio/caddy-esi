@@ -49,16 +49,16 @@ func testRunner(fileOrContent string, wantTags esitag.Entities, wantErrBhf error
 			assert.True(t, wantErrBhf(err), "%+v", err)
 			return
 		}
-		require.NoError(t, err)
+		require.NoError(t, err, " In Test %s", t.Name())
 
 		if have, want := len(haveTags), len(wantTags); have != want {
 			t.Errorf("esitag.ESITags Count does not match: Have: %v Want: %v", have, want)
 		}
 
 		for i, tg := range wantTags {
-			assert.Exactly(t, string(tg.RawTag), string(haveTags[i].RawTag), "RawTag Index %d", i)
-			assert.Exactly(t, tg.DataTag.Start, haveTags[i].DataTag.Start, "Start Index %d", i)
-			assert.Exactly(t, tg.DataTag.End, haveTags[i].DataTag.End, "End Index %d", i)
+			assert.Exactly(t, string(tg.RawTag), string(haveTags[i].RawTag), "RawTag Index %d %s", i, t.Name())
+			assert.Exactly(t, tg.DataTag.Start, haveTags[i].DataTag.Start, "Start Index %d %s", i, t.Name())
+			assert.Exactly(t, tg.DataTag.End, haveTags[i].DataTag.End, "End Index %d %s", i, t.Name())
 			if haveEnd, wantEnd := haveTags[i].DataTag.End, len(fileOrContent); haveEnd > wantEnd {
 				t.Fatalf("For DataTag index %d the end %d is greater than the content length %d", i, haveEnd, wantEnd)
 			}
@@ -70,24 +70,24 @@ func testRunner(fileOrContent string, wantTags esitag.Entities, wantErrBhf error
 // page3Results used in test and in benchmark; relates to file testdata/page3.html
 var page3Results = esitag.Entities{
 	&esitag.Entity{
-		RawTag: []byte(`include src="https://micr1.service/customer/account" timeout="18ms" onerror="accountNotAvailable.html"`),
+		RawTag: []byte(`include src="https://micr1.service/customer/account" timeout="18ms" onerror="testdata/nocart.html"`),
 		DataTag: esitag.DataTag{
 			Start: 2009,
-			End:   2118,
+			End:   2114,
 		},
 	},
 	&esitag.Entity{
-		RawTag: []byte(`include src="https://micr2.service/checkout/cart" timeout="19ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"`),
+		RawTag: []byte(`include src="https://micr2.service/checkout/cart" timeout="19ms" onerror="service not found" forwardheaders="Cookie,Accept-Language,Authorization"`),
 		DataTag: esitag.DataTag{
-			Start: 4042,
-			End:   4189,
+			Start: 4038,
+			End:   4191,
 		},
 	},
 	&esitag.Entity{
-		RawTag: []byte("include src=\"https://micr3.service/page/lastviewed\" timeout=\"20ms\" onerror=\"nofooter.html\" forwardheaders=\"Cookie,Accept-Language,Authorization\""),
+		RawTag: []byte("include src=\"https://micr3.service/page/lastviewed\" timeout=\"20ms\" onerror=\"service not found\" forwardheaders=\"Cookie,Accept-Language,Authorization\""),
 		DataTag: esitag.DataTag{
-			Start: 4453,
-			End:   4604,
+			Start: 4455,
+			End:   4610,
 		},
 	},
 }
@@ -110,10 +110,10 @@ func TestParseESITags_File(t *testing.T) {
 		("page1.html"),
 		esitag.Entities{
 			&esitag.Entity{
-				RawTag: []byte("include src=\"https://micro.service/esi/foo\" timeout=\"8ms\" onerror=\"mylocalFile.html\""),
+				RawTag: []byte("include src=\"https://micro.service/esi/foo\" timeout=\"8ms\" onerror=\"testdata/nocart.html\""),
 				DataTag: esitag.DataTag{
 					Start: 20644,
-					End:   20735,
+					End:   20739,
 				},
 			},
 		},
@@ -123,17 +123,17 @@ func TestParseESITags_File(t *testing.T) {
 		("page2.html"),
 		esitag.Entities{
 			&esitag.Entity{
-				RawTag: []byte("include src=\"https://micro.service/customer/account\" timeout=\"8ms\" onerror=\"accountNotAvailable.html\""),
+				RawTag: []byte("include src=\"https://micro.service/customer/account\" timeout=\"8ms\" onerror=\"testdata/nocart.html\""),
 				DataTag: esitag.DataTag{
 					Start: 6280,
-					End:   6388,
+					End:   6384,
 				},
 			},
 			&esitag.Entity{
-				RawTag: []byte(`include src="https://micro.service/checkout/cart" timeout="9ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"`),
+				RawTag: []byte(`include src="https://micro.service/checkout/cart" timeout="9ms" onerror="testdata/nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"`),
 				DataTag: esitag.DataTag{
-					Start: 7103,
-					End:   7249,
+					Start: 7099,
+					End:   7254,
 				},
 			},
 		},
@@ -144,6 +144,12 @@ func TestParseESITags_File(t *testing.T) {
 		page3Results,
 		nil,
 	))
+	t.Run("Page5 onerror file not found", testRunner(
+		("page5.html"),
+		nil,
+		errors.IsFatal,
+	))
+
 }
 
 var benchmarkParseESITags esitag.Entities

@@ -23,7 +23,7 @@
     <script  type="text/javascript"  src="http://m2demo.domainname.com/pub/static/frontend/Magento/luma/en_US/requirejs/require.js"></script>
     <script  type="text/javascript"  src="http://m2demo.domainname.com/pub/static/frontend/Magento/luma/en_US/mage/requirejs/mixins.js"></script>
     <script  type="text/javascript"  src="http://m2demo.domainname.com/pub/static/_requirejs/frontend/Magento/luma/en_US/requirejs-config.js"></script>
-    <esi:include src="https://micr1.service/customer/account" timeout="18ms" onerror="accountNotAvailable.html"/>
+    <esi:include src="https://micr1.service/customer/account" timeout="18ms" onerror="testdata/nocart.html"/>
 
     <link  rel="stylesheet" type="text/css"  media="all" href="http://m2demo.domainname.com/pub/media/styles.css" />            </head>
 <body data-container="body" data-mage-init='{"loaderAjax": {}, "loader": { "icon": "http://m2demo.domainname.com/pub/static/frontend/Magento/luma/en_US/images/loader-2.gif"}}' class="page-with-filter page-products categorypath-women-bottoms-women category-bottoms-women catalog-category-view page-layout-2columns-left">
@@ -59,7 +59,7 @@
 
             <!-- /ko --></span>
             <span class="counter-label">
-            <!-- ko if: cart().summary_count --><esi:include src="https://micr2.service/checkout/cart" timeout="19ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"/>
+            <!-- ko if: cart().summary_count --><esi:include src="https://micr2.service/checkout/cart" timeout="19ms" onerror="service not found" forwardheaders="Cookie,Accept-Language,Authorization"/>
                 <!-- ko text: cart().summary_count --><!-- /ko -->
                 <!-- ko i18n: 'items' --><!-- /ko -->
                 <!-- /ko -->
@@ -67,4 +67,4 @@
 Dont change this file because if forces a lookahead in the bufio.Reader with a buffer size of 2048
 
     </html>
-<esi:include src="https://micr3.service/page/lastviewed" timeout="20ms" onerror="nofooter.html" forwardheaders="Cookie,Accept-Language,Authorization"/>
+<esi:include src="https://micr3.service/page/lastviewed" timeout="20ms" onerror="service not found" forwardheaders="Cookie,Accept-Language,Authorization"/>

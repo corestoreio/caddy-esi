@@ -132,7 +132,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 				{URL: "https://micro.service/checkout/cart", IsURL: true},
 			},
 			Timeout:        time.Millisecond * 9,
-			OnError:        []byte(`Cart service not available`),
+			OnError:        []byte("Cart service not available\n"),
 			ForwardHeaders: []string{"Cookie", "Accept-Language", "Authorization"},
 		},
 	))

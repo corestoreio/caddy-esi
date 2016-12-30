@@ -132,7 +132,7 @@ ga('send', 'pageview');
         }
         </script>
         <li class="authorization-link" data-label="or">
-            <esi:include src="https://micro.service/customer/account" timeout="8ms" onerror="accountNotAvailable.html"/>
+            <esi:include src="https://micro.service/customer/account" timeout="8ms" onerror="testdata/nocart.html"/>
             <a href="http://m2demo.domainname.com/customer/account/login/">
                 Sign In    </a>
         </li>
@@ -144,7 +144,7 @@ ga('send', 'pageview');
     </a>
 
     <div data-block="minicart" class="minicart-wrapper">
-        <esi:include src="https://micro.service/checkout/cart" timeout="9ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"/>
+        <esi:include src="https://micro.service/checkout/cart" timeout="9ms" onerror="testdata/nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"/>
         <a class="action showcart" href="http://m2demo.domainname.com/checkout/cart/"
            data-bind="scope: 'minicart_content'">
             <span class="text">My Cart</span>
