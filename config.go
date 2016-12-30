@@ -2,13 +2,17 @@ package caddyesi
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/SchumacherFM/caddyesi/helpers"
+	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
 	"github.com/pierrec/xxHash/xxHash64"
@@ -20,6 +24,11 @@ const DefaultTimeOut = 20 * time.Second
 // DefaultMaxBodySize the body size of a retrieved request to a resource. 5 MB
 // is a lot of text.
 const DefaultMaxBodySize uint64 = 5 << 20
+
+// DefaultOnError default error message when a backend service cannot be
+// requested. Only when config value on_error in Caddyfile has not been
+// supplied.
+const DefaultOnError = `Resource not available`
 
 // PathConfigs contains the configuration for each path prefix
 type PathConfigs []*PathConfig
@@ -56,6 +65,8 @@ type PathConfig struct {
 	PageIDSource []string
 	// AllowedMethods list of all allowed methods, defaults to GET
 	AllowedMethods []string
+	// OnError gets output when a request to a backend service fails.
+	OnError []byte
 	// LogFile where to write the log output? Either any file name or stderr or
 	// stdout. If empty logging disabled.
 	LogFile string
@@ -90,6 +101,25 @@ func NewPathConfig() *PathConfig {
 	}
 }
 
+func (pc *PathConfig) parseOnError(val string) (err error) {
+	var fileExt string
+	if li := strings.LastIndexByte(val, '.'); li > 0 {
+		fileExt = strings.ToLower(val[li+1:])
+	}
+
+	switch fileExt {
+	case "html", "htm", "xml", "txt", "json":
+		pc.OnError, err = ioutil.ReadFile(filepath.Clean(val))
+		if err != nil {
+			return errors.NewFatalf("[caddyesi] PathConfig.parseOnError. Failed to process %q with error: %s. Scope %q", val, err, pc.Scope)
+		}
+	default:
+		pc.OnError = []byte(val)
+	}
+
+	return nil
+}
+
 // ESITagsByRequest selects in the ServeHTTP function all ESITags identified by
 // their pageIDs.
 func (pc *PathConfig) ESITagsByRequest(r *http.Request) (pageID uint64, t esitag.Entities) {
@@ -117,6 +147,9 @@ func (pc *PathConfig) UpsertESITags(pageID uint64, entities esitag.Entities) {
 		if et.TTL < 1 {
 			et.TTL = pc.TTL
 		}
+		if len(et.OnError) == 0 {
+			et.OnError = pc.OnError
+		}
 		// add here the KVFetcher ...
 	}
 
@@ -127,12 +160,15 @@ func (pc *PathConfig) UpsertESITags(pageID uint64, entities esitag.Entities) {
 
 // IsRequestAllowed decides if a request should be processed.
 func (pc *PathConfig) IsRequestAllowed(r *http.Request) bool {
+	if len(pc.AllowedMethods) == 0 {
+		return r.Method == http.MethodGet
+	}
 	for _, m := range pc.AllowedMethods {
 		if r.Method == m {
 			return true
 		}
 	}
-	return r.Method == http.MethodGet
+	return false
 }
 
 var defaultPageIDSource = [...]string{"host", "path"}

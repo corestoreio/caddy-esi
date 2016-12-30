@@ -18,42 +18,47 @@ func TestPluginSetup(t *testing.T) {
 	t.Parallel()
 
 	runner := func(config string, wantPC PathConfigs, wantErrBhf errors.BehaviourFunc) func(*testing.T) {
-		return func(ts *testing.T) {
+		return func(t *testing.T) {
 			c := caddy.NewTestController("http", config)
 
 			if err := PluginSetup(c); wantErrBhf != nil {
-				assert.True(ts, wantErrBhf(err), "%+v", err)
+				assert.True(t, wantErrBhf(err), "%+v", err)
 				return
 			} else if err != nil {
-				ts.Fatalf("Expected no errors, got: %+v", err)
+				t.Fatalf("Expected no errors, got: %+v", err)
 			}
 
 			mids := httpserver.GetConfig(c).Middleware()
 			if len(mids) != 1 {
-				ts.Fatalf("Expected one middleware, got %d instead", len(mids))
+				t.Fatalf("Expected one middleware, got %d instead", len(mids))
 			}
 			handler := mids[0](httpserver.EmptyNext)
 			myHandler, ok := handler.(*Middleware)
 			if !ok {
-				ts.Fatalf("Expected handler to be type ESI, got: %#v", handler)
+				t.Fatalf("Expected handler to be type ESI, got: %#v", handler)
 			}
-			assert.Exactly(ts, len(wantPC), len(myHandler.PathConfigs))
+			assert.Exactly(t, len(wantPC), len(myHandler.PathConfigs))
 			for j, wantC := range wantPC {
 				haveC := myHandler.PathConfigs[j]
 
-				assert.Exactly(ts, wantC.Scope, haveC.Scope, "Scope (Path)")
-				assert.Exactly(ts, wantC.Timeout, haveC.Timeout, "Timeout")
-				assert.Exactly(ts, wantC.TTL, haveC.TTL, "TTL")
-				assert.Exactly(ts, wantC.PageIDSource, haveC.PageIDSource, "PageIDSource")
-				assert.Exactly(ts, wantC.AllowedMethods, haveC.AllowedMethods, "AllowedMethods")
-
-				assert.Len(ts, haveC.KVServices, len(wantC.KVServices), "Index %d", j)
-				for key := range wantC.KVServices {
-					_, ok := haveC.KVServices[key]
-					assert.True(ts, ok, "Index %d", j)
+				assert.Exactly(t, wantC.Scope, haveC.Scope, "Scope (Path) %s", t.Name())
+				assert.Exactly(t, wantC.Timeout, haveC.Timeout, "Timeout %s", t.Name())
+				assert.Exactly(t, wantC.TTL, haveC.TTL, "TTL %s", t.Name())
+				assert.Exactly(t, wantC.PageIDSource, haveC.PageIDSource, "PageIDSource %s", t.Name())
+				assert.Exactly(t, wantC.AllowedMethods, haveC.AllowedMethods, "AllowedMethods %s", t.Name())
+				assert.Exactly(t, wantC.LogFile, haveC.LogFile, "LogFile %s", t.Name())
+				assert.Exactly(t, wantC.LogLevel, haveC.LogLevel, "LogLevel %s", t.Name())
+				if len(wantC.OnError) > 0 {
+					assert.Exactly(t, string(wantC.OnError), string(haveC.OnError), "OnError %s", t.Name())
 				}
 
-				assert.Len(ts, haveC.Caches, len(wantC.Caches), "Index  %d", j)
+				assert.Len(t, haveC.KVServices, len(wantC.KVServices), "Index %d %s", j, t.Name())
+				for key := range wantC.KVServices {
+					_, ok := haveC.KVServices[key]
+					assert.True(t, ok, "Index %d %s", j, t.Name())
+				}
+
+				assert.Len(t, haveC.Caches, len(wantC.Caches), "Index  %d", j)
 			}
 		}
 	}
@@ -283,6 +288,58 @@ func TestPluginSetup(t *testing.T) {
 			},
 		},
 		nil,
+	))
+
+	t.Run("Log level info and file stderr", runner(
+		`esi /catalog/product {
+		   log_file stderr
+		   log_level INFO
+		}`,
+		PathConfigs{
+			&PathConfig{
+				Scope:    "/catalog/product",
+				Timeout:  20 * time.Second,
+				LogFile:  "stderr",
+				LogLevel: "info",
+			},
+		},
+		nil,
+	))
+
+	t.Run("OnError String", runner(
+		`esi /catalog/product {
+		   on_error "Resource content unavailable"
+		}`,
+		PathConfigs{
+			&PathConfig{
+				Scope:   "/catalog/product",
+				Timeout: 20 * time.Second,
+				OnError: []byte("Resource content unavailable"),
+			},
+		},
+		nil,
+	))
+
+	t.Run("OnError File", runner(
+		`esi /catalog/product {
+		   on_error "testdata/on_error.txt"
+		}`,
+		PathConfigs{
+			&PathConfig{
+				Scope:   "/catalog/product",
+				Timeout: 20 * time.Second,
+				OnError: []byte("Output on a backend connection error\n"),
+			},
+		},
+		nil,
+	))
+
+	t.Run("OnError File not found", runner(
+		`esi / {
+		   on_error "testdataXX/on_error.txt"
+		}`,
+		nil,
+		errors.IsFatal,
 	))
 }
 

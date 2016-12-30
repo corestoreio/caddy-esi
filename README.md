@@ -25,6 +25,7 @@ https://cyrillschumacher.local:2718 {
         [cache redis://localhost:6380/0]
         [cache memcache://localhost:11211/2]
         [cache inmemory]
+        [on_error (filename|"any text")]
         [log_file (filename|stdout|stderr)]
         [log_level (fatal|info|debug)]
 

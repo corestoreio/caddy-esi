@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/SchumacherFM/caddyesi"
+	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/corestoreio/errors"
 	"github.com/mholt/caddy"
 	"github.com/mholt/caddy/caddyhttp/header"
@@ -14,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func mwTestRunner(caddyFile string, r *http.Request) func(*testing.T) {
+func mwTestRunner(caddyFile string, r *http.Request, bodyContains string) func(*testing.T) {
 
 	// Add here the middlewares Header and Template just to make sure that
 	// caddyesi middleware processes the other middlewares correctly.
@@ -81,23 +82,45 @@ func mwTestRunner(caddyFile string, r *http.Request) func(*testing.T) {
 		if rec.Body.Len() == 0 {
 			t.Error("Unexpected empty Body!")
 		}
-		// assert.NotContains(t, rec.Body.String(), `<esi:`, "Body should not contain any kind of ESI tag")
 
-		t.Logf("Code: %d", code)
-		t.Logf("Header: %#v", rec.Header())
-		t.Logf("Body: %q", rec.Body.String())
+		if bodyContains != "" {
+			assert.Contains(t, rec.Body.String(), bodyContains, "Body should contain in Test: %s", t.Name())
+		} else {
+
+			t.Logf("Code: %d", code)
+			t.Logf("Header: %#v", rec.Header())
+			t.Logf("Body: %q", rec.Body.String())
+		}
 	}
 }
 
 func TestMiddleware_ServeHTTP(t *testing.T) {
 
-	//defer backend.RegisterRequestFunc("mwTest01", func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
-	//	return nil, errors.NewAlreadyExistsf("[whops] todo")
-	//})
+	defer backend.RegisterRequestFunc("mwtest01", backend.MockRequestError(errors.NewWriteFailedf("write failed"))).DeferredDeregister()
 
-	t.Run("Replace a single ESI Tag in page0.html", mwTestRunner(
+	t.Run("Middleware inactive due to GET allowed but POST request supplied", mwTestRunner(
+		`esi {
+			allowed_methods GET
+		}`,
+		httptest.NewRequest("POST", "/page01.html", nil),
+		"<esi:include   src=\"mwTest01://micro.service/esi/foo\"",
+	))
+
+	t.Run("Replace a single ESI Tag in page01.html but error in backend request", mwTestRunner(
+		`esi {
+			on_error "my important global error message"
+			allowed_methods GET
+			log_file stdout
+			log_level debug
+		}`,
+		httptest.NewRequest("GET", "/page01.html", nil),
+		`my important global error message`,
+	))
+
+	t.Run("Replace a single ESI Tag in page01.html but error in backend triggers default on_error message", mwTestRunner(
 		`esi`,
-		httptest.NewRequest("GET", "/page0.html", nil),
+		httptest.NewRequest("GET", "/page01.html", nil),
+		caddyesi.DefaultOnError,
 	))
 
 }

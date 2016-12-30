@@ -93,6 +93,9 @@ func configEsiParse(c *caddy.Controller) (PathConfigs, error) {
 		if pc.Timeout == 0 {
 			pc.Timeout = DefaultTimeOut
 		}
+		if len(pc.OnError) == 0 {
+			pc.OnError = []byte(DefaultOnError)
+		}
 
 		pcs = append(pcs, pc)
 	}
@@ -196,6 +199,13 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 			return errors.NewNotValidf("[caddyesi] allowed_methods: %s", c.ArgErr())
 		}
 		pc.AllowedMethods = helpers.CommaListToSlice(strings.ToUpper(c.Val()))
+	case "on_error":
+		if !c.NextArg() {
+			return errors.NewNotValidf("[caddyesi] allowed_methods: %s", c.ArgErr())
+		}
+		if err := pc.parseOnError(c.Val()); err != nil {
+			return errors.Wrap(err, "[caddyesi] PathConfig.parseOnError")
+		}
 	case "log_file":
 		if !c.NextArg() {
 			return errors.NewNotValidf("[caddyesi] log_file: %s", c.ArgErr())
@@ -205,7 +215,7 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 		if !c.NextArg() {
 			return errors.NewNotValidf("[caddyesi] log_level: %s", c.ArgErr())
 		}
-		pc.LogFile = strings.ToLower(c.Val())
+		pc.LogLevel = strings.ToLower(c.Val())
 
 	default:
 		//catch all

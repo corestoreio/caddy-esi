@@ -223,6 +223,11 @@ func TestPathConfig_isRequestAllowed(t *testing.T) {
 		httptest.NewRequest("POST", "/test", nil),
 		true,
 	))
+	t.Run("GET allowed but only POSt allowed", runner(
+		[]string{"POST"},
+		httptest.NewRequest("GET", "/test", nil),
+		false,
+	))
 }
 
 func TestPathConfigs_ConfigForPath(t *testing.T) {

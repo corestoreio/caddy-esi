@@ -331,7 +331,7 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 
 		var lFields log.Fields
 		if et.Log.IsDebug() {
-			lFields = log.Fields{log.Stringer("time_now", time.Now()), log.String("url", r.String())}
+			lFields = log.Fields{log.String("url", r.String())}
 		}
 
 		switch state, lastFailure := r.CBState(); state {
@@ -343,8 +343,7 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 				lastFailureTime := r.CBRecordFailure()
 				if et.Log.IsDebug() {
 					et.Log.Debug("esitag.Entity.QueryResources.RequestFunc.Error",
-						log.Err(err), log.Uint64("failure_count", r.CBFailures()), log.UnixNanoHuman("last_failure", lastFailureTime),
-						log.Stringer("time_now", time.Now()), lFields)
+						log.Err(err), log.Uint64("failure_count", r.CBFailures()), log.UnixNanoHuman("last_failure", lastFailureTime), lFields)
 				}
 				continue // go to next resource in this loop
 			}

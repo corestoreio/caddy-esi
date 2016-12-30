@@ -1,6 +1,7 @@
 package caddyesi
 
 import (
+	"bytes"
 	"net/http"
 	"strconv"
 
@@ -62,7 +63,6 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 
 	pageID, esiEntities := cfg.ESITagsByRequest(r)
 	if len(esiEntities) == 0 {
-		// does the following code even work?
 
 		// within this IF block we make sure with the Group.Do call that ESI
 		// tags to a specific page get only parsed once even if multiple
@@ -71,7 +71,7 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 
 		result, err, shared := mw.Group.Do(strconv.FormatUint(pageID, 10), func() (interface{}, error) {
 
-			entities, err := esitag.Parse(fullRespBuf) // for now a NewReader, might be removed
+			entities, err := esitag.Parse(bytes.NewReader(fullRespBuf.Bytes())) // for now a NewReader, might be removed
 			if cfg.Log.IsDebug() {
 				cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse",
 					log.Err(err), log.Uint64("page_id", pageID), loghttp.Request("request", r),

@@ -3,6 +3,7 @@ package backend
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -70,6 +71,13 @@ func MockRequestContent(content string) RequestFunc {
 func MockRequestError(err error) RequestFunc {
 	return func(url string, timeout time.Duration, maxBodySize uint64) ([]byte, error) {
 		return nil, err
+	}
+}
+
+// MockRequestPanic just panics
+func MockRequestPanic(msg interface{}) RequestFunc {
+	return func(url string, timeout time.Duration, maxBodySize uint64) ([]byte, error) {
+		panic(msg)
 	}
 }
 
@@ -153,7 +161,7 @@ func (r *Resource) String() string {
 // DoRequest performs the request to the backend. Uses externalReq as data when
 // rendering the URL template.
 func (r *Resource) DoRequest(externalReq *http.Request, timeout time.Duration, maxBodySize uint64) ([]byte, error) {
-	url := r.url
+	currentURL := r.url
 	if r.urlTemplate != nil {
 		buf := bufpool.Get()
 		defer bufpool.Put(buf)
@@ -161,15 +169,20 @@ func (r *Resource) DoRequest(externalReq *http.Request, timeout time.Duration, m
 		if err := r.urlTemplate.Execute(buf, struct {
 			// These are the currently available template variables. which is only "r" for
 			// the request object.
-			r *http.Request
+			Req    *http.Request
+			URL    *url.URL
+			Header http.Header
+			// Cookie []*http.Cookie TODO add better cookie handling
 		}{
-			r: externalReq,
+			Req:    externalReq,
+			URL:    externalReq.URL,
+			Header: externalReq.Header,
 		}); err != nil {
 			return nil, errors.NewTemporaryf("[esitag] Resource %q Template error: %s\nContent: %s", r.String(), err, buf)
 		}
-		url = buf.String()
+		currentURL = buf.String()
 	}
-	return r.rf(url, timeout, maxBodySize)
+	return r.rf(currentURL, timeout, maxBodySize)
 }
 
 // CBState declares the different states for the circuit breaker (CB)
