@@ -497,7 +497,7 @@ func TestEntity_QueryResources(t *testing.T) {
 		}
 	}
 
-	backend.ResourceRequestRegister["testa"] = func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
+	defer backend.RegisterRequestFunc("testa", func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
 		switch url {
 		case "testA://micro1":
 			return []byte(`Response from micro1.service1: URL: ` + url), nil
@@ -507,8 +507,8 @@ func TestEntity_QueryResources(t *testing.T) {
 
 		t.Fatalf("Not supported: %q", url)
 		return nil, nil
+	}).DeferredDeregister()
 
-	}
 	t.Run("1st request to first Micro1", runner(
 		httptest.NewRequest("GET", "http://cyrillschumacher.com/esi/endpoint1", nil),
 		`<html><head></head><body>
@@ -518,7 +518,7 @@ func TestEntity_QueryResources(t *testing.T) {
 		nil,
 	))
 
-	backend.ResourceRequestRegister["testb"] = func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
+	defer backend.RegisterRequestFunc("testb", func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
 		switch url {
 		case "testB://micro1.service1":
 			return nil, errors.NewTimeoutf("Timed out") // this can be any error not timeout only
@@ -527,7 +527,7 @@ func TestEntity_QueryResources(t *testing.T) {
 		}
 		t.Fatalf("Not supported: %q", url)
 		return nil, nil
-	}
+	}).DeferredDeregister()
 	t.Run("2nd request to 2nd Micro2", runner(
 		httptest.NewRequest("GET", "http://cyrillschumacher.com/esi/endpoint1", nil),
 		`<html><head></head><body>
@@ -537,13 +537,13 @@ func TestEntity_QueryResources(t *testing.T) {
 		nil,
 	))
 
-	backend.ResourceRequestRegister["testc1"] = func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
+	defer backend.RegisterRequestFunc("testc1", func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
 		return nil, errors.NewTimeoutf("Timed out") // this can be any error not timeout only
-	}
-	backend.ResourceRequestRegister["testc2"] = func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
+	}).DeferredDeregister()
+	defer backend.RegisterRequestFunc("testc2", func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
 		t.Fatal("Should not get called because testc1 gets only assigned to type Entity and all other protocoals gets discarded.")
 		return nil, nil
-	}
+	}).DeferredDeregister()
 	t.Run("2nd request to 2nd Micro2 with different protocol, fails", runner(
 		httptest.NewRequest("GET", "http://cyrillschumacher.com/esi/endpoint1", nil),
 		`<html><head></head><body>
@@ -563,7 +563,7 @@ func TestEntity_QueryResources_Multi_Calls(t *testing.T) {
 	}()
 
 	var partialSuccess int
-	backend.ResourceRequestRegister["testd1"] = func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
+	defer backend.RegisterRequestFunc("testd1", func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
 		partialSuccess++
 
 		if partialSuccess%2 == 0 {
@@ -571,7 +571,7 @@ func TestEntity_QueryResources_Multi_Calls(t *testing.T) {
 		}
 
 		return nil, errors.NewTimeoutf("Timed out") // this can be any error not timeout only
-	}
+	}).DeferredDeregister()
 
 	entities, err := esitag.Parse(strings.NewReader(`<html><head></head><body>
 			<p><esi:include src="testD1://micro1.service1" src="testD1://micro2.service2"  /></p>
@@ -611,15 +611,16 @@ func TestEntity_QueryResources_Multi_Calls(t *testing.T) {
 
 func TestEntities_QueryResources(t *testing.T) {
 
-	backend.ResourceRequestRegister["teste1"] = func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
+	defer backend.RegisterRequestFunc("teste1", func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
 		return []byte(`Content: ` + url), nil
-	}
-	backend.ResourceRequestRegister["teste2"] = func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
+	}).DeferredDeregister()
+
+	defer backend.RegisterRequestFunc("teste2", func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
 		if url == `testE2://micro2.service2` {
 			return []byte(`Content: ` + url), nil
 		}
 		return nil, errors.NewAlreadyClosedf("Ups already closed")
-	}
+	}).DeferredDeregister()
 
 	t.Run("QueryResources Request context canceled", func(t *testing.T) {
 		entities, err := esitag.Parse(strings.NewReader(`<html><head></head><body>
@@ -638,6 +639,8 @@ func TestEntities_QueryResources(t *testing.T) {
 		cancel()
 
 		tags, err := entities.QueryResources(req)
+		// sometimes this test gets flaky because it seems the the cancel() does
+		// not work properly :-( No idea ...
 		assert.EqualError(t, errors.Cause(err), context.Canceled.Error())
 		assert.Nil(t, tags)
 	})

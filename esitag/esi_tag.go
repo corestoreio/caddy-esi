@@ -25,6 +25,10 @@ import (
 // supported.
 const TemplateIdentifier = "{{"
 
+// DefaultMaxBodySize the body size of a retrieved request to a resource. 5 MB
+// is a lot of text.
+const DefaultMaxBodySize int64 = 5 << 20
+
 // Conditioner does not represent your favorite shampoo but it gives you the
 // possibility to define an expression which gets executed for every request to
 // include the ESI resource or not.
@@ -127,16 +131,16 @@ type Entity struct {
 	// identifier. Then the Key field would be empty.
 	KeyTemplate *template.Template
 
-	// ResourceRequestFunc performs a request to a backend service via a specific
+	// RequestFunc performs a request to a backend service via a specific
 	// protocol.
-	backend.ResourceRequestFunc
+	backend.RequestFunc
 	// Resources contains multiple unique Resource entries, aka backend systems
 	// likes redis instances or other micro services. Resources occur within one
 	// single ESI tag. The resource attribute (src="") can occur multiple times.
 	// The first item which successfully returns data gets its content used in
 	// the response. If one item fails and we have multiple resources, the next
 	// resource gets queried. All resources share the same scheme/protocol which
-	// must handle the ResourceRequestFunc.
+	// must handle the RequestFunc.
 	Resources []*backend.Resource // Any 3rd party servers
 
 	Conditioner // todo
@@ -255,13 +259,13 @@ func (et *Entity) ParseRaw() error {
 	if len(et.Resources) == 0 || srcCounter == 0 {
 		return errors.NewEmptyf("[caddyesi] ESITag.ParseRaw. src (Items: %d/Src: %d) cannot be empty in Tag which requires at least one resource: %q", len(et.Resources), srcCounter, et.RawTag)
 	}
-	if err := et.setResourceRequestFunc(); err != nil {
-		return errors.Wrap(err, "[caddyesi] Entity.ParseRaw.setResourceRequestFunc failed")
+	if err := et.setRequestFunc(); err != nil {
+		return errors.Wrap(err, "[caddyesi] Entity.ParseRaw.setRequestFunc failed")
 	}
 	return nil
 }
 
-func (et *Entity) setResourceRequestFunc() error {
+func (et *Entity) setRequestFunc() error {
 	if len(et.Resources) == 0 {
 		return nil
 	}
@@ -278,7 +282,7 @@ func (et *Entity) setResourceRequestFunc() error {
 
 	scheme := strings.ToLower(et.Resources[0].URL[:idx])
 	var ok bool
-	et.ResourceRequestFunc, ok = backend.ResourceRequestRegister[scheme]
+	et.RequestFunc, ok = backend.LookupRequestFunc(scheme)
 	if !ok {
 		return errors.NewNotSupportedf("[esitag] Resource protocal %q not yet supported in tag %q", scheme, et.RawTag)
 	}
@@ -339,14 +343,14 @@ func (et *Entity) parseKey(val string) (err error) {
 }
 
 // QueryResources iterates sequentially over the resources and executes requests
-// as defined in the ResourceRequestFunc. If one resource fails it will be
+// as defined in the RequestFunc. If one resource fails it will be
 // marked as timed out and the next resource gets tried. The exponential
 // back-off stops when MaxBackOffs have been reached and then tries again.
 // Returns a Temporary error behaviour when all requests to all resources are
 // failing.
 func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 
-	maxBodySize := backend.DefaultMaxBodySize
+	maxBodySize := DefaultMaxBodySize
 	if et.MaxBodySize > 0 {
 		maxBodySize = et.MaxBodySize
 	}
@@ -358,8 +362,12 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 		if r.URLTemplate != nil {
 			buf := bufpool.Get()
 			if err := r.URLTemplate.Execute(buf, externalReq); err != nil {
+				if et.Log.IsDebug() {
+					et.Log.Debug("esitag.Entity.QueryResources.URLTemplate.Execute",
+						log.Err(err), log.Stringer("partial_rendered_template", buf), log.String("template", r.URLTemplate.Root.String()))
+				}
 				bufpool.Put(buf)
-				return nil, errors.Wrapf(err, "[esitag] Index %d Resource %#v Template error", i, r)
+				return nil, errors.NewTemporaryf("[esitag] Index %d Resource %#v Fatal Template error: %s", i, r, err)
 			}
 			url = buf.String()
 			bufpool.Put(buf)
@@ -373,12 +381,12 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 		switch state, lastFailure := r.CBState(); state {
 
 		case backend.CBStateHalfOpen, backend.CBStateClosed:
-			data, err := et.ResourceRequestFunc(url, et.Timeout, maxBodySize)
+			data, err := et.RequestFunc(url, et.Timeout, maxBodySize)
 			if err != nil {
 				mErr.AppendErrors(errors.Errorf("\nIndex %d URL %q with %s\n", i, url, err))
 				lastFailureTime := r.CBRecordFailure()
 				if et.Log.IsDebug() {
-					et.Log.Debug("esitag.Resources.DoRequest.ResourceRequestFunc.Error",
+					et.Log.Debug("esitag.Entity.QueryResources.RequestFunc.Error",
 						log.Err(err), log.Uint64("failure_count", r.CBFailures()), log.UnixNanoHuman("last_failure", lastFailureTime),
 						log.Stringer("time_now", time.Now()), lFields)
 				}
@@ -387,7 +395,7 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 			if state == backend.CBStateHalfOpen {
 				r.CBReset()
 				if et.Log.IsDebug() {
-					et.Log.Debug("esitag.Resources.DoRequest.ResourceRequestFunc.CBStateHalfOpen",
+					et.Log.Debug("esitag.Entity.QueryResources.RequestFunc.CBStateHalfOpen",
 						log.Uint64("failure_count", r.CBFailures()), log.Stringer("last_failure", lastFailure), lFields)
 				}
 			}
@@ -395,7 +403,7 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 
 		case backend.CBStateOpen:
 			if et.Log.IsDebug() {
-				et.Log.Debug("esitag.Resources.DoRequest.ResourceRequestFunc.CBStateOpen",
+				et.Log.Debug("esitag.Entity.QueryResources.RequestFunc.CBStateOpen",
 					log.Uint64("failure_count", r.CBFailures()), log.Stringer("last_failure", lastFailure), lFields)
 			}
 		}
@@ -456,7 +464,7 @@ func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 			isTempErr := errors.IsTemporary(err)
 			if err != nil && !isTempErr {
 				// err should have in most cases temporary error behaviour.
-				// if so fall back to the maybe provided physical file template
+				// but here URL template rendering went wrong.
 				return errors.Wrapf(err, "[esitag] QueryResources.Resources.DoRequest failed for Tag %q", e.RawTag)
 			}
 
