@@ -1,12 +1,12 @@
 package caddyesi_test
 
 import (
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/SchumacherFM/caddyesi"
+	"github.com/corestoreio/errors"
 	"github.com/mholt/caddy"
 	"github.com/mholt/caddy/caddyhttp/header"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
@@ -50,8 +50,8 @@ func mwTestRunner(caddyFile string, r *http.Request) func(*testing.T) {
 						IndexFiles: []string{"index.html"},
 					},
 				},
-				Root:    "esitag/testdata/",
-				FileSys: http.Dir("esitag/testdata/"),
+				Root:    "testdata/",
+				FileSys: http.Dir("testdata/"),
 			}
 		})
 
@@ -90,6 +90,10 @@ func mwTestRunner(caddyFile string, r *http.Request) func(*testing.T) {
 }
 
 func TestMiddleware_ServeHTTP(t *testing.T) {
+
+	//defer backend.RegisterRequestFunc("mwTest01", func(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
+	//	return nil, errors.NewAlreadyExistsf("[whops] todo")
+	//})
 
 	t.Run("Replace a single ESI Tag in page0.html", mwTestRunner(
 		`esi`,

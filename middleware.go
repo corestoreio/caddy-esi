@@ -81,8 +81,7 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 			if err != nil {
 				return nil, errors.Wrapf(err, "[caddyesi] Grouped parsing failed ID %d", pageID)
 			}
-			entities.ApplyLogger(cfg.Log)
-			cfg.StoreESITags(pageID, entities)
+			cfg.UpsertESITags(pageID, entities)
 
 			return entities, nil
 		})

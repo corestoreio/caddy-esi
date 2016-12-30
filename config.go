@@ -14,7 +14,12 @@ import (
 	"github.com/pierrec/xxHash/xxHash64"
 )
 
-const DefaultTimeOut = 30 * time.Second
+// DefaultTimeOut to a backend resource
+const DefaultTimeOut = 20 * time.Second
+
+// DefaultMaxBodySize the body size of a retrieved request to a resource. 5 MB
+// is a lot of text.
+const DefaultMaxBodySize uint64 = 5 << 20
 
 // PathConfigs contains the configuration for each path prefix
 type PathConfigs []*PathConfig
@@ -38,9 +43,12 @@ type PathConfig struct {
 	// Default value from the constant DefaultTimeOut.
 	Timeout time.Duration
 	// TTL global time-to-live in the storage backend for ESI data. Defaults to
-	// zero, caching globally disabled until an ESI tag contains the TTL
-	// attribute.
+	// zero, caching globally disabled until an ESI tag or this configuration
+	// value contains the TTL attribute.
 	TTL time.Duration
+	// MaxBodySize defaults to 5MB and limits the size of the returned body from a
+	// backend resource.
+	MaxBodySize uint64
 	// PageIDSource defines a slice of possible parameters which gets extracted
 	// from the http.Request object. All these parameters will be used to
 	// extract the values and calculate a unique hash for the current requested
@@ -66,7 +74,7 @@ type PathConfig struct {
 	// parsing and the default value is nil.
 	KVServices map[string]KVFetcher
 
-	muESI sync.RWMutex
+	esiMU sync.RWMutex
 	// esiCache identifies all parsed ESI tags in a page for specific path
 	// prefix. uint64 represents the hash for the current request calculated byt
 	// pageID function,
@@ -86,18 +94,35 @@ func NewPathConfig() *PathConfig {
 // their pageIDs.
 func (pc *PathConfig) ESITagsByRequest(r *http.Request) (pageID uint64, t esitag.Entities) {
 	pageID = pc.pageID(r)
-	pc.muESI.RLock()
+	pc.esiMU.RLock()
 	t = pc.esiCache[pageID]
-	pc.muESI.RUnlock()
+	pc.esiMU.RUnlock()
 	return
 }
 
-// StoreESITags as an ESI tag slice with its associated request ID to the
-// internal ESI cache and maybe overwrites an existing entry.
-func (pc *PathConfig) StoreESITags(pageID uint64, t esitag.Entities) {
-	pc.muESI.Lock()
-	defer pc.muESI.Unlock()
-	pc.esiCache[pageID] = t
+// UpsertESITags processes each ESI entity to update their default values with
+// the supplied global PathConfig value. Then inserts the ESI entities with its
+// associated page ID in the internal ESI cache.
+func (pc *PathConfig) UpsertESITags(pageID uint64, entities esitag.Entities) {
+	// These writes to esitag.Entity happens in a locked environment. So there
+	// should be no race condition.
+	for _, et := range entities {
+		et.Log = pc.Log
+		if et.MaxBodySize == 0 {
+			et.MaxBodySize = pc.MaxBodySize
+		}
+		if et.Timeout < 1 {
+			et.Timeout = pc.Timeout
+		}
+		if et.TTL < 1 {
+			et.TTL = pc.TTL
+		}
+		// add here the KVFetcher ...
+	}
+
+	pc.esiMU.Lock()
+	pc.esiCache[pageID] = entities
+	pc.esiMU.Unlock()
 }
 
 // IsRequestAllowed decides if a request should be processed.

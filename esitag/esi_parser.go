@@ -11,7 +11,9 @@ import (
 	"github.com/corestoreio/log"
 )
 
-const maxSizeESITag = 4096
+// MaxSizeESITag maximum size of an ESI tag. For now this value has been
+// returned from a dice roll.
+const MaxSizeESITag = 4096
 
 // Parse parses a stream of data to extract ESI Tags. Malformed ESI tags won't
 // trigger any errors, instead the parser skips them.
@@ -52,7 +54,7 @@ func Parse(r io.Reader) (Entities, error) {
 
 var finderPool = sync.Pool{
 	New: func() interface{} {
-		return newFinder(maxSizeESITag)
+		return newFinder(MaxSizeESITag)
 	},
 }
 

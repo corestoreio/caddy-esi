@@ -46,7 +46,7 @@ func testRunner(fileOrContent string, wantTags esitag.Entities, wantErrBhf error
 		haveTags, err := esitag.Parse(rc)
 		if wantErrBhf != nil {
 			assert.Nil(t, haveTags)
-			assert.True(t, wantErrBhf(err), "%+v", err)
+			assert.True(t, wantErrBhf(err), "%+v %s", err, t.Name())
 			return
 		}
 		require.NoError(t, err, " In Test %s", t.Name())

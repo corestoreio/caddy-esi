@@ -18,6 +18,7 @@ https://cyrillschumacher.local:2718 {
     esi [/path_optional] {
         timeout 5ms|100us|1m|...
         ttl 5ms|100us|1m|...
+        [max_body_size 500kib|5MB|10GB|2EB|etc]
         [page_id_source [host,path,ip, etc]]
         [allowed_methods [GET,POST,DELETE]]
         [cache redis://localhost:6379/0]
@@ -44,6 +45,8 @@ valid URI. Reserved keys are:
 Time when a request to a source should be canceled. Can only occur one time.
 - `ttl`, global time-to-live in the cache for ESI data. Defaults to
 zero, caching disabled. Can only occur one time.
+- `max_body_size` Defaults to 5MB, optional. Limits the size of the returned
+body from a backend resource.
 - `cache` defines a cache service which stores the retrieved data from a e.g.
 micro service but only when the ttl (within an ESI tag) has been set. Can only
 occur multiple times.
@@ -81,6 +84,7 @@ Implemented:
 - [ ] Return all headers
 - [ ] Return some headers
 - [x] Multiple sources
+- [ ] Multiple sources with `race="true"`
 - [x] Dynamic sources
 - [ ] Conditional tag loading
 - [ ] Redis access
@@ -158,6 +162,17 @@ Supported file extensions: `"html", "htm", "xml", "txt", "json"`
 <esi:include src="https://micro.service/esi/foo" timeout="time.Duration" onerror="Cannot load weather service"/>
 ```
 
+### Max body size to limit the size of the body returned from a backend (optional)
+
+The basic tag with the attribute `maxbodysize="size"` takes care that the
+returned body size has been limited to the provided value. Default body size is
+5 MB. Other attributes can be additionally defined.
+Available size identifiers: [https://github.com/dustin/go-humanize/blob/master/bytes.go#L34](https://github.com/dustin/go-humanize/blob/master/bytes.go#L34)
+
+```
+<esi:include src="https://micro.service/esi/foo" maxbodysize="3MB"/>
+```
+
 ### Flip src to AJAX call after timeout (optional)
 
 The basic tag with the attribute `timeout` waits for the src until the timeout
@@ -222,14 +237,14 @@ additionally defined.
 
 The basic ESI tag can contain multiple sources. The ESI processor tries to load
 `src` attributes in its specified order. The next `src` gets called after the
-`esi.timeout` or `timeout`. Other attributes can be additionally defined. Add
-the attribute `race="true"` to fire all requests at once and the one which is
-the fastest gets served and the others dropped.
+`esi.timeout` or `timeout` occurs. Other attributes can be additionally defined.
+Add the attribute `race="true"` to fire all requests at once and the one which
+is the fastest gets served and the others dropped.
 
 ```
 <esi:include 
     src="https://micro1.service/esi/foo" 
-    src="https://micro2.service/esi/foo" 
+    src="http://micro2.service/esi/foo"
     src="https://micro3.service/esi/foo" 
     timeout="time.Duration" />
 ```

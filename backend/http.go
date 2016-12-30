@@ -8,12 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
+	"github.com/corestoreio/errors"
 )
-
-// DefaultHTTPTimeOut time to wait until a request to a micro service gets marked as
-// failed.
-const DefaultHTTPTimeOut = 20 * time.Second
 
 func init() {
 	RegisterRequestFunc("http", FetchHTTP)
@@ -43,7 +39,6 @@ var httpClientPool = &sync.Pool{
 	New: func() interface{} {
 		return &http.Client{
 			Transport: DefaultClientTransport,
-			Timeout:   DefaultHTTPTimeOut,
 		}
 	},
 }
@@ -53,20 +48,22 @@ func newHttpClient() *http.Client {
 }
 
 func putHttpClient(c *http.Client) {
-	c.Timeout = DefaultHTTPTimeOut
 	httpClientPool.Put(c)
 }
 
 // FetchHTTP implements RequestFunc and is registered in
 // RegisterRequestFunc for http and https scheme.
-func FetchHTTP(url string, timeout time.Duration, maxBodySize int64) ([]byte, error) {
+func FetchHTTP(url string, timeout time.Duration, maxBodySize uint64) ([]byte, error) {
 	var c = TestClient
 	if c == nil {
 		c = newHttpClient()
 		defer putHttpClient(c)
 	}
 	if timeout < 1 {
-		timeout = DefaultHTTPTimeOut
+		return nil, errors.NewEmptyf("[esibackend] For FetchHTTP %q the timeout value is empty", url)
+	}
+	if maxBodySize == 0 {
+		return nil, errors.NewEmptyf("[esibackend] For FetchHTTP %q the maxBodySize value is empty", url)
 	}
 	c.Timeout = timeout
 
@@ -76,8 +73,8 @@ func FetchHTTP(url string, timeout time.Duration, maxBodySize int64) ([]byte, er
 	}
 
 	buf := new(bytes.Buffer)
-	_, err = buf.ReadFrom(io.LimitReader(resp.Body, maxBodySize))
-	// todo log or report when we reach EOF to let the admin know that the content is too large.
+	_, err = buf.ReadFrom(io.LimitReader(resp.Body, int64(maxBodySize))) // overflow of uint into int ?
+	// todo log or report when we reach EOF to let the admin know that the content is too large has been cut off.
 	_ = resp.Body.Close() // for now ignore it ...
 	if err != nil && err != io.EOF {
 		return nil, errors.Wrapf(err, "[esibackend] FetchHTTP.ReadFrom Body for URL %q failed", url)

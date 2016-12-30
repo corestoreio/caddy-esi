@@ -11,6 +11,7 @@ import (
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	"github.com/corestoreio/log/logw"
+	"github.com/dustin/go-humanize"
 	"github.com/mholt/caddy"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
 )
@@ -85,6 +86,14 @@ func configEsiParse(c *caddy.Controller) (PathConfigs, error) {
 		if err := setupLogger(pc); err != nil {
 			return nil, errors.Wrap(err, "[caddyesi] Failed to setup Logger")
 		}
+
+		if pc.MaxBodySize == 0 {
+			pc.MaxBodySize = DefaultMaxBodySize
+		}
+		if pc.Timeout == 0 {
+			pc.Timeout = DefaultTimeOut
+		}
+
 		pcs = append(pcs, pc)
 	}
 	return pcs, nil
@@ -154,6 +163,16 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 			return errors.NewNotValidf("[caddyesi] Invalid duration in ttl configuration: %q Error: %s", c.Val(), err)
 		}
 		pc.TTL = d
+
+	case "max_body_size":
+		if !c.NextArg() {
+			return errors.NewNotValidf("[caddyesi] max_body_size: %s", c.ArgErr())
+		}
+		d, err := humanize.ParseBytes(c.Val())
+		if err != nil {
+			return errors.NewNotValidf("[caddyesi] Invalid max body size value configuration: %q Error: %s", c.Val(), err)
+		}
+		pc.MaxBodySize = d
 
 	case "cache":
 		if !c.NextArg() {

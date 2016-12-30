@@ -17,6 +17,7 @@ import (
 	"github.com/SchumacherFM/caddyesi/helpers"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
+	"github.com/dustin/go-humanize"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -24,10 +25,6 @@ import (
 // template.Template will be created. For now a resource key or an URL is
 // supported.
 const TemplateIdentifier = "{{"
-
-// DefaultMaxBodySize the body size of a retrieved request to a resource. 5 MB
-// is a lot of text.
-const DefaultMaxBodySize int64 = 5 << 20
 
 // Conditioner does not represent your favorite shampoo but it gives you the
 // possibility to define an expression which gets executed for every request to
@@ -114,7 +111,7 @@ type Entity struct {
 	Log         log.Logger
 	RawTag      []byte
 	DataTag     DataTag
-	MaxBodySize int64 // DefaultMaxBodySize; TODO(CyS) implement in ESI tag
+	MaxBodySize uint64 // DefaultMaxBodySize 5MB
 	TTL         time.Duration
 	Timeout     time.Duration
 	// OnError contains the content which gets injected into an erroneous ESI
@@ -131,9 +128,6 @@ type Entity struct {
 	// identifier. Then the Key field would be empty.
 	KeyTemplate *template.Template
 
-	// RequestFunc performs a request to a backend service via a specific
-	// protocol.
-	backend.RequestFunc
 	// Resources contains multiple unique Resource entries, aka backend systems
 	// likes redis instances or other micro services. Resources occur within one
 	// single ESI tag. The resource attribute (src="") can occur multiple times.
@@ -146,7 +140,7 @@ type Entity struct {
 	Conditioner // todo
 }
 
-// SplitAttributes splits an ESI tag by its attributes
+// SplitAttributes splits an ESI tag by its attributes. This function avoids regexp.
 func SplitAttributes(raw string) ([]string, error) {
 	// include src='https://micro.service/checkout/cart={{ .r "x"}}' timeout="9ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"
 
@@ -236,6 +230,12 @@ func (et *Entity) ParseRaw() error {
 			if err != nil {
 				return errors.NewNotValidf("[caddyesi] ESITag.ParseRaw. Cannot parse duration in ttl: %s => %q\nTag: %q", err, value, et.RawTag)
 			}
+		case "maxbodysize":
+			var err error
+			et.MaxBodySize, err = humanize.ParseBytes(value)
+			if err != nil {
+				return errors.NewNotValidf("[caddyesi] ESITag.ParseRaw. Cannot max body size in maxbodysize: %s => %q\nTag: %q", err, value, et.RawTag)
+			}
 		case "forwardheaders":
 			if value == "all" {
 				et.ForwardHeadersAll = true
@@ -258,33 +258,6 @@ func (et *Entity) ParseRaw() error {
 	}
 	if len(et.Resources) == 0 || srcCounter == 0 {
 		return errors.NewEmptyf("[caddyesi] ESITag.ParseRaw. src (Items: %d/Src: %d) cannot be empty in Tag which requires at least one resource: %q", len(et.Resources), srcCounter, et.RawTag)
-	}
-	if err := et.setRequestFunc(); err != nil {
-		return errors.Wrap(err, "[caddyesi] Entity.ParseRaw.setRequestFunc failed")
-	}
-	return nil
-}
-
-func (et *Entity) setRequestFunc() error {
-	if len(et.Resources) == 0 {
-		return nil
-	}
-
-	// we only check for the first index URL because sub sequent entries must
-	// use the same protocol to fall back resources.
-
-	idx := strings.Index(et.Resources[0].URL, "://")
-	if idx == -1 {
-		// do nothing because the string points to an alias to a globally
-		// defined URL in the Caddyfile.
-		return nil
-	}
-
-	scheme := strings.ToLower(et.Resources[0].URL[:idx])
-	var ok bool
-	et.RequestFunc, ok = backend.LookupRequestFunc(scheme)
-	if !ok {
-		return errors.NewNotSupportedf("[esitag] Resource protocal %q not yet supported in tag %q", scheme, et.RawTag)
 	}
 	return nil
 }
@@ -317,14 +290,10 @@ func (et *Entity) parseCondition(s string) error {
 	return nil
 }
 
-func (et *Entity) parseResource(idx int, val string) (err error) {
-	r := backend.NewResource(idx, val)
-
-	if r.IsURL && strings.Contains(val, TemplateIdentifier) {
-		r.URLTemplate, err = template.New("resource_tpl").Parse(val)
-		if err != nil {
-			return errors.NewFatalf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", val, err, et.RawTag)
-		}
+func (et *Entity) parseResource(idx int, val string) error {
+	r, err := backend.NewResource(idx, val)
+	if err != nil {
+		return errors.Wrapf(err, "[caddyesi] ESITag.ParseRaw. Failed to parse %q as template\nTag: %q", val, et.RawTag)
 	}
 	et.Resources = append(et.Resources, r)
 	return nil
@@ -350,40 +319,27 @@ func (et *Entity) parseKey(val string) (err error) {
 // failing.
 func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 
-	maxBodySize := DefaultMaxBodySize
-	if et.MaxBodySize > 0 {
-		maxBodySize = et.MaxBodySize
+	if et.Timeout < 1 {
+		return nil, errors.NewEmptyf("[esitag] For Entity.QueryResources the Timeout value is empty. Tag: %q", et.RawTag)
+	}
+	if et.MaxBodySize == 0 {
+		return nil, errors.NewEmptyf("[esitag] For Entity.QueryResources the MaxBodySize value is empty. Tag: %q", et.RawTag)
 	}
 
 	mErr := errors.NewMultiErr() // just for collecting errors for informational purposes at the Temporary error at the end.
 	for i, r := range et.Resources {
 
-		url := r.URL
-		if r.URLTemplate != nil {
-			buf := bufpool.Get()
-			if err := r.URLTemplate.Execute(buf, externalReq); err != nil {
-				if et.Log.IsDebug() {
-					et.Log.Debug("esitag.Entity.QueryResources.URLTemplate.Execute",
-						log.Err(err), log.Stringer("partial_rendered_template", buf), log.String("template", r.URLTemplate.Root.String()))
-				}
-				bufpool.Put(buf)
-				return nil, errors.NewTemporaryf("[esitag] Index %d Resource %#v Fatal Template error: %s", i, r, err)
-			}
-			url = buf.String()
-			bufpool.Put(buf)
-		}
-
 		var lFields log.Fields
 		if et.Log.IsDebug() {
-			lFields = log.Fields{log.Stringer("time_now", time.Now()), log.String("url", url)}
+			lFields = log.Fields{log.Stringer("time_now", time.Now()), log.String("url", r.String())}
 		}
 
 		switch state, lastFailure := r.CBState(); state {
 
 		case backend.CBStateHalfOpen, backend.CBStateClosed:
-			data, err := et.RequestFunc(url, et.Timeout, maxBodySize)
+			data, err := r.DoRequest(externalReq, et.Timeout, et.MaxBodySize)
 			if err != nil {
-				mErr.AppendErrors(errors.Errorf("\nIndex %d URL %q with %s\n", i, url, err))
+				mErr.AppendErrors(errors.Errorf("\nIndex %d URL %q with %s\n", i, r.String(), err))
 				lastFailureTime := r.CBRecordFailure()
 				if et.Log.IsDebug() {
 					et.Log.Debug("esitag.Entity.QueryResources.RequestFunc.Error",
