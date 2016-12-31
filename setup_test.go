@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/SchumacherFM/caddyesi/esitesting"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	"github.com/mholt/caddy"
@@ -408,12 +409,9 @@ func TestSetupLogger(t *testing.T) {
 	t.Run("Log File open fails", runner(pc, errors.IsFatal))
 	assert.Exactly(t, pc.Log.(log.BlackHole), log.BlackHole{})
 
-	tmpFile := tempfile(t)
-	defer func() {
-		if err := os.Remove(tmpFile); err != nil {
-			t.Fatal(err)
-		}
-	}()
+	tmpFile, clean := esitesting.Tempfile(t)
+	defer clean()
+
 	pc = &PathConfig{
 		LogLevel: "debug",
 		LogFile:  tmpFile,
@@ -430,19 +428,4 @@ func TestSetupLogger(t *testing.T) {
 	}
 	assert.Contains(t, string(tmpFileContent), `InfoWriteToTempFile info03: 2412`)
 	assert.Contains(t, string(tmpFileContent), `DebugWriteToTempFile debugo04: 2512`)
-}
-
-// tempfile returns a temporary file path.
-func tempfile(t *testing.T) string {
-	f, err := ioutil.TempFile("", "caddyesi-")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := f.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Remove(f.Name()); err != nil {
-		t.Fatal(err)
-	}
-	return f.Name()
 }

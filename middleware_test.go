@@ -1,12 +1,15 @@
 package caddyesi_test
 
 import (
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/SchumacherFM/caddyesi"
 	"github.com/SchumacherFM/caddyesi/backend"
+	"github.com/SchumacherFM/caddyesi/esitesting"
 	"github.com/corestoreio/errors"
 	"github.com/mholt/caddy"
 	"github.com/mholt/caddy/caddyhttp/header"
@@ -15,58 +18,64 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var mwTestHeaders = http.Header{"X-Esi-Test": []string{"GopherX"}}
+
+func mwTestHandler(t *testing.T, caddyFile string) httpserver.Handler {
+	ctc := caddy.NewTestController("http", caddyFile)
+
+	httpserver.GetConfig(ctc).AddMiddleware(func(next httpserver.Handler) httpserver.Handler {
+		return header.Headers{
+			Next: next,
+			Rules: []header.Rule{
+				{
+					Path:    "/",
+					Headers: mwTestHeaders,
+				},
+			},
+		}
+	})
+
+	if err := caddyesi.PluginSetup(ctc); err != nil {
+		t.Fatal(err)
+	}
+
+	httpserver.GetConfig(ctc).AddMiddleware(func(next httpserver.Handler) httpserver.Handler {
+		return templates.Templates{
+			Next: next,
+			Rules: []templates.Rule{
+				{
+					Path:       "/",
+					Extensions: []string{".html"},
+					IndexFiles: []string{"index.html"},
+				},
+			},
+			Root:    "testdata/",
+			FileSys: http.Dir("testdata/"),
+		}
+	})
+
+	mids := httpserver.GetConfig(ctc).Middleware()
+
+	finalHandler := httpserver.HandlerFunc(func(w http.ResponseWriter, r *http.Request) (int, error) {
+		return http.StatusNotImplemented, errors.New("Should not be called! Or File not found")
+	})
+
+	var stack httpserver.Handler = finalHandler
+
+	for i := len(mids) - 1; i >= 0; i-- {
+		stack = mids[i](stack)
+	}
+	return stack
+}
+
 func mwTestRunner(caddyFile string, r *http.Request, bodyContains string) func(*testing.T) {
 
 	// Add here the middlewares Header and Template just to make sure that
 	// caddyesi middleware processes the other middlewares correctly.
 
-	wantHeaders := http.Header{"X-Esi-Test": []string{"GopherX"}}
-
 	return func(t *testing.T) {
-		ctc := caddy.NewTestController("http", caddyFile)
 
-		httpserver.GetConfig(ctc).AddMiddleware(func(next httpserver.Handler) httpserver.Handler {
-			return header.Headers{
-				Next: next,
-				Rules: []header.Rule{
-					{
-						Path:    "/",
-						Headers: wantHeaders,
-					},
-				},
-			}
-		})
-
-		if err := caddyesi.PluginSetup(ctc); err != nil {
-			t.Fatal(err)
-		}
-
-		httpserver.GetConfig(ctc).AddMiddleware(func(next httpserver.Handler) httpserver.Handler {
-			return templates.Templates{
-				Next: next,
-				Rules: []templates.Rule{
-					{
-						Path:       "/",
-						Extensions: []string{".html"},
-						IndexFiles: []string{"index.html"},
-					},
-				},
-				Root:    "testdata/",
-				FileSys: http.Dir("testdata/"),
-			}
-		})
-
-		mids := httpserver.GetConfig(ctc).Middleware()
-
-		finalHandler := httpserver.HandlerFunc(func(w http.ResponseWriter, r *http.Request) (int, error) {
-			return http.StatusNotImplemented, errors.New("Should not be called! Or File not found")
-		})
-
-		var stack httpserver.Handler = finalHandler
-
-		for i := len(mids) - 1; i >= 0; i-- {
-			stack = mids[i](stack)
-		}
+		stack := mwTestHandler(t, caddyFile)
 
 		rec := httptest.NewRecorder()
 		code, err := stack.ServeHTTP(rec, r)
@@ -74,8 +83,8 @@ func mwTestRunner(caddyFile string, r *http.Request, bodyContains string) func(*
 			t.Fatalf("Code %d\n%+v", code, err)
 		}
 
-		for key := range wantHeaders {
-			val := wantHeaders.Get(key)
+		for key := range mwTestHeaders {
+			val := mwTestHeaders.Get(key)
 			assert.Exactly(t, val, rec.Header().Get(key), "Header Key %q", key)
 		}
 
@@ -94,7 +103,7 @@ func mwTestRunner(caddyFile string, r *http.Request, bodyContains string) func(*
 	}
 }
 
-func TestMiddleware_ServeHTTP(t *testing.T) {
+func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 
 	defer backend.RegisterRequestFunc("mwtest01", backend.MockRequestError(errors.NewWriteFailedf("write failed"))).DeferredDeregister()
 
@@ -106,21 +115,70 @@ func TestMiddleware_ServeHTTP(t *testing.T) {
 		"<esi:include   src=\"mwTest01://micro.service/esi/foo\"",
 	))
 
-	t.Run("Replace a single ESI Tag in page01.html but error in backend request", mwTestRunner(
-		`esi {
+	{
+		tmpLogFile, clean := esitesting.Tempfile(t)
+		defer clean()
+		t.Run("Replace a single ESI Tag in page01.html but error in backend request", mwTestRunner(
+			`esi {
 			on_error "my important global error message"
 			allowed_methods GET
-			log_file stdout
+			log_file `+tmpLogFile+`
 			log_level debug
 		}`,
-		httptest.NewRequest("GET", "/page01.html", nil),
-		`my important global error message`,
-	))
+			httptest.NewRequest("GET", "/page01.html", nil),
+			`my important global error message`,
+		))
+		logContent, err := ioutil.ReadFile(tmpLogFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Contains(t, string(logContent), `error: "write failed"`)
+		assert.Contains(t, string(logContent), `url: "mwTest01://micro.service/esi/foo"`)
+	}
 
 	t.Run("Replace a single ESI Tag in page01.html but error in backend triggers default on_error message", mwTestRunner(
 		`esi`,
 		httptest.NewRequest("GET", "/page01.html", nil),
 		caddyesi.DefaultOnError,
 	))
+
+	defer backend.RegisterRequestFunc("mwtest02a", backend.MockRequestContent("Micro1Service1")).DeferredDeregister()
+	defer backend.RegisterRequestFunc("mwtest02b", backend.MockRequestContent("Micro2Service2")).DeferredDeregister()
+	defer backend.RegisterRequestFunc("mwtest02c", backend.MockRequestContent("Micro3Service3")).DeferredDeregister()
+	t.Run("Load from three resources in page02.html successfully", mwTestRunner(
+		`esi`,
+		httptest.NewRequest("GET", "/page02.html", nil),
+		`<p>Micro1Service1 "mwTest02A://microService1" Timeout 5ms MaxBody 10 kB</p>
+<p>Micro2Service2 "mwTest02B://microService2" Timeout 6ms MaxBody 20 kB</p>
+<p>Micro3Service3 "mwTest02C://microService3" Timeout 7ms MaxBody 30 kB</p>`,
+	))
+}
+
+func TestMiddleware_ServeHTTP_Parallel(t *testing.T) {
+
+	defer backend.RegisterRequestFunc("mwtest02a", backend.MockRequestContent("Micro1Service11")).DeferredDeregister()
+	defer backend.RegisterRequestFunc("mwtest02b", backend.MockRequestContent("Micro2Service22")).DeferredDeregister()
+	defer backend.RegisterRequestFunc("mwtest02c", backend.MockRequestContent("Micro3Service33")).DeferredDeregister()
+
+	hpu := esitesting.NewHTTPParallelUsers(10, 10, 500, time.Millisecond)
+	hpu.AssertResponse = func(rec *httptest.ResponseRecorder, code int, err error) {
+		//t.Log(rec.Body.String())
+	}
+
+	req := httptest.NewRequest("GET", "/page02.html", nil)
+	hpu.ServeHTTP(req, mwTestHandler(t, `esi {
+			on_error "my important global error message"
+			allowed_methods GET
+			log_file stdout
+			log_level debug
+	}`))
+
+	//	t.Run("Load from three resources in page02.html successfully", mwTestRunner(
+	//		`esi`,
+	//		httptest.NewRequest("GET", "/page02.html", nil),
+	//		`<p>Micro1Service1 "mwTest02A://microService1" Timeout 5ms MaxBody 10 kB</p>
+	//<p>Micro2Service2 "mwTest02B://microService2" Timeout 6ms MaxBody 20 kB</p>
+	//<p>Micro3Service3 "mwTest02C://microService3" Timeout 7ms MaxBody 30 kB</p>`,
+	//	))
 
 }
