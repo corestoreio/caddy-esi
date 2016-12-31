@@ -29,8 +29,10 @@ var rrfRegister = &struct {
 
 // RegisterRequestFunc scheme is a protocol before the ://. This function
 // returns a closure which lets you deregister the scheme once a test has
-// finished. Use the defer word.
+// finished. Use the defer word. Scheme will be transformed into an all
+// lowercase string.
 func RegisterRequestFunc(scheme string, f RequestFunc) struct{ DeferredDeregister func() } {
+	scheme = strings.ToLower(scheme)
 	rrfRegister.Lock()
 	defer rrfRegister.Unlock()
 	rrfRegister.fetchers[scheme] = f
@@ -43,6 +45,7 @@ func RegisterRequestFunc(scheme string, f RequestFunc) struct{ DeferredDeregiste
 
 // DeregisterRequestFunc removes a previously registered scheme
 func DeregisterRequestFunc(scheme string) {
+	scheme = strings.ToLower(scheme)
 	rrfRegister.Lock()
 	defer rrfRegister.Unlock()
 	delete(rrfRegister.fetchers, scheme)
@@ -50,6 +53,7 @@ func DeregisterRequestFunc(scheme string) {
 
 // lookupRequestFunc if ok sets to true the rf cannot be nil.
 func lookupRequestFunc(scheme string) (rf RequestFunc, ok bool) {
+	scheme = strings.ToLower(scheme)
 	rrfRegister.RLock()
 	defer rrfRegister.RUnlock()
 	rf, ok = rrfRegister.fetchers[scheme]
