@@ -57,7 +57,7 @@ hash value. Available settings: `remoteaddr`, `realip`, `scheme`, `host`,
 `path`, `rawpath`, `rawquery` and `url`. Special feature to access cookies and
 headers: Prefix with `cookie-` or `header-` to access the appropriate value.
 Default setting: `host` and `path`. Attention: The more granular you define the
-more possibility occurs that your RAM will be filled up (will be fixed ...).
+higher possibility occurs that your RAM will be filled up (will be fixed ...).
 - `allowed_methods` optional, defaults to GET only.
 - `log_file` optional, default logging disabled. Put in here either a file name
 or the wordings stderr or stdout to write to those file descriptors. If empty,
@@ -76,7 +76,7 @@ Implemented:
 - [x] ESI tag replacement
 - [x] Background Fetcher workers
 - [x] Basic ESI Tag
-- [ ] With timeout
+- [x] With timeout
 - [ ] With ttl
 - [x] Load local file after timeout
 - [ ] Flip src to AJAX call after timeout
@@ -89,8 +89,8 @@ Implemented:
 - [x] Dynamic sources
 - [ ] Conditional tag loading
 - [ ] Redis access
-- [ ] Handle compressed content from backends
-- [x] Coalesce multiple requests into one backend request
+- [x] Handle compressed content from backends (Go http.Client)
+- [ ] Coalesce multiple requests into one backend request
 
 Implementation ideas:
 
@@ -228,7 +228,7 @@ response.
 
 The basic tag with the attribute `coalesce="true"` takes care that for multiple
 incoming requests only one backend request gets fired. Other attributes can be
-additionally defined.  
+additionally defined.
 
 ```
 <esi:include src="https://micro.service/esi/foo" coalesce="true"/>
