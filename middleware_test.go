@@ -4,6 +4,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -156,29 +158,59 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 
 func TestMiddleware_ServeHTTP_Parallel(t *testing.T) {
 
-	defer backend.RegisterRequestFunc("mwtest02a", backend.MockRequestContent("Micro1Service11")).DeferredDeregister()
-	defer backend.RegisterRequestFunc("mwtest02b", backend.MockRequestContent("Micro2Service22")).DeferredDeregister()
-	defer backend.RegisterRequestFunc("mwtest02c", backend.MockRequestContent("Micro3Service33")).DeferredDeregister()
+	// This test delivers food for the race detector.
+	// This tests creates 10 requests for each of the 20 users. All 200 requests
+	// occur in 900ms. We have three backend micro services in the HTML page.
+	// Each micro service receives 200 requests. In total this produces 600
+	// requests to backend services.
+	// Despite we have 200 incoming requests, the HTML page gets only parsed
+	// once.
 
-	hpu := esitesting.NewHTTPParallelUsers(10, 10, 500, time.Millisecond)
+	var reqCount2a = new(uint64)
+	var reqCount2b = new(uint64)
+	var reqCount2c = new(uint64)
+
+	defer backend.RegisterRequestFunc("mwtest02a", backend.MockRequestContentCB("Micro1Service11", func() error {
+		atomic.AddUint64(reqCount2a, 1)
+		return nil
+	})).DeferredDeregister()
+	defer backend.RegisterRequestFunc("mwtest02b", backend.MockRequestContentCB("Micro2Service22", func() error {
+		atomic.AddUint64(reqCount2b, 1)
+		return nil
+	})).DeferredDeregister()
+	defer backend.RegisterRequestFunc("mwtest02c", backend.MockRequestContentCB("Micro3Service33", func() error {
+		atomic.AddUint64(reqCount2c, 1)
+		return nil
+	})).DeferredDeregister()
+
+	hpu := esitesting.NewHTTPParallelUsers(20, 10, 900, time.Millisecond)
 	hpu.AssertResponse = func(rec *httptest.ResponseRecorder, code int, err error) {
-		//t.Log(rec.Body.String())
+		assert.Contains(t, rec.Body.String(), `<p>Micro1Service11 "mwTest02A://microService1" Timeout 5ms MaxBody 10 kB</p>`)
+		assert.Contains(t, rec.Body.String(), `<p>Micro2Service22 "mwTest02B://microService2" Timeout 6ms MaxBody 20 kB</p>`)
+		assert.Contains(t, rec.Body.String(), `<p>Micro3Service33 "mwTest02C://microService3" Timeout 7ms MaxBody 30 kB</p>`)
 	}
 
-	req := httptest.NewRequest("GET", "/page02.html", nil)
-	hpu.ServeHTTP(req, mwTestHandler(t, `esi {
+	tmpLogFile, _ := esitesting.Tempfile(t)
+	//defer clean()
+	t.Log(tmpLogFile)
+	hpu.ServeHTTPNewRequest(func() *http.Request {
+		return httptest.NewRequest("GET", "/page02.html", nil)
+	}, mwTestHandler(t, `esi {
 			on_error "my important global error message"
 			allowed_methods GET
-			log_file stdout
+			log_file `+tmpLogFile+`
 			log_level debug
 	}`))
 
-	//	t.Run("Load from three resources in page02.html successfully", mwTestRunner(
-	//		`esi`,
-	//		httptest.NewRequest("GET", "/page02.html", nil),
-	//		`<p>Micro1Service1 "mwTest02A://microService1" Timeout 5ms MaxBody 10 kB</p>
-	//<p>Micro2Service2 "mwTest02B://microService2" Timeout 6ms MaxBody 20 kB</p>
-	//<p>Micro3Service3 "mwTest02C://microService3" Timeout 7ms MaxBody 30 kB</p>`,
-	//	))
+	// 200 == 20 * 10 @see NewHTTPParallelUsers
+	assert.Exactly(t, 200, int(*reqCount2a), "Calls to Micro Service 1")
+	assert.Exactly(t, 200, int(*reqCount2b), "Calls to Micro Service 2")
+	assert.Exactly(t, 200, int(*reqCount2c), "Calls to Micro Service 3")
 
+	logContent, err := ioutil.ReadFile(tmpLogFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Exactly(t, 1, strings.Count(string(logContent), `caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse error: "<nil>"`), `caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse error: "<nil>" MUST only occur once!!!`)
+	assert.Exactly(t, 600, strings.Count(string(logContent), `esitag.Entity.QueryResources.RequestFunc.CBStateClosed`), `esitag.Entity.QueryResources.RequestFunc.CBStateClosed`)
 }

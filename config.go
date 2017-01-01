@@ -87,8 +87,11 @@ type PathConfig struct {
 
 	esiMU sync.RWMutex
 	// esiCache identifies all parsed ESI tags in a page for specific path
-	// prefix. uint64 represents the hash for the current request calculated byt
-	// pageID function,
+	// prefix. uint64 represents the hash for the current request calculated by
+	// pageID function. TODO(CyS) Long term bug: Maybe we need here another
+	// algorithm instead of the map. Due to a higher granularity of the pageID
+	// the map gets filled fast without dropping old entries. This will blow up
+	// the memory.
 	esiCache map[uint64]esitag.Entities
 }
 
