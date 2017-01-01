@@ -1,0 +1,22 @@
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/All-4         	 1000000	      1686 ns/op	    1523 B/op	       4 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/All-4         	 1000000	      1687 ns/op	    1523 B/op	       4 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/All-4         	 1000000	      1715 ns/op	    1523 B/op	       4 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/All-4         	 1000000	      1688 ns/op	    1523 B/op	       4 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/All-4         	 1000000	      1694 ns/op	    1523 B/op	       4 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/All-4         	 1000000	      1699 ns/op	    1523 B/op	       4 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/All-4         	 1000000	      1724 ns/op	    1523 B/op	       4 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/All-4         	 1000000	      1770 ns/op	    1523 B/op	       4 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/All-4         	 1000000	      1808 ns/op	    1523 B/op	       4 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/All-4         	 1000000	      1741 ns/op	    1523 B/op	       4 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/Two-4         	 3000000	       469 ns/op	     224 B/op	       3 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/Two-4         	 3000000	       469 ns/op	     224 B/op	       3 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/Two-4         	 3000000	       464 ns/op	     224 B/op	       3 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/Two-4         	 3000000	       467 ns/op	     224 B/op	       3 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/Two-4         	 3000000	       466 ns/op	     224 B/op	       3 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/Two-4         	 3000000	       465 ns/op	     224 B/op	       3 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/Two-4         	 3000000	       464 ns/op	     224 B/op	       3 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/Two-4         	 3000000	       470 ns/op	     224 B/op	       3 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/Two-4         	 3000000	       469 ns/op	     224 B/op	       3 allocs/op
+BenchmarkRequestFuncArgs_PrepareForwardHeaders/Two-4         	 3000000	       468 ns/op	     224 B/op	       3 allocs/op
+PASS
+ok  	github.com/SchumacherFM/caddyesi/backend	36.226s

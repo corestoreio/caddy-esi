@@ -21,7 +21,12 @@ func TestFetchHTTP(t *testing.T) {
 			Transport: esitesting.NewHTTPTrip(200, "A response longer than 15 bytes", nil),
 		}
 
-		content, err := backend.FetchHTTP("http://whatever.anydomain/page.html", time.Second, 15)
+		hdr, content, err := backend.FetchHTTP(backend.RequestFuncArgs{
+			URL:         "http://whatever.anydomain/page.html",
+			Timeout:     time.Second,
+			MaxBodySize: 15,
+		})
+		assert.Nil(t, hdr, "Header")
 		assert.Exactly(t, `A response long`, string(content))
 		assert.NoError(t, err)
 	})
@@ -32,7 +37,12 @@ func TestFetchHTTP(t *testing.T) {
 			Transport: esitesting.NewHTTPTrip(200, "A response longer than 15 bytes", haveErr),
 		}
 
-		content, err := backend.FetchHTTP("http://whatever.anydomain/page.html", time.Second, 15)
+		hdr, content, err := backend.FetchHTTP(backend.RequestFuncArgs{
+			URL:         "http://whatever.anydomain/page.html",
+			Timeout:     time.Second,
+			MaxBodySize: 15,
+		})
+		assert.Nil(t, hdr, "Header")
 		assert.Empty(t, content)
 		assert.Contains(t, err.Error(), `Brain already closed`)
 	})

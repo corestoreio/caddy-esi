@@ -61,54 +61,90 @@ func lookupRequestFunc(scheme string) (rf RequestFunc, ok bool) {
 	return
 }
 
-// RequestFunc performs a request to a backend service via a specific
-// protocol.
-type RequestFunc func(url string, timeout time.Duration, maxBodySize uint64) ([]byte, error)
+type (
+	// RequestFuncArgs arguments to RequestFunc. Might get extended.
+	RequestFuncArgs struct {
+		Log               log.Logger
+		ExternalReq       *http.Request
+		URL               string
+		Timeout           time.Duration
+		MaxBodySize       uint64
+		ForwardHeaders    []string
+		ForwardHeadersAll bool
+		ReturnHeaders     []string
+		ReturnHeadersAll  bool
+	}
+	// RequestFunc performs a request to a backend service via a specific
+	// protocol. Header might be nil depending on the underlying implementation.
+	RequestFunc func(RequestFuncArgs) (_ http.Header, content []byte, err error)
+)
 
-// RequestFuncOptions actings as arguments to RequestFunc
-type RequestFuncOptions struct {
-	Log               log.Logger
-	ExternalReq       *http.Request
-	URL               string
-	Timeout           time.Duration
-	MaxBodySize       uint64
-	ForwardHeaders    []string
-	ForwardHeadersAll bool
-	ReturnHeaders     []string
-	ReturnHeadersAll  bool
+// MaxBodySizeHumanized converts the bytes into a human readable format
+func (a RequestFuncArgs) MaxBodySizeHumanized() string {
+	return humanize.Bytes(a.MaxBodySize)
+}
+
+// PrepareForwardHeaders returns all headers which must get forwarded to the
+// backend resource. Returns a non-nil slice when no headers should be
+// forwarded. Slice is balanced: i == key and i+1 == value
+func (a RequestFuncArgs) PrepareForwardHeaders() []string {
+	if !a.ForwardHeadersAll && len(a.ForwardHeaders) == 0 {
+		return []string{}
+	}
+	if a.ForwardHeadersAll {
+		ret := make([]string, 0, len(a.ExternalReq.Header))
+		for hn, hvs := range a.ExternalReq.Header {
+			hn = http.CanonicalHeaderKey(hn)
+			for _, hv := range hvs {
+				ret = append(ret, hn, hv)
+			}
+		}
+		return ret
+	}
+
+	ret := make([]string, 0, len(a.ForwardHeaders))
+	for _, hn := range a.ForwardHeaders {
+		hn = http.CanonicalHeaderKey(hn)
+		if hvs, ok := a.ExternalReq.Header[hn]; ok {
+			for _, hv := range hvs {
+				ret = append(ret, hn, hv)
+			}
+		}
+	}
+	return ret
 }
 
 const mockRequestMsg = "%s %q Timeout %s MaxBody %s"
 
 // MockRequestContent for testing purposes only.
 func MockRequestContent(content string) RequestFunc {
-	return func(url string, timeout time.Duration, maxBodySize uint64) ([]byte, error) {
-		return []byte(fmt.Sprintf(mockRequestMsg, content, url, timeout, humanize.Bytes(maxBodySize))), nil
+	return func(args RequestFuncArgs) (http.Header, []byte, error) {
+		return nil, []byte(fmt.Sprintf(mockRequestMsg, content, args.URL, args.Timeout, args.MaxBodySizeHumanized())), nil
 	}
 }
 
 // MockRequestContentCB for testing purposes only. Call back gets executed
 // before the function returns.
 func MockRequestContentCB(content string, callback func() error) RequestFunc {
-	return func(url string, timeout time.Duration, maxBodySize uint64) ([]byte, error) {
+	return func(args RequestFuncArgs) (http.Header, []byte, error) {
 		if err := callback(); err != nil {
-			return nil, errors.Wrapf(err, "MockRequestContentCB with URL %q", url)
+			return nil, nil, errors.Wrapf(err, "MockRequestContentCB with URL %q", args.URL)
 		}
-		return []byte(fmt.Sprintf(mockRequestMsg, content, url, timeout, humanize.Bytes(maxBodySize))), nil
+		return nil, []byte(fmt.Sprintf(mockRequestMsg, content, args.URL, args.Timeout, args.MaxBodySizeHumanized())), nil
 	}
 
 }
 
 // MockRequestError for testing purposes only.
 func MockRequestError(err error) RequestFunc {
-	return func(url string, timeout time.Duration, maxBodySize uint64) ([]byte, error) {
-		return nil, err
+	return func(_ RequestFuncArgs) (http.Header, []byte, error) {
+		return nil, nil, err
 	}
 }
 
 // MockRequestPanic just panics
 func MockRequestPanic(msg interface{}) RequestFunc {
-	return func(url string, timeout time.Duration, maxBodySize uint64) ([]byte, error) {
+	return func(_ RequestFuncArgs) (http.Header, []byte, error) {
 		panic(msg)
 	}
 }
@@ -126,14 +162,10 @@ type Resource struct {
 	// URLTemplate gets created when the URL contains the template identifier. Then
 	// the URL field would be empty.
 	urlTemplate *template.Template
-	// IsURL set to true if the URL contains "://" and hence we must trigger
-	// http.Client. If false we know that the URL field relates to a configured
-	// resource in the Caddyfile, for example an alias to a Redis instance.
-	isURL bool
 
-	// RequestFunc performs a request to a backend service via a specific
+	// reqFunc performs a request to a backend service via a specific
 	// protocol.
-	rf RequestFunc
+	reqFunc RequestFunc
 	// circuit breaker http://martinfowler.com/bliki/CircuitBreaker.html
 	cbFailures        *uint64
 	cbLastFailureTime *uint64 //  in UnixNano
@@ -154,13 +186,12 @@ func MustNewResource(idx int, url string) *Resource {
 func NewResource(idx int, url string) (*Resource, error) {
 	r := &Resource{
 		Index:             idx,
-		isURL:             strings.Contains(url, "://"),
 		url:               url,
 		cbFailures:        new(uint64),
 		cbLastFailureTime: new(uint64),
 	}
 
-	if r.isURL && strings.Contains(r.url, TemplateIdentifier) {
+	if strings.Contains(url, "://") && strings.Contains(r.url, TemplateIdentifier) {
 		var err error
 		r.urlTemplate, err = template.New("resource_tpl").Parse(r.url)
 		if err != nil {
@@ -171,7 +202,7 @@ func NewResource(idx int, url string) (*Resource, error) {
 	if pos := strings.Index(r.url, "://"); pos > 1 {
 		scheme := strings.ToLower(r.url[:pos])
 		var ok bool
-		r.rf, ok = lookupRequestFunc(scheme)
+		r.reqFunc, ok = lookupRequestFunc(scheme)
 		if !ok {
 			return nil, errors.NewNotSupportedf("[esibackend] NewResource protocal %q not yet supported in URL %q", scheme, r.url)
 		}
@@ -190,9 +221,9 @@ func (r *Resource) String() string {
 	return r.url + tplName
 }
 
-// DoRequest performs the request to the backend. Uses externalReq as data when
-// rendering the URL template.
-func (r *Resource) DoRequest(externalReq *http.Request, timeout time.Duration, maxBodySize uint64) ([]byte, error) {
+// DoRequest performs the request to the backend resource. It generates the URL
+// and then fires the request. DoRequest has the same signature as RequestFunc
+func (r *Resource) DoRequest(args RequestFuncArgs) (http.Header, []byte, error) {
 	currentURL := r.url
 	if r.urlTemplate != nil {
 		buf := bufpool.Get()
@@ -206,15 +237,18 @@ func (r *Resource) DoRequest(externalReq *http.Request, timeout time.Duration, m
 			Header http.Header
 			// Cookie []*http.Cookie TODO add better cookie handling
 		}{
-			Req:    externalReq,
-			URL:    externalReq.URL,
-			Header: externalReq.Header,
+			Req:    args.ExternalReq,
+			URL:    args.ExternalReq.URL,
+			Header: args.ExternalReq.Header,
 		}); err != nil {
-			return nil, errors.NewTemporaryf("[esitag] Resource %q Template error: %s\nContent: %s", r.String(), err, buf)
+			return nil, nil, errors.NewTemporaryf("[esitag] Resource %q Template error: %s\nContent: %s", r.String(), err, buf)
 		}
 		currentURL = buf.String()
 	}
-	return r.rf(currentURL, timeout, maxBodySize)
+
+	args.URL = currentURL
+
+	return r.reqFunc(args)
 }
 
 // CBState declares the different states for the circuit breaker (CB)
