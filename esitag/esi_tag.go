@@ -129,6 +129,15 @@ type Entity struct {
 	// identifier. Then the Key field would be empty.
 	KeyTemplate *template.Template
 
+	// Coalesce TODO(CyS) multiple external requests which triggers a backend
+	// resource request gets merged into one backend request
+	Coalesce bool
+
+	// Race TODO(CyS) From the README: Add the attribute `race="true"` to fire
+	// all resource requests at once and the one which is the fastest gets
+	// served and the others dropped.
+	Race bool
+
 	// Resources contains multiple unique Resource entries, aka backend systems
 	// likes redis instances or other micro services. Resources occur within one
 	// single ESI tag. The resource attribute (src="") can occur multiple times.
@@ -138,7 +147,8 @@ type Entity struct {
 	// must handle the RequestFunc.
 	Resources []*backend.Resource // Any 3rd party servers
 
-	Conditioner // todo
+	// Conditioner TODO(CyS) depending on a condition an ESI tag gets executed or not.
+	Conditioner
 }
 
 // SplitAttributes splits an ESI tag by its attributes. This function avoids regexp.
