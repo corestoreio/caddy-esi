@@ -47,18 +47,17 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 
 	// maybe use a hashing function to check if content changes ...
 
-	// todo: we must wrap the ResponseWriter to provide stream parsing and replacement other handlers
-	// parse the stream ... build the cache of ESI tags.
-
 	fullRespBuf := bufpool.Get()
 	defer bufpool.Put(fullRespBuf)
 
 	// responseproxy should be a pipe writer to avoid blowing up the memory by
-	// writing everything into a buffer continue serving and gather the content
-	// into a buffer for later analyses.
+	// writing everything into a buffer. We could uses here one or two pipes.
+	// One pipe only for InjectContent when the ESI entities are already
+	// available and two pipes when we first must analyze the HTML page (pipe1)
+	// and at the end InjectContent (pipe2).
 	code, err := mw.Next.ServeHTTP(responseproxy.WrapBuffered(fullRespBuf, w), r)
-	if err != nil {
-		return 0, err
+	if !cfg.IsStatusCodeAllowed(code) || err != nil {
+		return code, err
 	}
 
 	pageID, esiEntities := cfg.ESITagsByRequest(r)
@@ -87,7 +86,7 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 		})
 		if err != nil {
 			if cfg.Log.IsDebug() {
-				cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.Group.Do",
+				cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.Group.Do.Error",
 					log.Err(err), loghttp.Request("request", r), log.Stringer("config", cfg),
 					log.Bool("shared", shared), log.Uint64("page_id", pageID),
 				)
@@ -101,12 +100,13 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 		}
 	}
 
-	// trigger the DoRequests and query all backend resources in parallel
+	// trigger the DoRequests and query all backend resources in parallel.
+	// TODO(CyS) Coalesce requests
 	tags, err := esiEntities.QueryResources(r)
 	if err != nil {
 		if err != nil {
 			if cfg.Log.IsDebug() {
-				cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.esiEntities.QueryResources",
+				cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.esiEntities.QueryResources.Error",
 					log.Err(err), loghttp.Request("request", r), log.Stringer("config", cfg),
 					log.Uint64("page_id", pageID),
 				)
@@ -115,10 +115,8 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 		}
 	}
 
-	// fullRespBuf maybe the reader needs to be reset
-
-	// replace the esi tags with the content from the resources
-	// after finishing the parsing and replacing we dump the output to the client.
+	// Replace the esi tags with the content from the resources. After finishing
+	// the parsing and replacing we dump the output to the client.
 	if err := tags.InjectContent(fullRespBuf, w); err != nil {
 		return http.StatusInternalServerError, err
 	}

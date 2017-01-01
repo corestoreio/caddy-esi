@@ -199,6 +199,11 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 			return errors.NewNotValidf("[caddyesi] allowed_methods: %s", c.ArgErr())
 		}
 		pc.AllowedMethods = helpers.CommaListToSlice(strings.ToUpper(c.Val()))
+	case "allowed_status_codes":
+		if !c.NextArg() {
+			return errors.NewNotValidf("[caddyesi] allowed_status_codes: %s", c.ArgErr())
+		}
+		pc.AllowedStatusCodes = helpers.StringsToInts(helpers.CommaListToSlice(strings.ToUpper(c.Val())))
 	case "on_error":
 		if !c.NextArg() {
 			return errors.NewNotValidf("[caddyesi] allowed_methods: %s", c.ArgErr())

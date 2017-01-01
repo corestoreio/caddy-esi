@@ -48,6 +48,9 @@ func (pc PathConfigs) ConfigForPath(r *http.Request) *PathConfig {
 type PathConfig struct {
 	// Base path to match used as path prefix
 	Scope string
+	// AllowedStatusCodes if a 3rd party middleware returns any of the not listed
+	// status codes then the ESI middleware will get skipped.
+	AllowedStatusCodes []int
 	// Timeout global. Time when a request to a source should be canceled.
 	// Default value from the constant DefaultTimeOut.
 	Timeout time.Duration
@@ -168,6 +171,20 @@ func (pc *PathConfig) IsRequestAllowed(r *http.Request) bool {
 	}
 	for _, m := range pc.AllowedMethods {
 		if r.Method == m {
+			return true
+		}
+	}
+	return false
+}
+
+// IsStatusCodeAllowed checks if the returned status code from a 3rd party
+// middleware is allowed to trigger the ESI middleware.
+func (pc *PathConfig) IsStatusCodeAllowed(code int) bool {
+	if len(pc.AllowedStatusCodes) == 0 {
+		return code == http.StatusOK
+	}
+	for _, c := range pc.AllowedStatusCodes {
+		if code == c {
 			return true
 		}
 	}

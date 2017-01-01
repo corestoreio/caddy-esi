@@ -105,6 +105,37 @@ func mwTestRunner(caddyFile string, r *http.Request, bodyContains string) func(*
 	}
 }
 
+func TestMiddleware_ServeHTTP_StatusCodes(t *testing.T) {
+	defer backend.RegisterRequestFunc("mwtest01", backend.MockRequestContent("Hello 2017!")).DeferredDeregister()
+
+	t.Run("404 Code not allowed", func(t *testing.T) {
+
+		hndl := mwTestHandler(t, `esi {		}`)
+
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/page0999.html", nil)
+		code, err := hndl.ServeHTTP(rec, req)
+		assert.Exactly(t, http.StatusNotFound, code)
+		assert.NoError(t, err)
+		assert.Empty(t, rec.Body.String())
+	})
+
+	t.Run("404 Code allowed", func(t *testing.T) {
+
+		hndl := mwTestHandler(t, `esi {
+				allowed_status_codes 404
+			}`)
+
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/page0998.html", nil)
+		code, err := hndl.ServeHTTP(rec, req)
+		assert.Exactly(t, http.StatusNotFound, code)
+		assert.NoError(t, err)
+		assert.Empty(t, rec.Body.String())
+	})
+
+}
+
 func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 
 	defer backend.RegisterRequestFunc("mwtest01", backend.MockRequestError(errors.NewWriteFailedf("write failed"))).DeferredDeregister()

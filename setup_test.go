@@ -342,6 +342,69 @@ func TestPluginSetup(t *testing.T) {
 		nil,
 		errors.IsFatal,
 	))
+
+	t.Run("AllowedStatusCodes one value", runner(
+		`esi / {
+		   allowed_status_codes 300
+		}`,
+		PathConfigs{
+			&PathConfig{
+				Scope:              "/",
+				Timeout:            20 * time.Second,
+				AllowedStatusCodes: []int{300},
+			},
+		},
+		nil,
+	))
+
+	t.Run("AllowedStatusCodes two values", runner(
+		`esi / {
+		   allowed_status_codes 300,200
+		}`,
+		PathConfigs{
+			&PathConfig{
+				Scope:              "/",
+				Timeout:            20 * time.Second,
+				AllowedStatusCodes: []int{300, 200},
+			},
+		},
+		nil,
+	))
+
+	t.Run("AllowedStatusCodes with spaces", runner(
+		`esi / {
+		   allowed_status_codes " 300 , 200, 500 "
+		}`,
+		PathConfigs{
+			&PathConfig{
+				Scope:              "/",
+				Timeout:            20 * time.Second,
+				AllowedStatusCodes: []int{300, 200, 500},
+			},
+		},
+		nil,
+	))
+
+	t.Run("AllowedStatusCodes error", runner(
+		`esi / {
+		   allowed_status_codes Hello
+		}`,
+		PathConfigs{
+			&PathConfig{
+				Scope:   "/",
+				Timeout: 20 * time.Second,
+			},
+		},
+		nil,
+	))
+
+	t.Run("AllowedStatusCodes 2nd arg not provided", runner(
+		`esi / {
+		   allowed_status_codes
+		}`,
+		nil,
+		errors.IsNotValid,
+	))
 }
 
 func TestSetupLogger(t *testing.T) {

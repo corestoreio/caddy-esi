@@ -21,6 +21,7 @@ https://cyrillschumacher.local:2718 {
         [max_body_size 500kib|5MB|10GB|2EB|etc]
         [page_id_source [host,path,ip, etc]]
         [allowed_methods [GET,POST,DELETE]]
+        [allowed_status_codes [200,404,etc]]
         [cache redis://localhost:6379/0]
         [cache redis://localhost:6380/0]
         [cache memcache://localhost:11211/2]
@@ -58,7 +59,10 @@ hash value. Available settings: `remoteaddr`, `realip`, `scheme`, `host`,
 headers: Prefix with `cookie-` or `header-` to access the appropriate value.
 Default setting: `host` and `path`. Attention: The more granular you define the
 higher possibility occurs that your RAM will be filled up (will be fixed ...).
-- `allowed_methods` optional, defaults to GET only.
+- `allowed_methods` optional. Any method listed here triggers the ESI
+middleware, defaults to GET only.
+- `allowed_status_codes` optional. Any HTTP status code listed here triggers the
+ESI middleware, defaults to HTTP Status OK (200) only.
 - `log_file` optional, default logging disabled. Put in here either a file name
 or the wordings stderr or stdout to write to those file descriptors. If empty,
 logging is disabled.
