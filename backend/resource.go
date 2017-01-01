@@ -12,6 +12,7 @@ import (
 
 	"github.com/SchumacherFM/mailout/bufpool"
 	"github.com/corestoreio/errors"
+	"github.com/corestoreio/log"
 	"github.com/dustin/go-humanize"
 )
 
@@ -64,11 +65,38 @@ func lookupRequestFunc(scheme string) (rf RequestFunc, ok bool) {
 // protocol.
 type RequestFunc func(url string, timeout time.Duration, maxBodySize uint64) ([]byte, error)
 
+// RequestFuncOptions actings as arguments to RequestFunc
+type RequestFuncOptions struct {
+	Log               log.Logger
+	ExternalReq       *http.Request
+	URL               string
+	Timeout           time.Duration
+	MaxBodySize       uint64
+	ForwardHeaders    []string
+	ForwardHeadersAll bool
+	ReturnHeaders     []string
+	ReturnHeadersAll  bool
+}
+
+const mockRequestMsg = "%s %q Timeout %s MaxBody %s"
+
 // MockRequestContent for testing purposes only.
 func MockRequestContent(content string) RequestFunc {
 	return func(url string, timeout time.Duration, maxBodySize uint64) ([]byte, error) {
-		return []byte(fmt.Sprintf("%s %q Timeout %s MaxBody %s", content, url, timeout, humanize.Bytes(maxBodySize))), nil
+		return []byte(fmt.Sprintf(mockRequestMsg, content, url, timeout, humanize.Bytes(maxBodySize))), nil
 	}
+}
+
+// MockRequestContentCB for testing purposes only. Call back gets executed
+// before the function returns.
+func MockRequestContentCB(content string, callback func() error) RequestFunc {
+	return func(url string, timeout time.Duration, maxBodySize uint64) ([]byte, error) {
+		if err := callback(); err != nil {
+			return nil, errors.Wrapf(err, "MockRequestContentCB with URL %q", url)
+		}
+		return []byte(fmt.Sprintf(mockRequestMsg, content, url, timeout, humanize.Bytes(maxBodySize))), nil
+	}
+
 }
 
 // MockRequestError for testing purposes only.
@@ -159,7 +187,7 @@ func (r *Resource) String() string {
 	if r.urlTemplate != nil {
 		tplName = " Template: " + r.urlTemplate.ParseName
 	}
-	return fmt.Sprintf("%s%s", r.url, tplName)
+	return r.url + tplName
 }
 
 // DoRequest performs the request to the backend. Uses externalReq as data when
