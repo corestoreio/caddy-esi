@@ -18,6 +18,7 @@ import (
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	"github.com/dustin/go-humanize"
+	"github.com/gavv/monotime"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -318,6 +319,7 @@ func (et *Entity) parseKey(val string) (err error) {
 // Returns a Temporary error behaviour when all requests to all resources are
 // failing.
 func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
+	timeStart := monotime.Now()
 
 	if et.Timeout < 1 {
 		return nil, errors.NewEmptyf("[esitag] For Entity.QueryResources the Timeout value is empty. Tag: %q", et.RawTag)
@@ -331,7 +333,7 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 
 		var lFields log.Fields
 		if et.Log.IsDebug() {
-			lFields = log.Fields{log.String("url", r.String())}
+			lFields = log.Fields{log.Int("resource_index", r.Index), log.String("url", r.String())}
 		}
 
 		switch state, lastFailure := r.CBState(); state {
@@ -343,6 +345,7 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 				lastFailureTime := r.CBRecordFailure()
 				if et.Log.IsDebug() {
 					et.Log.Debug("esitag.Entity.QueryResources.RequestFunc.Error",
+						log.Duration(log.KeyNameDuration, monotime.Since(timeStart)),
 						log.Err(err), log.Uint64("failure_count", r.CBFailures()), log.UnixNanoHuman("last_failure", lastFailureTime), lFields)
 				}
 				continue // go to next resource in this loop
@@ -351,14 +354,21 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 				r.CBReset()
 				if et.Log.IsDebug() {
 					et.Log.Debug("esitag.Entity.QueryResources.RequestFunc.CBStateHalfOpen",
+						log.Duration(log.KeyNameDuration, monotime.Since(timeStart)),
 						log.Uint64("failure_count", r.CBFailures()), log.Stringer("last_failure", lastFailure), lFields)
 				}
+			} else if et.Log.IsDebug() {
+				et.Log.Debug("esitag.Entity.QueryResources.RequestFunc.CBStateClosed",
+					log.Duration(log.KeyNameDuration, monotime.Since(timeStart)),
+					log.Uint64("failure_count", r.CBFailures()), log.Stringer("last_failure", lastFailure), lFields)
 			}
+
 			return data, nil
 
 		case backend.CBStateOpen:
 			if et.Log.IsDebug() {
 				et.Log.Debug("esitag.Entity.QueryResources.RequestFunc.CBStateOpen",
+					log.Duration(log.KeyNameDuration, monotime.Since(timeStart)),
 					log.Uint64("failure_count", r.CBFailures()), log.Stringer("last_failure", lastFailure), lFields)
 			}
 		}
