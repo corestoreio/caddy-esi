@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -23,4 +24,17 @@ func CommaListToSlice(str string) []string {
 		return []string{}
 	}
 	return sl
+}
+
+// StringsToInts converts stringified integers into real ints. If an error
+// occurs during converting the entries gets skipped.
+func StringsToInts(ssl []string) []int {
+	ret := make([]int, 0, len(ssl))
+	for _, s := range ssl {
+		if v, err := strconv.Atoi(s); err == nil {
+			ret = append(ret, v)
+		}
+
+	}
+	return ret
 }

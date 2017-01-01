@@ -19,3 +19,10 @@ func TestCommaListToSlice(t *testing.T) {
 		helpers.CommaListToSlice(`   `),
 	)
 }
+
+func TestStringsToInts(t *testing.T) {
+	assert.Exactly(t, []int{300, 400}, helpers.StringsToInts([]string{"300", "400"}))
+	assert.Exactly(t, []int{300}, helpers.StringsToInts([]string{"300", "#"}))
+	assert.Exactly(t, []int{}, helpers.StringsToInts([]string{"x", "y"}))
+	assert.Exactly(t, []int{}, helpers.StringsToInts([]string{}))
+}
