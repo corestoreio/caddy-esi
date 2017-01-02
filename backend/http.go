@@ -51,25 +51,26 @@ func putHttpClient(c *http.Client) {
 	httpClientPool.Put(c)
 }
 
-// FetchHTTP implements RequestFunc and is registered in
-// RegisterRequestFunc for http and https scheme.
-func FetchHTTP(args RequestFuncArgs) (http.Header, []byte, error) {
+// FetchHTTP implements RequestFunc and is registered in RegisterRequestFunc for
+// http and https scheme. The only allowed response code from the queried server
+// is http.StatusOK. All other response codes trigger a NotSupported error
+// behaviour.
+func FetchHTTP(args *RequestFuncArgs) (http.Header, []byte, error) {
+	if err := args.Validate(); err != nil {
+		return nil, nil, errors.Wrap(err, "[esibackend] FetchHTTP.args.Validate")
+	}
+
 	var c = TestClient
 	if c == nil {
 		c = newHttpClient()
 		defer putHttpClient(c)
 	}
-	if args.Timeout < 1 {
-		return nil, nil, errors.NewEmptyf("[esibackend] For FetchHTTP %q the timeout value is empty", args.URL)
-	}
-	if args.MaxBodySize == 0 {
-		return nil, nil, errors.NewEmptyf("[esibackend] For FetchHTTP %q the maxBodySize value is empty", args.URL)
-	}
+
 	c.Timeout = args.Timeout
 
 	req, err := http.NewRequest("GET", args.URL, nil)
 	if err != nil {
-		return nil, errors.Wrapf(err, "[esibackend] Failed NewRequest for %q", args.URL)
+		return nil, nil, errors.Wrapf(err, "[esibackend] Failed NewRequest for %q", args.URL)
 	}
 
 	for hdr, i := args.PrepareForwardHeaders(), 0; i < len(hdr); i = i + 2 {
@@ -81,7 +82,9 @@ func FetchHTTP(args RequestFuncArgs) (http.Header, []byte, error) {
 		return nil, nil, errors.Wrapf(err, "[esibackend] FetchHTTP error for URL %q", args.URL)
 	}
 
-	// TODO(CyS) return headers
+	if resp.StatusCode != http.StatusOK { // this can be made configurable in an ESI tag
+		return nil, nil, errors.NewNotSupportedf("[backend] FetchHTTP: Response Code %q not supported for URL %q", resp.StatusCode, args.URL)
+	}
 
 	buf := new(bytes.Buffer)
 	_, err = buf.ReadFrom(io.LimitReader(resp.Body, int64(args.MaxBodySize))) // overflow of uint into int ?
@@ -90,5 +93,6 @@ func FetchHTTP(args RequestFuncArgs) (http.Header, []byte, error) {
 	if err != nil && err != io.EOF {
 		return nil, nil, errors.Wrapf(err, "[esibackend] FetchHTTP.ReadFrom Body for URL %q failed", args.URL)
 	}
-	return nil, buf.Bytes(), nil
+
+	return args.PrepareReturnHeaders(resp.Header), buf.Bytes(), nil
 }

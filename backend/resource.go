@@ -64,39 +64,89 @@ func lookupRequestFunc(scheme string) (rf RequestFunc, ok bool) {
 type (
 	// RequestFuncArgs arguments to RequestFunc. Might get extended.
 	RequestFuncArgs struct {
-		Log               log.Logger
-		ExternalReq       *http.Request
-		URL               string
-		Timeout           time.Duration
-		MaxBodySize       uint64
-		ForwardHeaders    []string
-		ForwardHeadersAll bool
-		ReturnHeaders     []string
-		ReturnHeadersAll  bool
+		ExternalReq       *http.Request // required
+		URL               string        // required
+		Timeout           time.Duration // required
+		MaxBodySize       uint64        // required
+		Log               log.Logger    // optional
+		ForwardHeaders    []string      // optional, already treated with http.CanonicalHeaderKey
+		ForwardHeadersAll bool          // optional
+		ReturnHeaders     []string      // optional, already treated with http.CanonicalHeaderKey
+		ReturnHeadersAll  bool          // optional
 	}
 	// RequestFunc performs a request to a backend service via a specific
 	// protocol. Header might be nil depending on the underlying implementation.
-	RequestFunc func(RequestFuncArgs) (_ http.Header, content []byte, err error)
+	RequestFunc func(*RequestFuncArgs) (_ http.Header, content []byte, err error)
 )
 
+// Validate checks if required arguments have been set
+func (a *RequestFuncArgs) Validate() (err error) {
+	switch {
+	case a.URL == "":
+		err = errors.NewEmptyf("[esibackend] For RequestFuncArgs %#v the URL value is empty", a)
+	case a.ExternalReq == nil:
+		err = errors.NewEmptyf("[esibackend] For RequestFuncArgs %q the ExternalReq value is nil", a.URL)
+	case a.Timeout < 1:
+		err = errors.NewEmptyf("[esibackend] For RequestFuncArgs %q the timeout value is empty", a.URL)
+	case a.MaxBodySize == 0:
+		err = errors.NewEmptyf("[esibackend] For RequestFuncArgs %q the maxBodySize value is empty", a.URL)
+	}
+	return
+}
+
 // MaxBodySizeHumanized converts the bytes into a human readable format
-func (a RequestFuncArgs) MaxBodySizeHumanized() string {
+func (a *RequestFuncArgs) MaxBodySizeHumanized() string {
 	return humanize.Bytes(a.MaxBodySize)
+}
+
+// DropHeadersForward a list of headers which should never be forwarded to the
+// backend resource. Initial idea of excluded fields.
+// https://en.wikipedia.org/wiki/List_of_HTTP_header_fields
+var DropHeadersForward = map[string]bool{
+	"Cache-Control": true,
+	"Connection":    true,
+	"Host":          true,
+	"Pragma":        true,
+	"Upgrade":       true,
+}
+
+// DropHeadersReturn a list of headers which should never be forwarded to the
+// client. Initial idea of excluded fields.
+// https://en.wikipedia.org/wiki/List_of_HTTP_header_fields
+var DropHeadersReturn = map[string]bool{
+	"Cache-Control":             true,
+	"Connection":                true,
+	"Content-Disposition":       true,
+	"Content-Encoding":          true,
+	"Content-Length":            true,
+	"Content-Range":             true,
+	"Content-Type":              true,
+	"Date":                      true,
+	"Etag":                      true,
+	"Expires":                   true,
+	"Last-Modified":             true,
+	"Location":                  true,
+	"Status":                    true,
+	"Strict-Transport-Security": true,
+	"Trailer":                   true,
+	"Transfer-Encoding":         true,
+	"Upgrade":                   true,
 }
 
 // PrepareForwardHeaders returns all headers which must get forwarded to the
 // backend resource. Returns a non-nil slice when no headers should be
 // forwarded. Slice is balanced: i == key and i+1 == value
-func (a RequestFuncArgs) PrepareForwardHeaders() []string {
+func (a *RequestFuncArgs) PrepareForwardHeaders() []string {
 	if !a.ForwardHeadersAll && len(a.ForwardHeaders) == 0 {
 		return []string{}
 	}
 	if a.ForwardHeadersAll {
 		ret := make([]string, 0, len(a.ExternalReq.Header))
 		for hn, hvs := range a.ExternalReq.Header {
-			hn = http.CanonicalHeaderKey(hn)
-			for _, hv := range hvs {
-				ret = append(ret, hn, hv)
+			if !DropHeadersForward[hn] {
+				for _, hv := range hvs {
+					ret = append(ret, hn, hv)
+				}
 			}
 		}
 		return ret
@@ -104,10 +154,39 @@ func (a RequestFuncArgs) PrepareForwardHeaders() []string {
 
 	ret := make([]string, 0, len(a.ForwardHeaders))
 	for _, hn := range a.ForwardHeaders {
-		hn = http.CanonicalHeaderKey(hn)
-		if hvs, ok := a.ExternalReq.Header[hn]; ok {
+		if hvs, ok := a.ExternalReq.Header[hn]; ok && !DropHeadersForward[hn] {
 			for _, hv := range hvs {
 				ret = append(ret, hn, hv)
+			}
+		}
+	}
+	return ret
+}
+
+// PrepareReturnHeaders extracts the required headers fromBE as defined in the
+// struct fields ReturnHeaders*. fromBE means: From Back End. These are the
+// headers from the queried backend resource. Might return a nil map.
+func (a *RequestFuncArgs) PrepareReturnHeaders(fromBE http.Header) http.Header {
+	if !a.ReturnHeadersAll && len(a.ReturnHeaders) == 0 {
+		return nil
+	}
+
+	ret := make(http.Header) // using len(fromBE) as 2nd args makes the benchmark slower!
+	if a.ReturnHeadersAll {
+		for hn, hvs := range fromBE {
+			if !DropHeadersReturn[hn] {
+				for _, hv := range hvs {
+					ret.Set(hn, hv)
+				}
+			}
+		}
+		return ret
+	}
+
+	for _, hn := range a.ReturnHeaders {
+		if hvs, ok := fromBE[hn]; ok && !DropHeadersReturn[hn] {
+			for _, hv := range hvs {
+				ret.Set(hn, hv)
 			}
 		}
 	}
@@ -118,7 +197,7 @@ const mockRequestMsg = "%s %q Timeout %s MaxBody %s"
 
 // MockRequestContent for testing purposes only.
 func MockRequestContent(content string) RequestFunc {
-	return func(args RequestFuncArgs) (http.Header, []byte, error) {
+	return func(args *RequestFuncArgs) (http.Header, []byte, error) {
 		return nil, []byte(fmt.Sprintf(mockRequestMsg, content, args.URL, args.Timeout, args.MaxBodySizeHumanized())), nil
 	}
 }
@@ -126,7 +205,7 @@ func MockRequestContent(content string) RequestFunc {
 // MockRequestContentCB for testing purposes only. Call back gets executed
 // before the function returns.
 func MockRequestContentCB(content string, callback func() error) RequestFunc {
-	return func(args RequestFuncArgs) (http.Header, []byte, error) {
+	return func(args *RequestFuncArgs) (http.Header, []byte, error) {
 		if err := callback(); err != nil {
 			return nil, nil, errors.Wrapf(err, "MockRequestContentCB with URL %q", args.URL)
 		}
@@ -137,14 +216,14 @@ func MockRequestContentCB(content string, callback func() error) RequestFunc {
 
 // MockRequestError for testing purposes only.
 func MockRequestError(err error) RequestFunc {
-	return func(_ RequestFuncArgs) (http.Header, []byte, error) {
+	return func(_ *RequestFuncArgs) (http.Header, []byte, error) {
 		return nil, nil, err
 	}
 }
 
 // MockRequestPanic just panics
 func MockRequestPanic(msg interface{}) RequestFunc {
-	return func(_ RequestFuncArgs) (http.Header, []byte, error) {
+	return func(_ *RequestFuncArgs) (http.Header, []byte, error) {
 		panic(msg)
 	}
 }
@@ -223,7 +302,7 @@ func (r *Resource) String() string {
 
 // DoRequest performs the request to the backend resource. It generates the URL
 // and then fires the request. DoRequest has the same signature as RequestFunc
-func (r *Resource) DoRequest(args RequestFuncArgs) (http.Header, []byte, error) {
+func (r *Resource) DoRequest(args *RequestFuncArgs) (http.Header, []byte, error) {
 	currentURL := r.url
 	if r.urlTemplate != nil {
 		buf := bufpool.Get()
