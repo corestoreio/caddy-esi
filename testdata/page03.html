@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+    <script>
+    var require = {
+        "baseUrl": "http://m2demo.domainname.com/pub/static/frontend/Magento/luma/en_US"
+    };
+
+
+
+    </script>
+    <meta charset="utf-8"/>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="description" content="Recent Magento 2 Community Edition + extensions demo "/>
+    <meta name="keywords" content="magento, magento2, magento 2 extensions, magento 2 marketplace, magento 2 demo"/>
+    <meta name="robots" content="INDEX,FOLLOW"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no"/>
+    <title>Bottoms - Women | Magento 2 Demo</title>
+    <link rel="stylesheet" type="text/css" media="all"
+          href="http://m2demo.domainname.com/pub/static/_cache/merged/4c82ad06aa97e2ea47c5269161dd3172.css"/>
+    <link rel="stylesheet" type="text/css" media="screen and (min-width: 768px)"
+          href="http://m2demo.domainname.com/pub/static/frontend/Magento/luma/en_US/css/styles-l.css"/>
+    <link rel="stylesheet" type="text/css" media="print"
+          href="http://m2demo.domainname.com/pub/static/frontend/Magento/luma/en_US/css/print.css"/>
+    <link rel="icon" type="image/x-icon"
+          href="http://m2demo.domainname.com/pub/static/frontend/Magento/luma/en_US/Magento_Theme/favicon.ico"/>
+    <link rel="shortcut icon" type="image/x-icon"
+          href="http://m2demo.domainname.com/pub/static/frontend/Magento/luma/en_US/Magento_Theme/favicon.ico"/>
+    <script type="text/javascript"
+            src="http://m2demo.domainname.com/pub/static/frontend/Magento/luma/en_US/requirejs/require.js"></script>
+    <script type="text/javascript"
+            src="http://m2demo.domainname.com/pub/static/frontend/Magento/luma/en_US/mage/requirejs/mixins.js"></script>
+    <script type="text/javascript"
+            src="http://m2demo.domainname.com/pub/static/_requirejs/frontend/Magento/luma/en_US/requirejs-config.js"></script>
+
+    <link rel="stylesheet" type="text/css" media="all" href="http://m2demo.domainname.com/pub/media/styles.css"/>
+</head>
+<body data-container="body"
+      data-mage-init='{"loaderAjax": {}, "loader": { "icon": "http://m2demo.domainname.com/pub/static/frontend/Magento/luma/en_US/images/loader-2.gif"}}'
+      class="page-with-filter page-products categorypath-women-bottoms-women category-bottoms-women catalog-category-view page-layout-2columns-left">
+<script>
+        require.config({
+            deps: [
+                'jquery',
+                'mage/translate',
+                'jquery/jquery-storageapi'
+            ],
+            callback: function ($) {
+                'use strict';
+
+
+
+</script>
+<div>
+    <div>
+        <ul>
+            <li>
+                <esi:include src="{{HTTP_TEST_SERVER}}/customer/status" timeout="18ms"
+                             onerror="testdata/on_error.txt"/>
+                <a href="http://m2demo.domainname.com/customer/account/login/">
+                    Sign In </a>
+            </li>
+
+            <li><a href="http://m2demo.domainname.com/customer/account/create/">Create an Account</a></li>
+        </ul>
+    </div>
+</div>
+<div class="header content"><span data-action="toggle-nav" class="action nav-toggle"><span>Toggle Nav</span></span>
+    <a class="logo" href="http://m2demo.domainname.com/" title="Magento Commerce">
+        <img src="http://m2demo.domainname.com/pub/static/frontend/Magento/luma/en_US/images/logo.svg"
+             alt="Magento Commerce"
+             width="148" height="43"/>
+    </a>
+
+    <div data-block="minicart" class="minicart-wrapper">
+
+        <a class="action showcart" href="http://m2demo.domainname.com/checkout/cart/"
+           data-bind="scope: 'minicart_content'">
+            <span class="text">My Cart</span>
+            <span class="counter qty empty"
+                  data-bind="css: { empty: cart().summary_count == 0 }, blockLoader: isLoading">
+            <span class="-number"><!-- ko text: cart().summary_count -->
+
+                <!-- /ko --></span>
+            <span class="counter-label">
+            <!-- ko if: cart().summary_count --><esi:include src="{{HTTP_TEST_SERVER}}/cart" timeout="19ms"
+                                                             onerror="service not found"
+                                                             forwardheaders="Cookie,Accept-Language"/>
+                <!-- ko text: cart().summary_count --><!-- /ko -->
+                <!-- ko i18n: 'items' --><!-- /ko -->
+                <!-- /ko -->
+                <esi:include src="{{HTTP_TEST_SERVER}}/products/last_viewed" timeout="20ms"
+                             onerror="service not found" forwardheaders="cookie,accept-language"/>
+</body>
+</html>
