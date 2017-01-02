@@ -1,0 +1,24 @@
+language: go
+
+go:
+  - 1.7.4
+  - tip
+
+matrix:
+  allow_failures:
+    - go: tip
+  fast_finish: true
+
+install:
+  - go get -t ./...
+  - go get github.com/golang/lint/golint
+  - go get github.com/gordonklaus/ineffassign
+
+script:
+  - diff <(echo -n) <(gofmt -s -d .)
+  - ineffassign .
+  - go vet ./...
+  - go test -race ./...
+
+after_script:
+  - golint ./...
