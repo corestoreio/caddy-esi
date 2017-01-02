@@ -1,12 +1,13 @@
 language: go
 
 go:
-  - 1.7.4
+  - 1.8beta2
   - tip
 
 matrix:
-  allow_failures:
-    - go: tip
+  # failure is not an option
+  # allow_failures:
+  #  - go: tip
   fast_finish: true
 
 install:
@@ -18,7 +19,7 @@ script:
   - diff <(echo -n) <(gofmt -s -d .)
   - ineffassign .
   - go vet ./...
-  - go test -race ./...
+  - go test -race -count=4 ./...
 
 after_script:
   - golint ./...

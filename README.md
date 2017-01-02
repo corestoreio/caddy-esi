@@ -3,6 +3,8 @@
 This plugin implements partial ESI [Edge Side Includes](https://en.wikipedia.org/wiki/Edge_Side_Includes) support
 for the [Caddy Webserver](https://caddyserver.com).
 
+[![Build Status](https://travis-ci.org/SchumacherFM/caddyesi.svg?branch=master)](https://travis-ci.org/SchumacherFM/caddyesi)
+
 #### Some features:
 
 - No full ESI support
@@ -19,6 +21,7 @@ discard other responses
 - Variables support based on Cookie or Request parameters
 - Error handling and fail over. Either display a text from a string or a static
 file content when a backend server is unavailable.
+- Supports Go >= 1.8
 
 ## High level overview
 

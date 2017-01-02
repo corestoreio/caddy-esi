@@ -91,13 +91,12 @@ func (f *bufferedFancyWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	hj := f.bufferedWriter.ResponseWriter.(http.Hijacker)
 	return hj.Hijack()
 }
-
-//func (f *bufferedFancyWriter) Push(target string, opts *http.PushOptions) error {
-//	if p, ok := f.bufferedWriter.ResponseWriter.(http.Pusher); ok {
-//		return p.Push(target, opts)
-//	}
-//	return nil
-//}
+func (f *bufferedFancyWriter) Push(target string, opts *http.PushOptions) error {
+	if p, ok := f.bufferedWriter.ResponseWriter.(http.Pusher); ok {
+		return p.Push(target, opts)
+	}
+	return nil
+}
 
 // ReadFrom writes r into the underlying buffer
 func (f *bufferedFancyWriter) ReadFrom(r io.Reader) (int64, error) {
@@ -107,8 +106,7 @@ func (f *bufferedFancyWriter) ReadFrom(r io.Reader) (int64, error) {
 var _ http.CloseNotifier = &bufferedFancyWriter{}
 var _ http.Flusher = &bufferedFancyWriter{}
 var _ http.Hijacker = &bufferedFancyWriter{}
-
-//var _ http.Pusher = &bufferedFancyWriter{}
+var _ http.Pusher = &bufferedFancyWriter{}
 var _ io.ReaderFrom = &bufferedFancyWriter{}
 var _ http.Flusher = &flushWriter{}
 
