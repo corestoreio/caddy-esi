@@ -32,8 +32,8 @@ https://cyrillschumacher.local:2718 {
     other caddy directives
     ...
     esi [/path_optional] {
-        timeout 5ms|100us|1m|...
-        ttl 5ms|100us|1m|...
+        [timeout 5ms|100us|1m|...]
+        [ttl 5ms|100us|1m|...]
         [max_body_size 500kib|5MB|10GB|2EB|etc]
         [page_id_source [host,path,ip, etc]]
         [allowed_methods [GET,POST,DELETE]]
@@ -46,7 +46,7 @@ https://cyrillschumacher.local:2718 {
         [log_file (filename|stdout|stderr)]
         [log_level (fatal|info|debug)]
 
-        # next 3 are used for ESI includes
+        # optional: next 3 are used for ESI includes
         redisAWS1 redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0
         redisLocal1 redis://localhost:6381/3
         memcacheLocal2 memcache://localhost:11211/1
@@ -54,15 +54,18 @@ https://cyrillschumacher.local:2718 {
 }
 ```
 
+Most of the global configuration values can be overwritten with a different
+value in a single ESI tag.
+
 `esi` defines the namespace in the Caddy configuration file. All keys in the
 `esi` namespace which are not reserved key words will be treated as a `src` aka.
 resource to load data from. The value of the not reserved keywords must be a
 valid URI. Reserved keys are:
 
-- `timeout`, default x [time.Duration](https://golang.org/pkg/time/#Duration).
-Time when a request to a source should be canceled. Can only occur one time.
-- `ttl`, global time-to-live in the cache for ESI data. Defaults to
-zero, caching disabled. Can only occur one time.
+- `timeout` Defaults to 20s, based on [time.Duration](https://golang.org/pkg/time/#Duration).
+Time when a request to a resource should be canceled.
+- `ttl` globally time-to-live value in the NoSQL cache for ESI data. Defaults to
+zero, caching disabled.
 - `max_body_size` Defaults to 5MB, optional. Limits the size of the returned
 body from a backend resource.
 - `cache` defines a cache service which stores the retrieved data from a e.g.
@@ -79,11 +82,10 @@ higher possibility occurs that your RAM will be filled up (will be fixed ...).
 middleware, defaults to GET only.
 - `allowed_status_codes` optional. Any HTTP status code listed here triggers the
 ESI middleware, defaults to HTTP Status OK (200) only.
-- `log_file` optional, default logging disabled. Put in here either a file name
-or the wordings stderr or stdout to write to those file descriptors. If empty,
-logging is disabled.
-- `log_level` optional, default logging disabled. Debug is most verbose.  If
-empty or unknown, logging is disabled.
+- `log_file` optional. Put in here either a file name or the wordings `stderr`
+or `stdout` to write to those file descriptors. If empty, logging is disabled.
+- `log_level` optional. Default logging disabled. Available key words `debug`
+the most verbose and `info`, less verbose.
 - `log_format` not yet supported. Ideas?
 - ... ?
 
