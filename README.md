@@ -1,8 +1,24 @@
 # ESI Tags for Caddy Server
 
-This plugin implements ESI (Edge Side Includes) tag parsing and cache handling
-for the [https://caddyserver.com](Caddy Webserver).
+This plugin implements partial ESI [Edge Side Includes](https://en.wikipedia.org/wiki/Edge_Side_Includes) support
+for the [Caddy Webserver](https://caddyserver.com).
 
+#### Some features:
+
+- No full ESI support
+- Multiple incoming requests trigger only one single parsing of the ESI tags per
+page
+- Querying multiple backend server parallel and concurrent.
+- Coalesce multiple incoming requests into one single request to a backend
+server
+- Forwarding and returning of HTTP headers from backend servers
+- Query multiple backend servers sequentially as a fall back mechanism
+- Query multiple backend servers parallel and use the first returned result and
+discard other responses
+- Support for NoSQL Server to query a key and simply display its value
+- Variables support based on Cookie or Request parameters
+- Error handling and fail over. Either display a text from a string or a static
+file content when a backend server is unavailable.
 
 ## High level overview
 
