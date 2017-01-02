@@ -69,6 +69,7 @@ type (
 		Timeout           time.Duration // required
 		MaxBodySize       uint64        // required
 		Log               log.Logger    // optional
+		TTL               time.Duration // optional
 		ForwardHeaders    []string      // optional, already treated with http.CanonicalHeaderKey
 		ForwardHeadersAll bool          // optional
 		ReturnHeaders     []string      // optional, already treated with http.CanonicalHeaderKey

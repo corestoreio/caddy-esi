@@ -120,7 +120,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 	}
 
 	t.Run("1x src, timeout, onerror, forwardheaders", runner(
-		[]byte(`include src="https://micro.service/checkout/cart" timeout="9ms" onerror="testdata/nocart.html" forwardheaders="Cookie , Accept-Language, Authorization"`),
+		[]byte(`include src="https://micro.service/checkout/cart" timeout="9ms" onerror="testdata/nocart.html" forwardheaders="Cookie , accept-language, AUTHORIZATION"`),
 		nil,
 		&esitag.Entity{
 			Resources: []*backend.Resource{
@@ -133,7 +133,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 	))
 
 	t.Run("2x src, timeout, onerror, forwardheaders", runner(
-		[]byte(`include src="https://micro1.service/checkout/cart" src="https://micro2.service/checkout/cart" ttl="9ms"  returnheaders="Cookie , Accept-Language, Authorization"`),
+		[]byte(`include src="https://micro1.service/checkout/cart" src="https://micro2.service/checkout/cart" ttl="9ms"  returnheaders="cookie , ACCEPT-Language, Authorization"`),
 		nil,
 		&esitag.Entity{
 			Resources: []*backend.Resource{
@@ -535,14 +535,14 @@ func TestEntity_QueryResources_Multi_Calls(t *testing.T) {
 	}()
 
 	var partialSuccess int
-	defer backend.RegisterRequestFunc("testd1", func(_ string, _ time.Duration, _ uint64) ([]byte, error) {
+	defer backend.RegisterRequestFunc("testd1", func(_ *backend.RequestFuncArgs) (http.Header, []byte, error) {
 		partialSuccess++
 
 		if partialSuccess%2 == 0 {
-			return []byte(`Content`), nil
+			return nil, []byte(`Content`), nil
 		}
 
-		return nil, errors.NewTimeoutf("Timed out") // this can be any error not timeout only
+		return nil, nil, errors.NewTimeoutf("Timed out") // this can be any error not timeout only
 	}).DeferredDeregister()
 
 	entities, err := esitag.Parse(strings.NewReader(`<html><head></head><body>

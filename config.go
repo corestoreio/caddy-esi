@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/SchumacherFM/caddyesi/helpers"
@@ -51,6 +52,10 @@ type PathConfig struct {
 	// AllowedStatusCodes if a 3rd party middleware returns any of the not listed
 	// status codes then the ESI middleware will get skipped.
 	AllowedStatusCodes []int
+
+	// MaxBodySize defaults to 5MB and limits the size of the returned body from a
+	// backend resource.
+	MaxBodySize uint64
 	// Timeout global. Time when a request to a source should be canceled.
 	// Default value from the constant DefaultTimeOut.
 	Timeout time.Duration
@@ -58,9 +63,7 @@ type PathConfig struct {
 	// zero, caching globally disabled until an ESI tag or this configuration
 	// value contains the TTL attribute.
 	TTL time.Duration
-	// MaxBodySize defaults to 5MB and limits the size of the returned body from a
-	// backend resource.
-	MaxBodySize uint64
+
 	// PageIDSource defines a slice of possible parameters which gets extracted
 	// from the http.Request object. All these parameters will be used to
 	// extract the values and calculate a unique hash for the current requested
@@ -138,25 +141,27 @@ func (pc *PathConfig) ESITagsByRequest(r *http.Request) (pageID uint64, t esitag
 
 // UpsertESITags processes each ESI entity to update their default values with
 // the supplied global PathConfig value. Then inserts the ESI entities with its
-// associated page ID in the internal ESI cache.
+// associated page ID in the internal ESI cache. These writes to esitag.Entity
+// happens in a locked environment. So there should be no race condition.
 func (pc *PathConfig) UpsertESITags(pageID uint64, entities esitag.Entities) {
-	// These writes to esitag.Entity happens in a locked environment. So there
-	// should be no race condition.
+
 	for _, et := range entities {
+
 		et.Log = pc.Log
-		if et.MaxBodySize == 0 {
-			et.MaxBodySize = pc.MaxBodySize
-		}
-		if et.Timeout < 1 {
-			et.Timeout = pc.Timeout
-		}
-		if et.TTL < 1 {
-			et.TTL = pc.TTL
-		}
+
 		if len(et.OnError) == 0 {
 			et.OnError = pc.OnError
 		}
 		// add here the KVFetcher ...
+
+		// create sync.pool of arguments for the resources. Now with all correct
+		// default values.
+		et.InitPoolRFA(&backend.RequestFuncArgs{
+			Log:         pc.Log,
+			MaxBodySize: pc.MaxBodySize,
+			Timeout:     pc.Timeout,
+			TTL:         pc.TTL,
+		})
 	}
 
 	pc.esiMU.Lock()

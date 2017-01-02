@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 	"unicode"
@@ -109,20 +110,24 @@ func (dts DataTags) Less(i, j int) bool { return dts[i].Start < dts[j].Start }
 
 // Entity represents a single fully parsed ESI tag
 type Entity struct {
-	Log         log.Logger
-	RawTag      []byte
-	DataTag     DataTag
-	MaxBodySize uint64 // DefaultMaxBodySize 5MB
-	TTL         time.Duration
-	Timeout     time.Duration
-	// OnError contains the content which gets injected into an erroneous ESI
-	// tag when all reuqests are failing to its backends. If onError in the ESI
-	// tag contains a file name, then that content gets loaded.
-	OnError           []byte
+	Log     log.Logger
+	RawTag  []byte
+	DataTag DataTag
+
+	// <pool> but kept here for easy testing, for now.
+	MaxBodySize       uint64 // DefaultMaxBodySize 5MB
+	Timeout           time.Duration
 	ForwardHeaders    []string
 	ForwardHeadersAll bool
 	ReturnHeaders     []string
 	ReturnHeadersAll  bool
+	TTL               time.Duration
+	// </pool>
+
+	// OnError contains the content which gets injected into an erroneous ESI
+	// tag when all reuqests are failing to its backends. If onError in the ESI
+	// tag contains a file name, then that content gets loaded.
+	OnError []byte
 	// Key defines a key in a KeyValue server to fetch the value from.
 	Key string
 	// KeyTemplate gets created when the Key field contains the template
@@ -149,6 +154,9 @@ type Entity struct {
 
 	// Conditioner TODO(CyS) depending on a condition an ESI tag gets executed or not.
 	Conditioner
+
+	// resourceRFAPool for the request arguments
+	resourceRFAPool sync.Pool
 }
 
 // SplitAttributes splits an ESI tag by its attributes. This function avoids regexp.
@@ -252,12 +260,18 @@ func (et *Entity) ParseRaw() error {
 				et.ForwardHeadersAll = true
 			} else {
 				et.ForwardHeaders = helpers.CommaListToSlice(value)
+				for i, v := range et.ForwardHeaders {
+					et.ForwardHeaders[i] = http.CanonicalHeaderKey(v)
+				}
 			}
 		case "returnheaders":
 			if value == "all" {
 				et.ReturnHeadersAll = true
 			} else {
 				et.ReturnHeaders = helpers.CommaListToSlice(value)
+				for i, v := range et.ReturnHeaders {
+					et.ReturnHeaders[i] = http.CanonicalHeaderKey(v)
+				}
 			}
 		default:
 			// if an attribute starts with x we'll ignore it because the
@@ -270,6 +284,9 @@ func (et *Entity) ParseRaw() error {
 	if len(et.Resources) == 0 || srcCounter == 0 {
 		return errors.NewEmptyf("[caddyesi] ESITag.ParseRaw. src (Items: %d/Src: %d) cannot be empty in Tag which requires at least one resource: %q", len(et.Resources), srcCounter, et.RawTag)
 	}
+
+	et.InitPoolRFA(nil)
+
 	return nil
 }
 
@@ -322,6 +339,51 @@ func (et *Entity) parseKey(val string) (err error) {
 	return nil
 }
 
+// InitPoolRFA used in PathConfig.UpsertESITags and in Entity.ParseRaw to set
+// the pool function. When called in PathConfig.UpsertESITags all default config
+// values have been applied correctly.
+func (et *Entity) InitPoolRFA(defaultRFA *backend.RequestFuncArgs) {
+
+	if et.Log == nil && defaultRFA != nil {
+		et.Log = defaultRFA.Log
+	}
+	if et.MaxBodySize == 0 && defaultRFA != nil {
+		et.MaxBodySize = defaultRFA.MaxBodySize
+	}
+	if et.Timeout < 1 && defaultRFA != nil {
+		et.Timeout = defaultRFA.Timeout
+	}
+	if et.TTL < 1 && defaultRFA != nil {
+		et.TTL = defaultRFA.TTL
+	}
+
+	et.resourceRFAPool.New = func() interface{} {
+		return &backend.RequestFuncArgs{
+			Log:               et.Log,
+			Timeout:           et.Timeout,
+			MaxBodySize:       et.MaxBodySize,
+			ForwardHeaders:    et.ForwardHeaders,
+			ForwardHeadersAll: et.ForwardHeadersAll,
+			ReturnHeaders:     et.ReturnHeaders,
+			ReturnHeadersAll:  et.ReturnHeadersAll,
+		}
+	}
+}
+
+// used in Entity.QueryResources
+func (et *Entity) poolGetRFA(externalReq *http.Request) *backend.RequestFuncArgs {
+	rfa := et.resourceRFAPool.Get().(*backend.RequestFuncArgs)
+	rfa.ExternalReq = externalReq
+	return rfa
+}
+
+// used in Entity.QueryResources
+func (et *Entity) poolPutRFA(rfa *backend.RequestFuncArgs) {
+	rfa.ExternalReq = nil
+	rfa.URL = ""
+	et.resourceRFAPool.Put(rfa)
+}
+
 // QueryResources iterates sequentially over the resources and executes requests
 // as defined in the RequestFunc. If one resource fails it will be
 // marked as timed out and the next resource gets tried. The exponential
@@ -331,14 +393,10 @@ func (et *Entity) parseKey(val string) (err error) {
 func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 	timeStart := monotime.Now()
 
-	if et.Timeout < 1 {
-		return nil, errors.NewEmptyf("[esitag] For Entity.QueryResources the Timeout value is empty. Tag: %q", et.RawTag)
-	}
-	if et.MaxBodySize == 0 {
-		return nil, errors.NewEmptyf("[esitag] For Entity.QueryResources the MaxBodySize value is empty. Tag: %q", et.RawTag)
-	}
+	var mErr *errors.MultiErr // just for collecting errors for informational purposes at the Temporary error at the end.
+	rfa := et.poolGetRFA(externalReq)
+	defer et.poolPutRFA(rfa)
 
-	mErr := errors.NewMultiErr() // just for collecting errors for informational purposes at the Temporary error at the end.
 	for i, r := range et.Resources {
 
 		var lFields log.Fields
@@ -349,9 +407,10 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 		switch state, lastFailure := r.CBState(); state {
 
 		case backend.CBStateHalfOpen, backend.CBStateClosed:
-			data, err := r.DoRequest(externalReq, et.Timeout, et.MaxBodySize)
+			// TODO(CyS) add ReturnHeader
+			_, data, err := r.DoRequest(rfa)
 			if err != nil {
-				mErr.AppendErrors(errors.Errorf("\nIndex %d URL %q with %s\n", i, r.String(), err))
+				mErr = mErr.AppendErrors(errors.Errorf("\nIndex %d URL %q with %s\n", i, r.String(), err))
 				lastFailureTime := r.CBRecordFailure()
 				if et.Log.IsDebug() {
 					et.Log.Debug("esitag.Entity.QueryResources.RequestFunc.Error",
