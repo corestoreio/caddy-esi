@@ -36,7 +36,7 @@ https://cyrillschumacher.local:2718 {
         [ttl 5ms|100us|1m|...]
         [max_body_size 500kib|5MB|10GB|2EB|etc]
         [page_id_source [host,path,ip, etc]]
-        [allowed_methods [GET,POST,DELETE]]
+        [allowed_methods [GET,POST,etc]]
         [allowed_status_codes [200,404,etc]]
         [cache redis://localhost:6379/0]
         [cache redis://localhost:6380/0]
@@ -54,40 +54,26 @@ https://cyrillschumacher.local:2718 {
 }
 ```
 
-Most of the global configuration values can be overwritten with a different
-value in a single ESI tag.
+Most of the **global optional configuration values** can be overwritten with a different value in a single ESI tag.
 
 `esi` defines the namespace in the Caddy configuration file. All keys in the
 `esi` namespace which are not reserved key words will be treated as a `src` aka.
 resource to load data from. The value of the not reserved keywords must be a
 valid URI. Reserved keys are:
 
-- `timeout` Defaults to 20s, based on [time.Duration](https://golang.org/pkg/time/#Duration).
-Time when a request to a resource should be canceled.
-- `ttl` globally time-to-live value in the NoSQL cache for ESI data. Defaults to
-zero, caching disabled.
-- `max_body_size` Defaults to 5MB, optional. Limits the size of the returned
-body from a backend resource.
-- `cache` defines a cache service which stores the retrieved data from a e.g.
-micro service but only when the ttl (within an ESI tag) has been set. Can only
-occur multiple times.
-- `page_id_source` optional and special directive on how to identify a
-request to the same page. The following settings can be used to calculate the
-hash value. Available settings: `remoteaddr`, `realip`, `scheme`, `host`,
-`path`, `rawpath`, `rawquery` and `url`. Special feature to access cookies and
-headers: Prefix with `cookie-` or `header-` to access the appropriate value.
-Default setting: `host` and `path`. Attention: The more granular you define the
-higher possibility occurs that your RAM will be filled up (will be fixed ...).
-- `allowed_methods` optional. Any method listed here triggers the ESI
-middleware, defaults to GET only.
-- `allowed_status_codes` optional. Any HTTP status code listed here triggers the
-ESI middleware, defaults to HTTP Status OK (200) only.
-- `log_file` optional. Put in here either a file name or the wordings `stderr`
-or `stdout` to write to those file descriptors. If empty, logging is disabled.
-- `log_level` optional. Default logging disabled. Available key words `debug`
-the most verbose and `info`, less verbose.
-- `log_format` not yet supported. Ideas?
-- ... ?
+| Config Name |  Default | Support in ESI tag | Description |
+| ----------- |  ------- | ----------- |  ----------- |
+| `timeout`   | 20s    | Yes | Time when a request to a resource should be canceled. [time.Duration](https://golang.org/pkg/time/#Duration) |
+| `ttl`      | disabled  | Yes | Time-to-live value in the NoSQL cache for data returned from the backend resources. |
+| `max_body_size` | 5MB       | Yes |  Limits the size of the returned body from a backend resource. |
+| `cache` | disabled | No | Defines a cache service which stores the retrieved data from a backend resource but only when the ttl (within an ESI tag) has been set. Can only occur multiple times! |
+| `page_id_source` | `host`, `path` | No | Special directive on how to identify a request to the same page. The following settings can be used to calculate the hash value. Available settings: `remoteaddr`, `realip`, `scheme`, `host`, `path`, `rawpath`, `rawquery` and `url`. Special feature to access cookies and headers: Prefix with `cookie-` or `header-` to access the appropriate value. Attention: The more granular you define the higher possibility occurs that your RAM will be filled up (will be fixed ...). |
+| `allowed_methods` | `GET` | No | Any method listed here triggers the ESI middleware |
+| `allowed_status_codes` | 200 | No | Any HTTP status code listed here triggers the ESI middleware |
+| `log_file` | disabled | No | Put in here either a file name or the wordings `stderr` or `stdout` to write to those file descriptors. |
+| `log_level` | disabled | No | Available key words `debug` the most verbose and `info`, less verbose. |
+| `log_format` | n/a | No | Not yet supported. Ideas? |
+
 
 ## Supported ESI Tags and their attributes
 
