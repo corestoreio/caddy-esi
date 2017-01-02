@@ -47,7 +47,7 @@ func WrapPiped(iorf io.ReaderFrom, w http.ResponseWriter) PipedWriter {
 	_, rf := w.(io.ReaderFrom)
 
 	pr, pw := io.Pipe()
-	mw := pipedWriter{ResponseWriter: w, pw: pw}
+	mw := &pipedWriter{ResponseWriter: w, pw: pw}
 	mw.wg.Add(1)
 	go func() {
 		// todo fix race condition
@@ -66,7 +66,7 @@ func WrapPiped(iorf io.ReaderFrom, w http.ResponseWriter) PipedWriter {
 	if fl {
 		return &pipedFlushWriter{mw}
 	}
-	return &mw
+	return mw
 }
 
 // bufferedWriter wraps a http.ResponseWriter that implements the minimal
@@ -102,7 +102,7 @@ func (b *pipedWriter) Close() error {
 // of wrapping the http.ResponseWriter that package http gives you, in order to
 // make the proxied object support the full method set of the proxied object.
 type pipedFancyWriter struct {
-	pipedWriter
+	*pipedWriter
 }
 
 func (f *pipedFancyWriter) CloseNotify() <-chan bool {
@@ -117,28 +117,30 @@ func (f *pipedFancyWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	hj := f.pipedWriter.ResponseWriter.(http.Hijacker)
 	return hj.Hijack()
 }
-func (f *pipedFancyWriter) Push(target string, opts *http.PushOptions) error {
-	if p, ok := f.pipedWriter.ResponseWriter.(http.Pusher); ok {
-		return p.Push(target, opts)
-	}
-	return nil
-}
+
+//func (f *pipedFancyWriter) Push(target string, opts *http.PushOptions) error {
+//	if p, ok := f.pipedWriter.ResponseWriter.(http.Pusher); ok {
+//		return p.Push(target, opts)
+//	}
+//	return nil
+//}
 
 // ReadFrom writes r into the underlying pipe
 func (f *pipedFancyWriter) ReadFrom(r io.Reader) (int64, error) {
-	return io.Copy(&f.pipedWriter, r)
+	return io.Copy(f.pipedWriter, r)
 }
 
 var _ http.CloseNotifier = &pipedFancyWriter{}
 var _ http.Flusher = &pipedFancyWriter{}
 var _ http.Hijacker = &pipedFancyWriter{}
-var _ http.Pusher = &pipedFancyWriter{}
+
+//var _ http.Pusher = &pipedFancyWriter{}
 var _ io.ReaderFrom = &pipedFancyWriter{}
 var _ http.Flusher = &flushWriter{}
 
 // pipedFlushWriter implements only http.Flusher mostly used
 type pipedFlushWriter struct {
-	pipedWriter
+	*pipedWriter
 }
 
 func (f *pipedFlushWriter) Flush() {
