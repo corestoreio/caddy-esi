@@ -423,15 +423,15 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 				r.CBReset()
 				if et.Log.IsDebug() {
 					et.Log.Debug("esitag.Entity.QueryResources.RequestFunc.CBStateHalfOpen",
-						log.Duration(log.KeyNameDuration, monotime.Since(timeStart)),
+						log.Duration(log.KeyNameDuration, monotime.Since(timeStart)), log.String("content", string(data)),
 						log.Uint64("failure_count", r.CBFailures()), log.Stringer("last_failure", lastFailure), lFields)
 				}
 			} else if et.Log.IsDebug() {
 				et.Log.Debug("esitag.Entity.QueryResources.RequestFunc.CBStateClosed",
-					log.Duration(log.KeyNameDuration, monotime.Since(timeStart)),
+					log.Duration(log.KeyNameDuration, monotime.Since(timeStart)), log.String("content", string(data)),
 					log.Uint64("failure_count", r.CBFailures()), log.Stringer("last_failure", lastFailure), lFields)
 			}
-
+			// TODO(CyS): Log header, create special function to log header; LOG rfa with special format
 			return data, nil
 
 		case backend.CBStateOpen:
