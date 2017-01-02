@@ -3,6 +3,9 @@ language: go
 go:
   - 1.8beta2
   - tip
+os:
+  - linux
+  - osx
 
 matrix:
   # failure is not an option
