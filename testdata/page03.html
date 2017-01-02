@@ -56,7 +56,7 @@
     <div>
         <ul>
             <li>
-                <esi:include src="{{HTTP_TEST_SERVER}}/customer/status" timeout="18ms"
+                <esi:include src="bmServe01://domain.shop/customer/status" timeout="18ms"
                              onerror="testdata/on_error.txt"/>
                 <a href="http://m2demo.domainname.com/customer/account/login/">
                     Sign In </a>
@@ -84,13 +84,13 @@
 
                 <!-- /ko --></span>
             <span class="counter-label">
-            <!-- ko if: cart().summary_count --><esi:include src="{{HTTP_TEST_SERVER}}/cart" timeout="19ms"
+            <!-- ko if: cart().summary_count --><esi:include src="bmServe01://domain.shop/cart" timeout="19ms"
                                                              onerror="service not found"
                                                              forwardheaders="Cookie,Accept-Language"/>
                 <!-- ko text: cart().summary_count --><!-- /ko -->
                 <!-- ko i18n: 'items' --><!-- /ko -->
                 <!-- /ko -->
-                <esi:include src="{{HTTP_TEST_SERVER}}/products/last_viewed" timeout="20ms"
+                <esi:include src="bmServe01://domain.shop/products/last_viewed" timeout="20ms"
                              onerror="service not found" forwardheaders="cookie,accept-language"/>
 </body>
 </html>

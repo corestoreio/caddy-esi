@@ -121,7 +121,7 @@ func TestMiddleware_ServeHTTP_StatusCodes(t *testing.T) {
 	})
 
 	t.Run("404 Code allowed", func(t *testing.T) {
-
+		// stupid test ... must be refactored
 		hndl := mwTestHandler(t, `esi {
 				allowed_status_codes 404
 			}`)
@@ -133,7 +133,6 @@ func TestMiddleware_ServeHTTP_StatusCodes(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Empty(t, rec.Body.String())
 	})
-
 }
 
 func TestMiddleware_ServeHTTP_Once(t *testing.T) {
