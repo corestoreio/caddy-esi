@@ -20,7 +20,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/corestoreio/csfw/net/responseproxy"
+	"github.com/SchumacherFM/caddyesi/responseproxy"
 	"github.com/stretchr/testify/assert"
 )
 
