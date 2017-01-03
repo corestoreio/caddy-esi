@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"testing"
 	"time"
 
@@ -275,20 +276,14 @@ func TestRequestFuncArgs_PrepareForwardHeaders(t *testing.T) {
 		}
 
 		have := rfa.PrepareForwardHeaders()
-		//t.Logf("%#v", have)
+		sort.Strings(have)
+		sort.Strings(want)
 
 		if have, want := len(want), len(have); have != want {
 			t.Fatalf("Differnt length of the lists Have: %v Want: %v", have, want)
 		}
 
-		for i := 0; i < len(want); i = i + 2 {
-			for j := 0; j < len(have); j = j + 2 {
-				// stupid slow comparison ... but ok for tests
-				if want[i] == have[i] {
-					assert.Exactly(t, want[i+1], have[i+1], "Key %q", want[i])
-				}
-			}
-		}
+		assert.Exactly(t, have, want)
 
 	})
 
