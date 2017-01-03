@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/corestoreio/errors"
+	"github.com/corestoreio/log"
 )
 
 func init() {
@@ -81,17 +82,23 @@ func FetchHTTP(args *RequestFuncArgs) (http.Header, []byte, error) {
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "[esibackend] FetchHTTP error for URL %q", args.URL)
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK { // this can be made configurable in an ESI tag
 		return nil, nil, errors.NewNotSupportedf("[backend] FetchHTTP: Response Code %q not supported for URL %q", resp.StatusCode, args.URL)
 	}
 
 	buf := new(bytes.Buffer)
-	_, err = buf.ReadFrom(io.LimitReader(resp.Body, int64(args.MaxBodySize))) // overflow of uint into int ?
-	// todo log or report when we reach EOF to let the admin know that the content is too large has been cut off.
-	_ = resp.Body.Close() // for now ignore it ...
+	mbs := int64(args.MaxBodySize) // overflow of uint into int ?
+	n, err := buf.ReadFrom(io.LimitReader(resp.Body, mbs))
 	if err != nil && err != io.EOF {
 		return nil, nil, errors.Wrapf(err, "[esibackend] FetchHTTP.ReadFrom Body for URL %q failed", args.URL)
+	}
+
+	if n >= mbs && args.Log != nil && args.Log.IsInfo() { // body has been cut off
+		args.Log.Info("esibackend.FetchHTTP.LimitReader",
+			log.String("url", args.URL), log.Int64("bytes_read", n), log.Int64("bytes_max_read", mbs),
+		)
 	}
 
 	return args.PrepareReturnHeaders(resp.Header), buf.Bytes(), nil
