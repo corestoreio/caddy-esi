@@ -16,13 +16,14 @@ package esikv_test
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esikv"
 	"github.com/alicebob/miniredis"
 	"github.com/corestoreio/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 // https://github.com/alicebob/miniredis

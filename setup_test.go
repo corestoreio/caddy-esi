@@ -2,22 +2,30 @@ package caddyesi
 
 import (
 	"bytes"
+	"io/ioutil"
+	"os"
+	"testing"
+	"time"
+
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esicache"
 	"github.com/SchumacherFM/caddyesi/esitesting"
+	"github.com/alicebob/miniredis"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	"github.com/mholt/caddy"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
 	"github.com/stretchr/testify/assert"
-	"io/ioutil"
-	"os"
-	"testing"
-	"time"
 )
 
 func TestPluginSetup(t *testing.T) {
 	t.Parallel()
+
+	mr := miniredis.NewMiniRedis()
+	if err := mr.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer mr.Close()
 
 	runner := func(config string, wantPC PathConfigs, cacheCount int, requestFuncs []string, wantErrBhf errors.BehaviourFunc) func(*testing.T) {
 		return func(t *testing.T) {
@@ -87,7 +95,7 @@ func TestPluginSetup(t *testing.T) {
 		`esi {
 			timeout 5ms
 			ttl 10ms
-			cache redis://localhost:6379/0
+			cache redis://`+mr.Addr()+`/0
 		}`,
 		PathConfigs{
 			&PathConfig{
@@ -105,8 +113,8 @@ func TestPluginSetup(t *testing.T) {
 		`esi {
 			timeout 5ms
 			ttl 10ms
-			cache redis://localhost:6379/0
-			cache redis://localhost:6380/0
+			cache redis://`+mr.Addr()+`/0
+			cache redis://`+mr.Addr()+`/1
 		}`,
 		PathConfigs{
 			&PathConfig{
@@ -124,7 +132,7 @@ func TestPluginSetup(t *testing.T) {
 		`esi {
 			timeout 5ms
 			ttl 10ms
-			backend redis://localhost:6379/0
+			backend redis://`+mr.Addr()+`/0
 		}`,
 		PathConfigs{
 			&PathConfig{
@@ -194,7 +202,7 @@ func TestPluginSetup(t *testing.T) {
 		`esi {
 			timeout 5ms
 			ttl 10ms
-			backend redis//localhost:6379/0
+			backend redis//`+mr.Addr()+`/0
 		}`,
 		nil,
 		0,   // cache length
@@ -206,8 +214,8 @@ func TestPluginSetup(t *testing.T) {
 		`esi {
 			timeout 5ms
 			ttl 10ms
-			backend redis://localhost:6379/0
-			backend redis://localhost:6380/0
+			backend redis://`+mr.Addr()+`/0
+			backend redis://`+mr.Addr()+`/1
 		}`,
 		PathConfigs{
 			&PathConfig{
@@ -225,8 +233,8 @@ func TestPluginSetup(t *testing.T) {
 		`esi {
 			timeout 5ms
 			ttl 10ms
-			redis1 redis://localhost:6379/0
-			redis2 redis://localhost:6380/0
+			redis1 redis://`+mr.Addr()+`/0
+			redis2 redis://`+mr.Addr()+`/1
 		}`,
 		PathConfigs{
 			&PathConfig{
@@ -267,16 +275,16 @@ func TestPluginSetup(t *testing.T) {
 		   log_file stderr
 		   log_level debug
 
-		   redisAWS1 redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0
-		   redisLocal1 redis://localhost:6379/3
-		   redisLocal2 redis://localhost:6380/1
+		   redisAWS1 redis://`+mr.Addr()+`/2
+		   redisLocal1 redis://`+mr.Addr()+`/3
+		   redisLocal2 redis://`+mr.Addr()+`/1
 
 		}
 		esi /checkout/cart {
 		   timeout 131ms
 		   ttl 132ms
 
-		   redisLocal3 redis://localhost:6379/3
+		   redisLocal3 redis://`+mr.Addr()+`/3
 		}`,
 		PathConfigs{
 			&PathConfig{
