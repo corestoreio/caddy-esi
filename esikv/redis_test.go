@@ -1,15 +1,51 @@
-package esiredis_test
+// Copyright 2016-2017, Cyrill @ Schumacher.fm and the CaddyESI Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
+package esikv_test
 
 import (
 	"testing"
 
-	"github.com/SchumacherFM/caddyesi"
-	"github.com/SchumacherFM/caddyesi/esiredis"
+	"github.com/SchumacherFM/caddyesi/esikv"
+	"github.com/stretchr/testify/assert"
 )
 
-var _ caddyesi.KVFetcher = (*esiredis.Redis)(nil)
+func TestNewRequestFunc(t *testing.T) {
+	t.Parallel()
 
-func TestParseRedis(t *testing.T) {
+	t.Run("Redis", func(t *testing.T) {
+		be, err := esikv.NewRequestFunc("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0")
+		assert.NoError(t, err)
+		assert.NotNil(t, be)
+	})
+	t.Run("URL Error", func(t *testing.T) {
+		be, err := esikv.NewRequestFunc("redis//localhost")
+		assert.Nil(t, be)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), `Unknown URL: "redis//localhost". Does not contain ://`)
+	})
+	t.Run("Scheme Error", func(t *testing.T) {
+		be, err := esikv.NewRequestFunc("mysql://localhost")
+		assert.Nil(t, be)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), `Unknown URL: "mysql://localhost". No driver defined for scheme: "mysql"`)
+	})
+}
+
+func TestParseRedisURL(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		raw          string
 		wantAddress  string
@@ -99,7 +135,7 @@ func TestParseRedis(t *testing.T) {
 	}
 	for i, test := range tests {
 
-		haveAddress, havePW, haveDB, haveErr := esiredis.ParseURL(test.raw)
+		haveAddress, havePW, haveDB, haveErr := esikv.ParseRedisURL(test.raw)
 
 		if have, want := haveAddress, test.wantAddress; have != want {
 			t.Errorf("(%d) Address: Have: %v Want: %v", i, have, want)
