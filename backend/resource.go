@@ -28,10 +28,10 @@ var rrfRegister = &struct {
 	fetchers: make(map[string]RequestFunc),
 }
 
-// RegisterRequestFunc scheme is a protocol before the ://. This function
-// returns a closure which lets you deregister the scheme once a test has
-// finished. Use the defer word. Scheme will be transformed into an all
-// lowercase string.
+// RegisterRequestFunc scheme can be a protocol before the :// but also an alias
+// to register a key-value service. This function returns a closure which lets
+// you deregister the scheme/alias once a test has finished. Use the defer word.
+// Scheme/alias will be transformed into an all lowercase string.
 func RegisterRequestFunc(scheme string, f RequestFunc) struct{ DeferredDeregister func() } {
 	scheme = strings.ToLower(scheme)
 	rrfRegister.Lock()
@@ -69,6 +69,7 @@ type (
 		Timeout           time.Duration // required
 		MaxBodySize       uint64        // required
 		Log               log.Logger    // optional
+		Key               string        // optional (for KV Service)
 		TTL               time.Duration // optional
 		ForwardHeaders    []string      // optional, already treated with http.CanonicalHeaderKey
 		ForwardHeadersAll bool          // optional
@@ -261,8 +262,7 @@ func MustNewResource(idx int, url string) *Resource {
 }
 
 // NewResource creates a new resource to one backend. Inspects the URL if it
-// contains a template and parses that template. Looks also up the HTTP Fetcher
-// function depending on the scheme.
+// contains a template and parses that template.
 func NewResource(idx int, url string) (*Resource, error) {
 	r := &Resource{
 		Index:             idx,
