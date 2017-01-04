@@ -7,6 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SchumacherFM/caddyesi/backend"
+	"github.com/SchumacherFM/caddyesi/esicache"
+	"github.com/SchumacherFM/caddyesi/esikv"
 	"github.com/SchumacherFM/caddyesi/helpers"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
@@ -182,11 +185,9 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 			return errors.NewNotValidf("[caddyesi] cache: %s", c.ArgErr())
 		}
 
-		cchr, err := newCacher(c.Val())
-		if err != nil {
-			return errors.Wrapf(err, "[caddyesi] Failed to instantiate a new cache object for %q with URL: %q", key, c.Val())
+		if err := esicache.MainRegistry.Register(pc.Scope, c.Val()); err != nil {
+			return errors.Wrapf(err, "[caddyesi] esicache.MainRegistry.Register Key %q with URL: %q", key, c.Val())
 		}
-		pc.Caches = append(pc.Caches, cchr)
 
 	case "page_id_source":
 		if !c.NextArg() {
@@ -230,14 +231,12 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 		if key == "" || c.Val() == "" {
 			return nil // continue
 		}
-		if pc.KVServices == nil {
-			pc.KVServices = make(map[string]KVFetcher, 10)
-		}
-		kvf, err := newKVFetcher(c.Val())
+
+		f, err := esikv.NewRequestFunc(c.Val())
 		if err != nil {
-			return errors.Wrapf(err, "[caddyesi] newKVFetcher failed for Key %q and Value %q", key, c.Val())
+			return errors.Wrapf(err, "[caddyesi] KeyValue Service init failed for Key %q and Value %q", key, c.Val())
 		}
-		pc.KVServices[key] = kvf
+		backend.RegisterRequestFunc(key, f)
 	}
 
 	return nil

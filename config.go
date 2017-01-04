@@ -81,16 +81,6 @@ type PathConfig struct {
 	// Log gets set up during setup
 	Log log.Logger
 
-	// Caches stores content from a e.g. micro service but only when the TTL has
-	// been set within an ESI tag. Caches gets set during configuration parsing.
-	Caches Caches
-
-	// KVFetchers the map key is the alias name in the CaddyFile for a Key-Value
-	// service. The value is the already instantiated object but with a lazy
-	// connection initialization. This map gets created during configuration
-	// parsing and the default value is nil.
-	KVServices map[string]KVFetcher
-
 	esiMU sync.RWMutex
 	// esiCache identifies all parsed ESI tags in a page for specific path
 	// prefix. uint64 represents the hash for the current request calculated by

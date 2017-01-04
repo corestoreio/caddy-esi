@@ -156,6 +156,7 @@ type Entity struct {
 	Conditioner
 
 	// resourceRFAPool for the request arguments
+	// https://twitter.com/_rsc/status/816710229861793795 ;-)
 	resourceRFAPool sync.Pool
 }
 

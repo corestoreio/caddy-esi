@@ -2,24 +2,27 @@ package caddyesi
 
 import (
 	"bytes"
-	"io/ioutil"
-	"os"
-	"testing"
-	"time"
-
+	"github.com/SchumacherFM/caddyesi/backend"
+	"github.com/SchumacherFM/caddyesi/esicache"
 	"github.com/SchumacherFM/caddyesi/esitesting"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	"github.com/mholt/caddy"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
 	"github.com/stretchr/testify/assert"
+	"io/ioutil"
+	"os"
+	"testing"
+	"time"
 )
 
 func TestPluginSetup(t *testing.T) {
 	t.Parallel()
 
-	runner := func(config string, wantPC PathConfigs, wantErrBhf errors.BehaviourFunc) func(*testing.T) {
+	runner := func(config string, wantPC PathConfigs, cacheCount int, requestFuncs []string, wantErrBhf errors.BehaviourFunc) func(*testing.T) {
 		return func(t *testing.T) {
+			defer esicache.MainRegistry.Clear()
+
 			c := caddy.NewTestController("http", config)
 
 			if err := PluginSetup(c); wantErrBhf != nil {
@@ -38,6 +41,7 @@ func TestPluginSetup(t *testing.T) {
 			if !ok {
 				t.Fatalf("Expected handler to be type ESI, got: %#v", handler)
 			}
+
 			assert.Exactly(t, len(wantPC), len(myHandler.PathConfigs))
 			for j, wantC := range wantPC {
 				haveC := myHandler.PathConfigs[j]
@@ -53,14 +57,15 @@ func TestPluginSetup(t *testing.T) {
 					assert.Exactly(t, string(wantC.OnError), string(haveC.OnError), "OnError %s", t.Name())
 				}
 
-				assert.Len(t, haveC.KVServices, len(wantC.KVServices), "Index %d %s", j, t.Name())
-				for key := range wantC.KVServices {
-					_, ok := haveC.KVServices[key]
-					assert.True(t, ok, "Index %d %s", j, t.Name())
-				}
-
-				assert.Len(t, haveC.Caches, len(wantC.Caches), "Index  %d", j)
+				assert.Exactly(t, cacheCount, esicache.MainRegistry.Len(haveC.Scope), "Mismatch esicache.MainRegistry.Len")
 			}
+
+			for _, kvName := range requestFuncs {
+				rf, ok := backend.LookupRequestFunc(kvName)
+				assert.True(t, ok, "Should have been registered %q", kvName)
+				assert.NotNil(t, rf, "Should have a non-nil func %q", kvName)
+			}
+
 		}
 	}
 
@@ -73,6 +78,8 @@ func TestPluginSetup(t *testing.T) {
 				TTL:     0,
 			},
 		},
+		0,   // cache length
+		nil, // kv services []string
 		nil,
 	))
 
@@ -87,11 +94,10 @@ func TestPluginSetup(t *testing.T) {
 				Scope:   "/",
 				Timeout: time.Millisecond * 5,
 				TTL:     time.Millisecond * 10,
-				Caches: []Cacher{
-					cacherMock{},
-				},
 			},
 		},
+		1,   // cache length
+		nil, // kv services []string
 		nil,
 	))
 
@@ -107,12 +113,10 @@ func TestPluginSetup(t *testing.T) {
 				Scope:   "/",
 				Timeout: time.Millisecond * 5,
 				TTL:     time.Millisecond * 10,
-				Caches: []Cacher{
-					cacherMock{},
-					cacherMock{},
-				},
 			},
 		},
+		2,   // cache length
+		nil, // kv services []string
 		nil,
 	))
 
@@ -127,11 +131,10 @@ func TestPluginSetup(t *testing.T) {
 				Scope:   "/",
 				Timeout: time.Millisecond * 5,
 				TTL:     time.Millisecond * 10,
-				KVServices: map[string]KVFetcher{
-					"backend": kvFetchMock{},
-				},
 			},
 		},
+		0,                   // cache length
+		[]string{"backend"}, // kv services []string
 		nil,
 	))
 
@@ -146,6 +149,8 @@ func TestPluginSetup(t *testing.T) {
 				AllowedMethods: []string{"GET", "PUT", "POST"},
 			},
 		},
+		0,   // cache length
+		nil, // kv services []string
 		nil,
 	))
 
@@ -160,6 +165,8 @@ func TestPluginSetup(t *testing.T) {
 				PageIDSource: []string{"pAth", "host", "IP", "header-X-GitHub-Request-Id", "header-Server", "cookie-__Host-user_session_same_site"},
 			},
 		},
+		0,   // cache length
+		nil, // kv services []string
 		nil,
 	))
 
@@ -168,6 +175,8 @@ func TestPluginSetup(t *testing.T) {
 			page_id_source "path,host , ip
 		}`,
 		nil,
+		0,   // cache length
+		nil, // kv services []string
 		errors.IsNotValid,
 	))
 
@@ -176,6 +185,8 @@ func TestPluginSetup(t *testing.T) {
 			timeout Dms
 		}`,
 		nil,
+		0,   // cache length
+		nil, // kv services []string
 		errors.IsNotValid,
 	))
 
@@ -186,6 +197,8 @@ func TestPluginSetup(t *testing.T) {
 			backend redis//localhost:6379/0
 		}`,
 		nil,
+		0,   // cache length
+		nil, // kv services []string
 		errors.IsNotValid,
 	))
 
@@ -201,11 +214,10 @@ func TestPluginSetup(t *testing.T) {
 				Scope:   "/",
 				Timeout: time.Millisecond * 5,
 				TTL:     time.Millisecond * 10,
-				KVServices: map[string]KVFetcher{
-					"backend": kvFetchMock{},
-				},
 			},
 		},
+		0,                   // cache length
+		[]string{"backend"}, // kv services []string
 		nil,
 	))
 
@@ -221,12 +233,10 @@ func TestPluginSetup(t *testing.T) {
 				Scope:   "/",
 				Timeout: time.Millisecond * 5,
 				TTL:     time.Millisecond * 10,
-				KVServices: map[string]KVFetcher{
-					"redis1": kvFetchMock{},
-					"redis2": kvFetchMock{},
-				},
 			},
 		},
+		0, // cache length
+		[]string{"redis1", "redis2"}, // kv services []string
 		nil,
 	))
 
@@ -245,6 +255,8 @@ func TestPluginSetup(t *testing.T) {
 				TTL:     0,
 			},
 		},
+		0,   // cache length
+		nil, // kv services []string
 		nil,
 	))
 
@@ -268,14 +280,9 @@ func TestPluginSetup(t *testing.T) {
 		}`,
 		PathConfigs{
 			&PathConfig{
-				Scope:   "/catalog/product",
-				Timeout: time.Millisecond * 122,
-				TTL:     time.Millisecond * 123,
-				KVServices: map[string]KVFetcher{
-					"redisAWS1":   kvFetchMock{},
-					"redisLocal1": kvFetchMock{},
-					"redisLocal2": kvFetchMock{},
-				},
+				Scope:    "/catalog/product",
+				Timeout:  time.Millisecond * 122,
+				TTL:      time.Millisecond * 123,
 				LogFile:  "stderr",
 				LogLevel: "debug",
 			},
@@ -283,11 +290,10 @@ func TestPluginSetup(t *testing.T) {
 				Scope:   "/checkout/cart",
 				Timeout: time.Millisecond * 131,
 				TTL:     time.Millisecond * 132,
-				KVServices: map[string]KVFetcher{
-					"redisLocal3": kvFetchMock{},
-				},
 			},
 		},
+		0, // cache length
+		[]string{"redisAWS1", "redisLocal1", "redisLocal2", "redisLocal3"}, // kv services []string
 		nil,
 	))
 
@@ -304,6 +310,8 @@ func TestPluginSetup(t *testing.T) {
 				LogLevel: "info",
 			},
 		},
+		0,   // cache length
+		nil, // kv services []string
 		nil,
 	))
 
@@ -318,6 +326,8 @@ func TestPluginSetup(t *testing.T) {
 				OnError: []byte("Resource content unavailable"),
 			},
 		},
+		0,   // cache length
+		nil, // kv services []string
 		nil,
 	))
 
@@ -332,6 +342,8 @@ func TestPluginSetup(t *testing.T) {
 				OnError: []byte("Output on a backend connection error\n"),
 			},
 		},
+		0,   // cache length
+		nil, // kv services []string
 		nil,
 	))
 
@@ -340,6 +352,8 @@ func TestPluginSetup(t *testing.T) {
 		   on_error "testdataXX/on_error.txt"
 		}`,
 		nil,
+		0,   // cache length
+		nil, // kv services []string
 		errors.IsFatal,
 	))
 
@@ -354,6 +368,8 @@ func TestPluginSetup(t *testing.T) {
 				AllowedStatusCodes: []int{300},
 			},
 		},
+		0,   // cache length
+		nil, // kv services []string
 		nil,
 	))
 
@@ -368,6 +384,8 @@ func TestPluginSetup(t *testing.T) {
 				AllowedStatusCodes: []int{300, 200},
 			},
 		},
+		0,   // cache length
+		nil, // kv services []string
 		nil,
 	))
 
@@ -382,6 +400,8 @@ func TestPluginSetup(t *testing.T) {
 				AllowedStatusCodes: []int{300, 200, 500},
 			},
 		},
+		0,   // cache length
+		nil, // kv services []string
 		nil,
 	))
 
@@ -395,6 +415,8 @@ func TestPluginSetup(t *testing.T) {
 				Timeout: 20 * time.Second,
 			},
 		},
+		0,   // cache length
+		nil, // kv services []string
 		nil,
 	))
 
@@ -403,6 +425,8 @@ func TestPluginSetup(t *testing.T) {
 		   allowed_status_codes
 		}`,
 		nil,
+		0,   // cache length
+		nil, // kv services []string
 		errors.IsNotValid,
 	))
 }

@@ -52,8 +52,8 @@ func DeregisterRequestFunc(scheme string) {
 	delete(rrfRegister.fetchers, scheme)
 }
 
-// lookupRequestFunc if ok sets to true the rf cannot be nil.
-func lookupRequestFunc(scheme string) (rf RequestFunc, ok bool) {
+// LookupRequestFunc if ok sets to true ,the rf cannot be nil.
+func LookupRequestFunc(scheme string) (rf RequestFunc, ok bool) {
 	scheme = strings.ToLower(scheme)
 	rrfRegister.RLock()
 	defer rrfRegister.RUnlock()
@@ -282,7 +282,7 @@ func NewResource(idx int, url string) (*Resource, error) {
 	if pos := strings.Index(r.url, "://"); pos > 1 {
 		scheme := strings.ToLower(r.url[:pos])
 		var ok bool
-		r.reqFunc, ok = lookupRequestFunc(scheme)
+		r.reqFunc, ok = LookupRequestFunc(scheme)
 		if !ok {
 			return nil, errors.NewNotSupportedf("[esibackend] NewResource protocal %q not yet supported in URL %q", scheme, r.url)
 		}

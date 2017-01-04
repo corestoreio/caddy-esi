@@ -1,15 +1,12 @@
 package caddyesi
 
 import (
+	"fmt"
+	"github.com/SchumacherFM/caddyesi/helpers"
+	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"fmt"
-
-	"github.com/SchumacherFM/caddyesi/esiredis"
-	"github.com/SchumacherFM/caddyesi/helpers"
-	"github.com/stretchr/testify/assert"
 )
 
 var _ fmt.Stringer = (*PathConfig)(nil)
@@ -172,29 +169,6 @@ func BenchmarkPageID_Cookie(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		benchmarkPageID = pc.pageID(r)
 	}
-}
-
-func TestParseBackendUrl(t *testing.T) {
-	t.Parallel()
-
-	t.Run("Redis", func(t *testing.T) {
-		be, err := newKVFetcher("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0")
-		assert.NoError(t, err)
-		_, ok := be.(*esiredis.Redis)
-		assert.True(t, ok, "Expecting Redis in the Backender interface")
-	})
-	t.Run("URL Error", func(t *testing.T) {
-		be, err := newKVFetcher("redis//localhost")
-		assert.Nil(t, be)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), `Unknown URL: "redis//localhost". Does not contain ://`)
-	})
-	t.Run("Scheme Error", func(t *testing.T) {
-		be, err := newKVFetcher("mysql://localhost")
-		assert.Nil(t, be)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), `Unknown URL: "mysql://localhost". No driver defined for scheme: "mysql"`)
-	})
 }
 
 func TestPathConfig_isRequestAllowed(t *testing.T) {

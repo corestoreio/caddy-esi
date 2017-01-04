@@ -16,9 +16,10 @@ package esicache
 
 import (
 	"context"
-	"github.com/corestoreio/errors"
 	"sync"
 	"time"
+
+	"github.com/corestoreio/errors"
 )
 
 // Cacher used to cache the response of a micro service as found in the src
@@ -48,25 +49,25 @@ func (c Caches) Get(key string) ([]byte, error) {
 }
 
 var MainRegistry = &registry{
-	caches: make(Caches, 0, 2),
+	caches: make(map[string]Caches),
 }
 
 type registry struct {
 	mu sync.RWMutex
-	// kvServices the map key is the alias name in the CaddyFile for a Key-Value
-	// service. The value is the already instantiated object but with a lazy
-	// connection initialization. This map gets created during configuration
-	// parsing and the default value is nil.
-	caches Caches
+	// caches for each scope (string key), aka. each path in the Caddyfile, we
+	// might have different but same named caches or even no caches.
+	caches map[string]Caches
 }
 
-func (r *registry) Get(ctx context.Context, alias string, key []byte) error {
-
+func (r *registry) Get(ctx context.Context, scope, alias, key string) error {
+	panic("TODO IMPLEMENT")
 	return nil
 }
 
-// Register registers a new key-value service
-func (r *registry) Register(url string) error {
+// Register registers a new key-value service. Scope refers to the URL provided
+// in the Caddyfile after the `esi` keyword. URL represents the destination to
+// Redis or Memcache etc
+func (r *registry) Register(scope, url string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -74,22 +75,26 @@ func (r *registry) Register(url string) error {
 	if err != nil {
 		return errors.Wrapf(err, "[esikv] NewCacher URL %q", url)
 	}
-	r.caches = append(r.caches, c)
+
+	if _, ok := r.caches[scope]; !ok {
+		r.caches[scope] = make(Caches, 0, 2)
+	}
+	r.caches[scope] = append(r.caches[scope], c)
 
 	return nil
 }
 
 // Aliases returns a sorted list of the available aliases for the loaded
 // services.
-func (r *registry) Len() int {
+func (r *registry) Len(scope string) int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	return len(r.caches)
+	return len(r.caches[scope])
 }
 
 // Clear removes all cache service objects
 func (r *registry) Clear() {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	r.caches = make(Caches, 0, 2)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.caches = make(map[string]Caches)
 }
