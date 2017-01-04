@@ -15,20 +15,90 @@
 package esikv_test
 
 import (
-	"testing"
-
+	"fmt"
+	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esikv"
+	"github.com/alicebob/miniredis"
+	"github.com/corestoreio/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"testing"
 )
+
+// https://github.com/alicebob/miniredis
+
+func TestNewRedis(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Ping fail", func(t *testing.T) {
+		be, err := esikv.NewRequestFunc("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0")
+		assert.True(t, errors.IsFatal(err), "%+v", err)
+		assert.Nil(t, be)
+	})
+
+	t.Run("Fetch Key OK", func(t *testing.T) {
+
+		mr := miniredis.NewMiniRedis()
+		if err := mr.Start(); err != nil {
+			t.Fatal(err)
+		}
+		defer mr.Close()
+
+		if err := mr.Set("product_price_4711", "123,45 €"); err != nil {
+			t.Fatal(err)
+		}
+
+		be, err := esikv.NewRequestFunc(fmt.Sprintf("redis://%s", mr.Addr()))
+		assert.NoError(t, err, "%+v", err)
+
+		hdr, content, err := be(&backend.RequestFuncArgs{
+			Key: "product_price_4711",
+		})
+		require.NoError(t, err, "%+v", err)
+		assert.Nil(t, hdr, "Header return must be nil")
+		assert.Exactly(t, "123,45 €", string(content))
+	})
+
+	t.Run("Fetch Key OK but value not set, should return all nil", func(t *testing.T) {
+
+		mr := miniredis.NewMiniRedis()
+		if err := mr.Start(); err != nil {
+			t.Fatal(err)
+		}
+		defer mr.Close()
+
+		be, err := esikv.NewRequestFunc(fmt.Sprintf("redis://%s", mr.Addr()))
+		assert.NoError(t, err, "%+v", err)
+
+		hdr, content, err := be(&backend.RequestFuncArgs{
+			Key: "product_price_4711",
+		})
+		require.NoError(t, err, "%+v", err)
+		assert.Nil(t, hdr, "Header return must be nil")
+		assert.Nil(t, content, "Content must be nil")
+	})
+
+	t.Run("Key empty error", func(t *testing.T) {
+
+		mr := miniredis.NewMiniRedis()
+		if err := mr.Start(); err != nil {
+			t.Fatal(err)
+		}
+		defer mr.Close()
+
+		be, err := esikv.NewRequestFunc(fmt.Sprintf("redis://%s", mr.Addr()))
+		assert.NoError(t, err, "%+v", err)
+
+		hdr, content, err := be(&backend.RequestFuncArgs{})
+		require.True(t, errors.IsEmpty(err), "%+v", err)
+		assert.Nil(t, hdr, "Header return must be nil")
+		assert.Nil(t, content, "Content must be nil")
+	})
+}
 
 func TestNewRequestFunc(t *testing.T) {
 	t.Parallel()
 
-	t.Run("Redis", func(t *testing.T) {
-		be, err := esikv.NewRequestFunc("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0")
-		assert.NoError(t, err)
-		assert.NotNil(t, be)
-	})
 	t.Run("URL Error", func(t *testing.T) {
 		be, err := esikv.NewRequestFunc("redis//localhost")
 		assert.Nil(t, be)
@@ -50,7 +120,7 @@ func TestParseRedisURL(t *testing.T) {
 		raw          string
 		wantAddress  string
 		wantPassword string
-		wantDB       int64
+		wantDB       int
 		wantErr      bool
 	}{
 		{

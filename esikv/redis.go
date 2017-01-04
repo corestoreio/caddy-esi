@@ -23,29 +23,103 @@ import (
 
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/corestoreio/errors"
+	"gopkg.in/redis.v5"
 )
 
 type Redis struct {
-	// todo
+	cl *redis.Client
 }
 
+// NewRedis provides, for now, a basic implementation for simple key fetching.
 func NewRedis(rawURL string) (backend.RequestFunc, error) {
-	_, _, _, err := ParseRedisURL(rawURL)
+	addr, pw, db, err := ParseRedisURL(rawURL)
 	if err != nil {
-		return nil, errors.Errorf("[esikv] Error parsing URL %q => %s", rawURL, err)
+		return nil, errors.Errorf("[esikv] Redis error parsing URL %q => %s", rawURL, err)
 	}
-	r := &Redis{}
+	r := &Redis{
+		cl: redis.NewClient(&redis.Options{
+			// The network type, either tcp or unix.
+			// Default is tcp.
+			Network: "tcp",
+			// host:port address.
+			Addr: addr,
+
+			// Optional password. Must match the password specified in the
+			// requirepass server configuration option.
+			Password: pw,
+			// Database to be selected after connecting to the server.
+			DB: db,
+
+			//// Maximum number of retries before giving up.
+			//// Default is to not retry failed commands.
+			//MaxRetries int
+			//
+			//// Dial timeout for establishing new connections.
+			//// Default is 5 seconds.
+			//DialTimeout time.Duration
+			//// Timeout for socket reads. If reached, commands will fail
+			//// with a timeout instead of blocking.
+			//// Default is 3 seconds.
+			//ReadTimeout time.Duration
+			//// Timeout for socket writes. If reached, commands will fail
+			//// with a timeout instead of blocking.
+			//// Default is 3 seconds.
+			//WriteTimeout time.Duration
+			//
+			//// Maximum number of socket connections.
+			//// Default is 10 connections.
+			//PoolSize int
+			//// Amount of time client waits for connection if all connections
+			//// are busy before returning an error.
+			//// Default is ReadTimeout + 1 second.
+			//PoolTimeout time.Duration
+			//// Amount of time after which client closes idle connections.
+			//// Should be less than server's timeout.
+			//// Default is to not close idle connections.
+			//IdleTimeout time.Duration
+			//// Frequency of idle checks.
+			//// Default is 1 minute.
+			//// When minus value is set, then idle check is disabled.
+			//IdleCheckFrequency time.Duration
+			//
+			//// TLS Config to use. When set TLS will be negotiated.
+			//TLSConfig *tls.Config
+		}),
+	}
+
+	pong, err := r.cl.Ping().Result()
+	if err != nil {
+		return nil, errors.NewFatalf("[esikv] Redis Ping failed: %s", err)
+	}
+	if pong != "PONG" {
+		return nil, errors.NewFatalf("[esikv] Redis Ping not Pong: %q", pong)
+	}
+
 	return r.Get, nil
 }
 
+// Get returns a value from the field Key in the args argument. Header is not
+// supported.
 func (r *Redis) Get(args *backend.RequestFuncArgs) (_ http.Header, content []byte, err error) {
-	// todo
-	return nil, nil, nil
+
+	if args.Key == "" {
+		return nil, nil, errors.NewEmptyf("[esikv] Redis.Get Key is empty: %q", args.URL)
+	}
+
+	v, err := r.cl.Get(args.Key).Bytes()
+	if err == redis.Nil {
+		return nil, nil, nil
+	}
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "[esikv] Redis.Get %q => %q", args.URL, r.cl.String())
+	}
+
+	return nil, v, nil
 }
 
 func (r *Redis) Close() error {
-	// todo
-	return nil
+
+	return r.cl.Close()
 }
 
 var pathDBRegexp = regexp.MustCompile(`/(\d*)\z`)
@@ -60,7 +134,7 @@ var pathDBRegexp = regexp.MustCompile(`/(\d*)\z`)
 // 		redis://:6380/0 => connects to localhost:6380
 // 		redis:// => connects to localhost:6379 with DB 0
 // 		redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0
-func ParseRedisURL(raw string) (address, password string, db int64, err error) {
+func ParseRedisURL(raw string) (address, password string, db int, err error) {
 	u, err := url.Parse(raw)
 	if err != nil {
 		return "", "", 0, errors.Errorf("[esikv] url.Parse: %s", err)
@@ -94,10 +168,11 @@ func ParseRedisURL(raw string) (address, password string, db int64, err error) {
 	match := pathDBRegexp.FindStringSubmatch(u.Path)
 	if len(match) == 2 {
 		if len(match[1]) > 0 {
-			db, err = strconv.ParseInt(match[1], 10, 64)
+			db64, err := strconv.ParseInt(match[1], 10, 64)
 			if err != nil {
 				return "", "", 0, errors.Errorf("[esikv] Invalid database: %q in %q", u.Path[1:], match[1])
 			}
+			db = int(db64)
 		}
 	} else if u.Path != "" {
 		return "", "", 0, errors.Errorf("[esikv] Invalid database: %q", u.Path[1:])

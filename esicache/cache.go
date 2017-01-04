@@ -60,8 +60,7 @@ type registry struct {
 }
 
 func (r *registry) Get(ctx context.Context, scope, alias, key string) error {
-	panic("TODO IMPLEMENT")
-	return nil
+	return errors.New("TODO IMPLEMENT")
 }
 
 // Register registers a new key-value service. Scope refers to the URL provided

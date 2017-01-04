@@ -78,6 +78,8 @@ type (
 	}
 	// RequestFunc performs a request to a backend service via a specific
 	// protocol. Header might be nil depending on the underlying implementation.
+	// Any returned error may trigger the circuit breaker. So it may return 3x
+	// nil to signal neither an error nor content.
 	RequestFunc func(*RequestFuncArgs) (_ http.Header, content []byte, err error)
 )
 
