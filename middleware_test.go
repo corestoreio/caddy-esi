@@ -12,6 +12,7 @@ import (
 	"github.com/SchumacherFM/caddyesi"
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esitesting"
+	"github.com/alicebob/miniredis"
 	"github.com/corestoreio/errors"
 	"github.com/mholt/caddy"
 	"github.com/mholt/caddy/caddyhttp/header"
@@ -243,4 +244,62 @@ func TestMiddleware_ServeHTTP_Parallel(t *testing.T) {
 	}
 	assert.Exactly(t, 1, strings.Count(string(logContent), `caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse error: "<nil>"`), `caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse error: "<nil>" MUST only occur once!!!`)
 	assert.Exactly(t, 600, strings.Count(string(logContent), `esitag.Entity.QueryResources.RequestFunc.CBStateClosed`), `esitag.Entity.QueryResources.RequestFunc.CBStateClosed`)
+}
+
+func TestMiddleware_ServeHTTP_Redis(t *testing.T) {
+	t.Parallel()
+
+	mr := miniredis.NewMiniRedis()
+	if err := mr.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer mr.Close()
+
+	//{
+	//	tmpLogFile, clean := esitesting.Tempfile(t)
+	//	defer clean()
+	//	t.Run("Replace a single ESI Tag in page01.html but error in backend request", mwTestRunner(
+	//		`esi {
+	//		on_error "my important global error message"
+	//		allowed_methods GET
+	//		log_file `+tmpLogFile+`
+	//		log_level debug
+	//	}`,
+	//		httptest.NewRequest("GET", "/page01.html", nil),
+	//		`my important global error message`,
+	//	))
+	//	logContent, err := ioutil.ReadFile(tmpLogFile)
+	//	if err != nil {
+	//		t.Fatal(err)
+	//	}
+	//	assert.Contains(t, string(logContent), `error: "write failed"`)
+	//	assert.Contains(t, string(logContent), `url: "mwTest01://micro.service/esi/foo"`)
+	//}
+
+	//t.Run("Replace a single ESI Tag in page01.html but error in backend triggers default on_error message", mwTestRunner(
+	//	`esi`,
+	//	httptest.NewRequest("GET", "/page01.html", nil),
+	//	caddyesi.DefaultOnError,
+	//))
+
+	if err := mr.Set("myKey01", "Gopher01"); err != nil {
+		t.Fatal(err)
+	}
+	if err := mr.Set("myKey02", "Rustafarian02"); err != nil {
+		t.Fatal(err)
+	}
+
+	tmpLogFile, _ := esitesting.Tempfile(t)
+	t.Log(tmpLogFile)
+	//defer clean()
+	t.Run("Query Redis from page04.html successfully", mwTestRunner(
+		`esi {
+			miniRedis redis://`+mr.Addr()+`/0
+			log_file `+tmpLogFile+`
+			log_level debug
+		}`,
+		httptest.NewRequest("GET", "/page04.html", nil),
+		`<p>Gopher01</p>
+<p>Rustafarian02</p>`,
+	))
 }

@@ -44,7 +44,7 @@ func RegisterRequestFunc(scheme string, f RequestFunc) struct{ DeferredDeregiste
 	}
 }
 
-// DeregisterRequestFunc removes a previously registered scheme
+// DeregisterRequestFunc removes a previously registered scheme/alias.
 func DeregisterRequestFunc(scheme string) {
 	scheme = strings.ToLower(scheme)
 	rrfRegister.Lock()
@@ -52,7 +52,7 @@ func DeregisterRequestFunc(scheme string) {
 	delete(rrfRegister.fetchers, scheme)
 }
 
-// LookupRequestFunc if ok sets to true ,the rf cannot be nil.
+// LookupRequestFunc uses the scheme/alias to retrieve the backend request function.
 func LookupRequestFunc(scheme string) (rf RequestFunc, ok bool) {
 	scheme = strings.ToLower(scheme)
 	rrfRegister.RLock()
@@ -64,17 +64,18 @@ func LookupRequestFunc(scheme string) (rf RequestFunc, ok bool) {
 type (
 	// RequestFuncArgs arguments to RequestFunc. Might get extended.
 	RequestFuncArgs struct {
-		ExternalReq       *http.Request // required
-		URL               string        // required
-		Timeout           time.Duration // required
-		MaxBodySize       uint64        // required
-		Log               log.Logger    // optional
-		Key               string        // optional (for KV Service)
-		TTL               time.Duration // optional
-		ForwardHeaders    []string      // optional, already treated with http.CanonicalHeaderKey
-		ForwardHeadersAll bool          // optional
-		ReturnHeaders     []string      // optional, already treated with http.CanonicalHeaderKey
-		ReturnHeadersAll  bool          // optional
+		ExternalReq       *http.Request      // required
+		URL               string             // required
+		Timeout           time.Duration      // required
+		MaxBodySize       uint64             // required
+		Log               log.Logger         // optional
+		Key               string             // optional (for KV Service)
+		KeyTemplate       *template.Template // optional (for KV Service)
+		TTL               time.Duration      // optional
+		ForwardHeaders    []string           // optional, already treated with http.CanonicalHeaderKey
+		ForwardHeadersAll bool               // optional
+		ReturnHeaders     []string           // optional, already treated with http.CanonicalHeaderKey
+		ReturnHeadersAll  bool               // optional
 	}
 	// RequestFunc performs a request to a backend service via a specific
 	// protocol. Header might be nil depending on the underlying implementation.
@@ -277,17 +278,19 @@ func NewResource(idx int, url string) (*Resource, error) {
 		var err error
 		r.urlTemplate, err = template.New("resource_tpl").Parse(r.url)
 		if err != nil {
-			return nil, errors.NewFatalf("[esibackend] NewResource. Failed to parse (Index %d) %q as template with error: %s", idx, r.url, err)
+			return nil, errors.NewFatalf("[esibackend] NewResource. Failed to parse (Index %d) %q as URL template with error: %s", idx, r.url, err)
 		}
 	}
 
+	schemeAlias := r.url
 	if pos := strings.Index(r.url, "://"); pos > 1 {
-		scheme := strings.ToLower(r.url[:pos])
-		var ok bool
-		r.reqFunc, ok = LookupRequestFunc(scheme)
-		if !ok {
-			return nil, errors.NewNotSupportedf("[esibackend] NewResource protocal %q not yet supported in URL %q", scheme, r.url)
-		}
+		schemeAlias = strings.ToLower(r.url[:pos])
+	}
+
+	var ok bool
+	r.reqFunc, ok = LookupRequestFunc(schemeAlias)
+	if !ok {
+		return nil, errors.NewNotSupportedf("[esibackend] NewResource protocal or alias %q not yet supported for URL/Alias %q", schemeAlias, r.url)
 	}
 
 	return r, nil

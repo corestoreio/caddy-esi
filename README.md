@@ -287,14 +287,14 @@ can be used for comparison. TODO: rethink this to optimize condition execution.
 ### Redis access
 
 The ESI processor can access Redis resources which are specified in the Caddy
-configuration. The `src` attribute must contain the valid reference name as
-defined in config. The ESI tag must contain a `key` attribute which accesses the
-value in Redis. This value will be rendered unmodified into the HTML page
+configuration. The `src` attribute must contain the valid alias name as defined
+in configuration file. The ESI tag must contain a `key` attribute which accesses
+the value in Redis. This value will be rendered unmodified into the HTML page
 output. If multiple `src` tags are defined the next `src` gets used once the key
 cannot be found in the previous source or the `timeout` applies. Return and
 forward headers are not supported.
 
-If the `key` attribute contains curly brackets, the Go `text/template` logic
+If the `key` attribute contains 2x curly brackets, the Go `text/template` logic
 gets created.
 
 ```

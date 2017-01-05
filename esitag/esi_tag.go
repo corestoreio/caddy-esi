@@ -322,7 +322,7 @@ func (et *Entity) parseCondition(s string) error {
 func (et *Entity) parseResource(idx int, val string) error {
 	r, err := backend.NewResource(idx, val)
 	if err != nil {
-		return errors.Wrapf(err, "[caddyesi] ESITag.ParseRaw. Failed to parse %q as template\nTag: %q", val, et.RawTag)
+		return errors.Wrapf(err, "[caddyesi] ESITag.ParseRaw. Failed to parse %q\nTag: %q", val, et.RawTag)
 	}
 	et.Resources = append(et.Resources, r)
 	return nil
@@ -335,7 +335,6 @@ func (et *Entity) parseKey(val string) (err error) {
 		if err != nil {
 			return errors.NewFatalf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", val, err, et.RawTag)
 		}
-		et.Key = "" // unset Key because we have a template
 	}
 	return nil
 }
@@ -361,6 +360,8 @@ func (et *Entity) InitPoolRFA(defaultRFA *backend.RequestFuncArgs) {
 	et.resourceRFAPool.New = func() interface{} {
 		return &backend.RequestFuncArgs{
 			Log:               et.Log,
+			Key:               et.Key,
+			KeyTemplate:       et.KeyTemplate,
 			Timeout:           et.Timeout,
 			MaxBodySize:       et.MaxBodySize,
 			ForwardHeaders:    et.ForwardHeaders,

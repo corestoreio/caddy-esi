@@ -103,8 +103,10 @@ func NewRedis(rawURL string) (backend.RequestFunc, error) {
 func (r *Redis) Get(args *backend.RequestFuncArgs) (_ http.Header, content []byte, err error) {
 
 	if args.Key == "" {
-		return nil, nil, errors.NewEmptyf("[esikv] Redis.Get Key is empty: %q", args.URL)
+		return nil, nil, errors.NewEmptyf("[esikv] Redis.Get Key is empty for resource %q", args.URL)
 	}
+
+	// todo args.KeyTemplate
 
 	v, err := r.cl.Get(args.Key).Bytes()
 	if err == redis.Nil {
@@ -113,6 +115,8 @@ func (r *Redis) Get(args *backend.RequestFuncArgs) (_ http.Header, content []byt
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "[esikv] Redis.Get %q => %q", args.URL, r.cl.String())
 	}
+
+	// todo: check max body size
 
 	return nil, v, nil
 }
