@@ -216,7 +216,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend(out *jwriter.Wri
 		if !first {
 			out.RawByte(',')
 		}
-		first = false
+		//first = false
 		out.RawString("\"return_headers_all\":")
 		out.Bool(bool(in.ReturnHeadersAll))
 	}
@@ -731,7 +731,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 		if !first {
 			out.RawByte(',')
 		}
-		first = false
+		//first = false
 		out.RawString("\"request_uri\":")
 		out.String(string(in.RequestURI))
 	}
@@ -890,7 +890,7 @@ func easyjson1688e6a4EncodeMimeMultipart(out *jwriter.Writer, in multipart.Form)
 		if !first {
 			out.RawByte(',')
 		}
-		first = false
+		//first = false
 		out.RawString("\"file\":")
 		if in.File == nil && (out.Flags&jwriter.NilMapAsEmpty) == 0 {
 			out.RawString(`null`)
@@ -1010,7 +1010,7 @@ func easyjson1688e6a4EncodeMimeMultipart1(out *jwriter.Writer, in multipart.File
 		if !first {
 			out.RawByte(',')
 		}
-		first = false
+		//first = false
 		out.RawString("\"header\":")
 		if in.Header == nil && (out.Flags&jwriter.NilMapAsEmpty) == 0 {
 			out.RawString(`null`)
@@ -1173,7 +1173,7 @@ func easyjson1688e6a4EncodeNetUrl(out *jwriter.Writer, in url.URL) {
 		if !first {
 			out.RawByte(',')
 		}
-		first = false
+		//first = false
 		out.RawString("\"fragment\":")
 		out.String(string(in.Fragment))
 	}
