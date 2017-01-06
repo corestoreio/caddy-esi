@@ -273,6 +273,9 @@ const mockRequestMsg = "%s %q Timeout %s MaxBody %s"
 // MockRequestContent for testing purposes only.
 func MockRequestContent(content string) RequestFunc {
 	return func(args *RequestFuncArgs) (http.Header, []byte, error) {
+		if args.URL == "" && args.Key == "" {
+			panic(fmt.Sprintf("[esibackend] URL and Key cannot be empty: %#v\n", args))
+		}
 		return nil, []byte(fmt.Sprintf(mockRequestMsg, content, args.URL, args.Timeout, args.MaxBodySizeHumanized())), nil
 	}
 }
@@ -379,14 +382,15 @@ func (r *Resource) String() string {
 // DoRequest performs the request to the backend resource. It generates the URL
 // and then fires the request. DoRequest has the same signature as RequestFunc
 func (r *Resource) DoRequest(args *RequestFuncArgs) (http.Header, []byte, error) {
-	currentURL := r.url
 
 	tURL, err := args.TemplateToURL(r.urlTemplate)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "[esibackend] TemplateToURL rendering failed")
 	}
+
+	args.URL = r.url
 	if tURL != "" {
-		args.URL = currentURL
+		args.URL = tURL
 	}
 
 	return r.reqFunc(args)
