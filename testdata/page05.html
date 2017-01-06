@@ -6,7 +6,7 @@
 <body>
 <div>
 <p><esi:include src="miniRedis" key='myKey_{{ .Req.Header.Get "X-Gopher-ID" }}' timeout="5ms" /></p>
-<p><esi:include src="miniRedis" key="myKey02"/></p>
+<p><esi:include src="miniRedisTimeout" src="miniRedis" key="myKey02" timeout="1ms"/></p>
     <h1>Hello World</h1>
 </div>
 </body>

@@ -255,50 +255,43 @@ func TestMiddleware_ServeHTTP_Redis(t *testing.T) {
 	}
 	defer mr.Close()
 
-	//{
-	//	tmpLogFile, clean := esitesting.Tempfile(t)
-	//	defer clean()
-	//	t.Run("Replace a single ESI Tag in page01.html but error in backend request", mwTestRunner(
-	//		`esi {
-	//		on_error "my important global error message"
-	//		allowed_methods GET
-	//		log_file `+tmpLogFile+`
-	//		log_level debug
-	//	}`,
-	//		httptest.NewRequest("GET", "/page01.html", nil),
-	//		`my important global error message`,
-	//	))
-	//	logContent, err := ioutil.ReadFile(tmpLogFile)
-	//	if err != nil {
-	//		t.Fatal(err)
-	//	}
-	//	assert.Contains(t, string(logContent), `error: "write failed"`)
-	//	assert.Contains(t, string(logContent), `url: "mwTest01://micro.service/esi/foo"`)
-	//}
-
-	//t.Run("Replace a single ESI Tag in page01.html but error in backend triggers default on_error message", mwTestRunner(
-	//	`esi`,
-	//	httptest.NewRequest("GET", "/page01.html", nil),
-	//	caddyesi.DefaultOnError,
-	//))
-
-	if err := mr.Set("myKey01", "Gopher01"); err != nil {
+	if err := mr.Set("myKey_9876", "Gopher01"); err != nil {
 		t.Fatal(err)
 	}
 	if err := mr.Set("myKey02", "Rustafarian02"); err != nil {
 		t.Fatal(err)
 	}
 
-	tmpLogFile, _ := esitesting.Tempfile(t)
-	t.Log(tmpLogFile)
-	//defer clean()
-	t.Run("Query Redis from page04.html successfully", mwTestRunner(
+	t.Run("Query in page04.html successfully", mwTestRunner(
 		`esi {
 			miniRedis redis://`+mr.Addr()+`/0
-			log_file `+tmpLogFile+`
-			log_level debug
+			# log_file +tmpLogFile+
+			# log_level debug
 		}`,
-		httptest.NewRequest("GET", "/page04.html", nil),
+		func() *http.Request {
+			req := httptest.NewRequest("GET", "/page04.html", nil)
+			req.Header.Set("X-Gopher-ID", "9876")
+			return req
+		}(),
+		`<p>Gopher01</p>
+<p>Rustafarian02</p>`,
+	))
+
+	//tmpLogFile, _ := esitesting.Tempfile(t)
+	//t.Log(tmpLogFile)
+	// defer clean()
+	t.Run("Query in page05.html but timeout in server 2 and fall back to server 1", mwTestRunner(
+		`esi {
+			miniRedis redis://`+mr.Addr()+`/0 # server 1
+			miniRedisTimeout mockTimeout://50s # server 2
+			  #log_file  +tmpLogFile+
+			  #log_level debug
+		}`,
+		func() *http.Request {
+			req := httptest.NewRequest("GET", "/page05.html", nil)
+			req.Header.Set("X-Gopher-ID", "9876")
+			return req
+		}(),
 		`<p>Gopher01</p>
 <p>Rustafarian02</p>`,
 	))
