@@ -9,6 +9,7 @@ import (
 	"github.com/SchumacherFM/caddyesi/bufpool"
 )
 
+// Available HTTP header keys for reading the real IP address.
 const (
 	ClientIP         = "Client-Ip"
 	Forwarded        = "Forwarded"

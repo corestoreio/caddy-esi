@@ -12,7 +12,7 @@ import (
 
 var _ fmt.Stringer = (*PathConfig)(nil)
 
-const weirdLongUrl = `https://app.usunu.com/-/login?u=https%3A%2F%2Fapp.usunu.com%2F0%2Fsearch%2F2385944396396%2F81453167684176&e=emailaddress%40gmail.com&passive=1`
+const weirdLongURL = `https://app.usunu.com/-/login?u=https%3A%2F%2Fapp.usunu.com%2F0%2Fsearch%2F2385944396396%2F81453167684176&e=emailaddress%40gmail.com&passive=1`
 
 func TestPathConfig_PageID(t *testing.T) {
 	t.Parallel()
@@ -107,27 +107,27 @@ func TestPathConfig_PageID(t *testing.T) {
 
 	t.Run("host", runner(
 		[]string{"host"},
-		httptest.NewRequest("GET", weirdLongUrl, nil),
+		httptest.NewRequest("GET", weirdLongURL, nil),
 		0x16a46f35c998d63d,
 	))
 	t.Run("path", runner(
 		[]string{"path"},
-		httptest.NewRequest("GET", weirdLongUrl, nil),
+		httptest.NewRequest("GET", weirdLongURL, nil),
 		0x163de6d2f60202bc, // path is: /-/login
 	))
 	t.Run("rawpath", runner(
 		[]string{"rawpath"},
-		httptest.NewRequest("GET", weirdLongUrl, nil),
+		httptest.NewRequest("GET", weirdLongURL, nil),
 		0xb4b967239b2b0817, // rawpath is: app.usunu.com/-/login
 	))
 	t.Run("rawquery", runner(
 		[]string{"rawquery"},
-		httptest.NewRequest("GET", weirdLongUrl, nil),
+		httptest.NewRequest("GET", weirdLongURL, nil),
 		0xb08e9c9fd24079b4, // rawquery is: u=https%3A%2F%2Fapp.usunu.com%2F0%2Fsearch%2F2385944396396%2F81453167684176&e=emailaddress%40gmail.com&passive=1
 	))
 	t.Run("url", runner(
 		[]string{"url"},
-		httptest.NewRequest("GET", weirdLongUrl, nil),
+		httptest.NewRequest("GET", weirdLongURL, nil),
 		0x6c7360d1c2978e84, // full url
 	))
 
@@ -146,7 +146,7 @@ func BenchmarkPageID(b *testing.B) {
 }
 
 func BenchmarkPageID_FullURL(b *testing.B) {
-	r := httptest.NewRequest("GET", weirdLongUrl, nil)
+	r := httptest.NewRequest("GET", weirdLongURL, nil)
 
 	pc := NewPathConfig()
 	pc.PageIDSource = []string{"url"}
@@ -159,7 +159,7 @@ func BenchmarkPageID_FullURL(b *testing.B) {
 }
 
 func BenchmarkPageID_Cookie(b *testing.B) {
-	r := httptest.NewRequest("GET", weirdLongUrl, nil)
+	r := httptest.NewRequest("GET", weirdLongURL, nil)
 	r.AddCookie(&http.Cookie{Name: "xtestKeks", Value: "xVal"})
 
 	pc := NewPathConfig()

@@ -404,7 +404,7 @@ const (
 	CBStateClosed
 )
 
-// MaxFailures maximum amount of failures before the circuit breaker is half
+// CBMaxFailures maximum amount of failures before the circuit breaker is half
 // open to try the next request.
 var CBMaxFailures uint64 = 12
 

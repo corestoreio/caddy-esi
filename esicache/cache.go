@@ -30,24 +30,29 @@ type Cacher interface {
 	Get(key string) ([]byte, error)
 }
 
+// NewCacher creates a new cache service object and its connection as defined by
+// its URL.
 func NewCacher(url string) (Cacher, error) {
-	// same logic as newKVFetcher
+
 	return nil, nil
 }
 
 // Caches gets set during config reading and implements Cacher interface
 type Caches []Cacher
 
+// Set writes to the cache service
 func (c Caches) Set(key string, value []byte, expiration time.Duration) error {
 	// write to all
 	return nil
 }
 
+// Get fetches from the cache service
 func (c Caches) Get(key string) ([]byte, error) {
 	// race condition which cache returns first
 	return nil, nil
 }
 
+// MainRegistry global cache registry
 var MainRegistry = &registry{
 	caches: make(map[string]Caches),
 }

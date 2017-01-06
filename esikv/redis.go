@@ -26,7 +26,7 @@ import (
 	"gopkg.in/redis.v5"
 )
 
-type Redis struct {
+type esiRedis struct {
 	cl *redis.Client
 }
 
@@ -36,7 +36,7 @@ func NewRedis(rawURL string) (backend.RequestFunc, error) {
 	if err != nil {
 		return nil, errors.Errorf("[esikv] Redis error parsing URL %q => %s", rawURL, err)
 	}
-	r := &Redis{
+	r := &esiRedis{
 		cl: redis.NewClient(&redis.Options{
 			// The network type, either tcp or unix.
 			// Default is tcp.
@@ -100,7 +100,7 @@ func NewRedis(rawURL string) (backend.RequestFunc, error) {
 
 // Get returns a value from the field Key in the args argument. Header is not
 // supported.
-func (r *Redis) Get(args *backend.RequestFuncArgs) (_ http.Header, content []byte, err error) {
+func (r *esiRedis) Get(args *backend.RequestFuncArgs) (_ http.Header, content []byte, err error) {
 	// TODO context cancellation and deadline
 
 	key := args.Key

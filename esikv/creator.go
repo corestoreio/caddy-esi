@@ -22,8 +22,8 @@ import (
 	"github.com/corestoreio/errors"
 )
 
-// NewFetcher a given URL gets checked which service it should instantiate and
-// connect to. Supported schemes: redis:// for now.
+// NewRequestFunc a given URL gets checked which service it should instantiate
+// and connect to. Supported schemes: redis:// for now.
 func NewRequestFunc(url string) (backend.RequestFunc, error) {
 	idx := strings.Index(url, "://")
 	if idx < 0 {
