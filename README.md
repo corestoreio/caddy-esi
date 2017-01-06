@@ -1,4 +1,4 @@
-# ESI Tags for Caddy Server (WIP = Work in Progress)
+# ESI Tags for Caddy Server (Beta)
 
 This plugin implements partial ESI [Edge Side Includes](https://en.wikipedia.org/wiki/Edge_Side_Includes) support
 for the [Caddy Webserver](https://caddyserver.com).
@@ -91,17 +91,19 @@ Implemented:
 - [ ] With ttl
 - [x] Load local file after timeout
 - [ ] Flip src to AJAX call after timeout
-- [ ] Forward all headers
-- [ ] Forward some headers
+- [x] Forward all headers
+- [x] Forward some headers
 - [ ] Return all headers
 - [ ] Return some headers
 - [x] Multiple sources
 - [ ] Multiple sources with `race="true"`
 - [x] Dynamic sources
 - [ ] Conditional tag loading
-- [ ] Redis access
+- [x] Redis access
 - [x] Handle compressed content from backends (Go http.Client)
 - [ ] Coalesce multiple requests into one backend request
+- [x] Query HTTP/S backend servers
+- [x] Query and execute shell scripts/programs (stderr|out|in) communication
 
 Implementation ideas:
 
@@ -145,6 +147,8 @@ nothing. The attribute `timeout` overwrites the default `esi.timeout`.
 ```
 <esi:include src="https://micro.service/esi/foo" timeout="time.Duration" />
 ```
+
+100% Support with http/s requests to backend services.
 
 ### With ttl (optional)
 
@@ -268,8 +272,8 @@ The basic ESI tag can extend all `src` URLs with additional parameters from the
 processor detects curly brackets in the `src`.
 
 ```
-<esi:include src="http://micro.service/search?query={{ r.Form.Encode }}"/>
-<esi:include src="https://micro.service/catalog/product/?id={{ r.Form.Get productID }}"/>
+<esi:include src="http://micro.service/search?query={{ .Req.Form.Encode }}"/>
+<esi:include src="https://micro.service/catalog/product/?id={{ .Req.Form.Get productID }}"/>
 ```
 
 ### Conditional tag loading
@@ -280,8 +284,8 @@ attribute uses Go `text/template` logic. For now only the `http.Request` object
 can be used for comparison. TODO: rethink this to optimize condition execution.
 
 ```
-<esi:include src="http://micro.service/search?query={{ r.Form.Encode }}" 
-    condition="{{ if r.Host eq 'customer.micro.service' }}true{{end}}"/>
+<esi:include src="http://micro.service/search?query={{ .Req.Form.Encode }}"
+    condition="{{ if .Req.Host eq 'customer.micro.service' }}true{{end}}"/>
 ```
 
 ### Redis access
@@ -300,7 +304,35 @@ gets created.
 ```
 <esi:include src="redisAWS1" src="redisLocal1" key="my_redis_key_x" timeout="time.Duration" />
 <esi:include src="redisAWS1" key="my_redis_key_x" onerror="myLocalFile.html" timeout="time.Duration" />
-<esi:include src="redis1" key="prefix_{{ r.Host }}_{{ r.Header.Get "X-Whatever" }}" timeout="time.Duration" />
+<esi:include src="redis1" key="prefix_{{ .Req.Host }}_{{ .Header.Get "X-Whatever" }}" timeout="time.Duration" />
+```
+
+### Registered schemes or aliases in the src attribute
+
+The `src` attribute can contain the following prefixes to fetch content from a
+resource backend:
+
+- http://
+- https://
+- sh://
+- Name of the aliases as defined in the Caddyfile
+- sql:// a SQL query (TODO)
+
+`http|s` allows the usual HTTP requests to a resource.
+
+`sh` starts a shell program or any other executable script. The incoming HTTP
+request plus the current arguments gets transformed into a JSON string and will
+be passed as first argument to the program via stdin. If the program writes to
+stderr CaddyESI recognizes that and triggers it as an usual error. Too many
+errors and the circuit breaker opens. To output towards the HTTP response write
+to stdout. The src attribute must look like:
+
+```
+<esi:include src="sh://myGoBinary" />
+<esi:include src="sh:///path/to/my/slow/php/script.php" />
+
+illegal (for now):
+<esi:include src="sh://php /path/to/my/slow/php/script.php" />
 ```
 
 ## Unsupported ESI Tags
@@ -308,6 +340,12 @@ gets created.
 All other tags, as defined in
 [https://www.w3.org/TR/esi-lang](https://www.w3.org/TR/esi-lang), won't be
 supported. You should switch to a server side scripting language ;-).
+
+## Future backwards compatibility breaks
+
+1. Due to performance reasons the template engine text/template might get
+replaced by a different package with a different syntax.
+2. That's it for now.
 
 # Contribute
 
