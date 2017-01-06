@@ -1,7 +1,22 @@
+// Copyright 2016-2017, Cyrill @ Schumacher.fm and the CaddyESI Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
 package backend
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -20,6 +35,31 @@ import (
 // template.Template will be created. For now a resource key or an URL is
 // supported.
 const TemplateIdentifier = "{{"
+
+// TemplateExecer implemented by text/template or other packages. Mocked out in
+// an interface because we might want to replace the template engine with a
+// faster one.
+type TemplateExecer interface {
+	// Execute applies a parsed template to the specified data object, and
+	// writes the output to wr. If an error occurs executing the template or
+	// writing its output, execution stops, but partial results may already have
+	// been written to the output writer. A template may be executed safely in
+	// parallel.
+	// If data is a reflect.Value, the template applies to the concrete value
+	// that the reflect.Value holds, as in fmt.Print.
+	Execute(wr io.Writer, data interface{}) error
+	// Name returns the name of the template.
+	Name() string
+}
+
+// ParseTemplate parses text as a template body for t. To implement a new
+// template engine just change the function body. We cannot return a pointer to
+// a struct because other functions use nil checks to the interface and a nil
+// pointer on an interface returns false if it should be nil. Hence we return
+// here an interface.
+func ParseTemplate(name, text string) (TemplateExecer, error) {
+	return template.New(name).Parse(text)
+}
 
 var rrfRegister = &struct {
 	sync.RWMutex
@@ -64,18 +104,20 @@ func LookupRequestFunc(scheme string) (rf RequestFunc, ok bool) {
 type (
 	// RequestFuncArgs arguments to RequestFunc. Might get extended.
 	RequestFuncArgs struct {
-		ExternalReq       *http.Request      // required
-		URL               string             // required
-		Timeout           time.Duration      // required
-		MaxBodySize       uint64             // required
-		Log               log.Logger         // optional
-		Key               string             // optional (for KV Service)
-		KeyTemplate       *template.Template // optional (for KV Service)
-		TTL               time.Duration      // optional
-		ForwardHeaders    []string           // optional, already treated with http.CanonicalHeaderKey
-		ForwardHeadersAll bool               // optional
-		ReturnHeaders     []string           // optional, already treated with http.CanonicalHeaderKey
-		ReturnHeadersAll  bool               // optional
+		ExternalReq *http.Request // required
+		URL         string        // required
+		Timeout     time.Duration // required
+		MaxBodySize uint64        // required
+		Log         log.Logger    // optional
+		// Key also in type esitag.Entity
+		Key string // optional (for KV Service)
+		// KeyTemplate also in type esitag.Entity
+		KeyTemplate       TemplateExecer // optional (for KV Service)
+		TTL               time.Duration  // optional
+		ForwardHeaders    []string       // optional, already treated with http.CanonicalHeaderKey
+		ForwardHeadersAll bool           // optional
+		ReturnHeaders     []string       // optional, already treated with http.CanonicalHeaderKey
+		ReturnHeadersAll  bool           // optional
 	}
 	// RequestFunc performs a request to a backend service via a specific
 	// protocol. Header might be nil depending on the underlying implementation.
@@ -198,6 +240,34 @@ func (a *RequestFuncArgs) PrepareReturnHeaders(fromBE http.Header) http.Header {
 	return ret
 }
 
+// TemplateToURL renders a template into a string. A nil te returns an empty
+// string.
+func (a *RequestFuncArgs) TemplateToURL(te TemplateExecer) (string, error) {
+
+	if te == nil {
+		return "", nil
+	}
+
+	buf := bufpool.Get()
+	defer bufpool.Put(buf)
+
+	if err := te.Execute(buf, struct {
+		// These are the currently available template variables. which is only "r" for
+		// the request object.
+		Req    *http.Request
+		URL    *url.URL
+		Header http.Header
+		// Cookie []*http.Cookie TODO add better cookie handling
+	}{
+		Req:    a.ExternalReq,
+		URL:    a.ExternalReq.URL,
+		Header: a.ExternalReq.Header,
+	}); err != nil {
+		return "", errors.NewTemporaryf("[esitag] Resource URL %q, Key %q: Template error: %s\nContent: %s", a.URL, a.Key, err, buf)
+	}
+	return buf.String(), nil
+}
+
 const mockRequestMsg = "%s %q Timeout %s MaxBody %s"
 
 // MockRequestContent for testing purposes only.
@@ -245,7 +315,7 @@ type Resource struct {
 	url string
 	// URLTemplate gets created when the URL contains the template identifier. Then
 	// the URL field would be empty.
-	urlTemplate *template.Template
+	urlTemplate TemplateExecer
 
 	// reqFunc performs a request to a backend service via a specific
 	// protocol.
@@ -276,7 +346,7 @@ func NewResource(idx int, url string) (*Resource, error) {
 
 	if strings.Contains(url, "://") && strings.Contains(r.url, TemplateIdentifier) {
 		var err error
-		r.urlTemplate, err = template.New("resource_tpl").Parse(r.url)
+		r.urlTemplate, err = ParseTemplate("resource_tpl", r.url)
 		if err != nil {
 			return nil, errors.NewFatalf("[esibackend] NewResource. Failed to parse (Index %d) %q as URL template with error: %s", idx, r.url, err)
 		}
@@ -301,7 +371,7 @@ func NewResource(idx int, url string) (*Resource, error) {
 func (r *Resource) String() string {
 	tplName := ""
 	if r.urlTemplate != nil {
-		tplName = " Template: " + r.urlTemplate.ParseName
+		tplName = " Template: " + r.urlTemplate.Name()
 	}
 	return r.url + tplName
 }
@@ -310,28 +380,14 @@ func (r *Resource) String() string {
 // and then fires the request. DoRequest has the same signature as RequestFunc
 func (r *Resource) DoRequest(args *RequestFuncArgs) (http.Header, []byte, error) {
 	currentURL := r.url
-	if r.urlTemplate != nil {
-		buf := bufpool.Get()
-		defer bufpool.Put(buf)
 
-		if err := r.urlTemplate.Execute(buf, struct {
-			// These are the currently available template variables. which is only "r" for
-			// the request object.
-			Req    *http.Request
-			URL    *url.URL
-			Header http.Header
-			// Cookie []*http.Cookie TODO add better cookie handling
-		}{
-			Req:    args.ExternalReq,
-			URL:    args.ExternalReq.URL,
-			Header: args.ExternalReq.Header,
-		}); err != nil {
-			return nil, nil, errors.NewTemporaryf("[esitag] Resource %q Template error: %s\nContent: %s", r.String(), err, buf)
-		}
-		currentURL = buf.String()
+	tURL, err := args.TemplateToURL(r.urlTemplate)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "[esibackend] TemplateToURL rendering failed")
 	}
-
-	args.URL = currentURL
+	if tURL != "" {
+		args.URL = currentURL
+	}
 
 	return r.reqFunc(args)
 }

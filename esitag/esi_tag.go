@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"text/template"
 	"time"
 	"unicode"
 
@@ -36,7 +35,7 @@ type Conditioner interface {
 }
 
 type condition struct {
-	*template.Template
+	tpl backend.TemplateExecer
 }
 
 func (c condition) OK(r *http.Request) bool {
@@ -132,7 +131,7 @@ type Entity struct {
 	Key string
 	// KeyTemplate gets created when the Key field contains the template
 	// identifier. Then the Key field would be empty.
-	KeyTemplate *template.Template
+	KeyTemplate backend.TemplateExecer
 
 	// Coalesce TODO(CyS) multiple external requests which triggers a backend
 	// resource request gets merged into one backend request
@@ -311,11 +310,11 @@ func (et *Entity) parseOnError(val string) (err error) {
 }
 
 func (et *Entity) parseCondition(s string) error {
-	tpl, err := template.New("condition_tpl").Parse(s)
+	tpl, err := backend.ParseTemplate("condition_tpl", s)
 	if err != nil {
 		return errors.NewFatalf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", s, err, et.RawTag)
 	}
-	et.Conditioner = condition{Template: tpl}
+	et.Conditioner = condition{tpl: tpl}
 	return nil
 }
 
@@ -331,7 +330,7 @@ func (et *Entity) parseResource(idx int, val string) error {
 func (et *Entity) parseKey(val string) (err error) {
 	et.Key = val
 	if strings.Contains(val, TemplateIdentifier) {
-		et.KeyTemplate, err = template.New("key_tpl").Parse(val)
+		et.KeyTemplate, err = backend.ParseTemplate("key_tpl", val)
 		if err != nil {
 			return errors.NewFatalf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", val, err, et.RawTag)
 		}

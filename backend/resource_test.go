@@ -8,12 +8,15 @@ import (
 	"testing"
 	"time"
 
+	"text/template"
+
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/corestoreio/errors"
 	"github.com/stretchr/testify/assert"
 )
 
 var _ fmt.Stringer = (*backend.Resource)(nil)
+var _ backend.TemplateExecer = (*template.Template)(nil)
 
 func TestNewResource(t *testing.T) {
 	t.Run("URL", func(t *testing.T) {
@@ -25,6 +28,7 @@ func TestNewResource(t *testing.T) {
 	})
 
 	t.Run("URL is an alias", func(t *testing.T) {
+		backend.RegisterRequestFunc("awsRedisCartService", nil)
 		r, err := backend.NewResource(0, "awsRedisCartService")
 		if err != nil {
 			t.Fatalf("%+v", err)
@@ -338,5 +342,14 @@ func TestRequestFuncArgs_PrepareReturnHeaders(t *testing.T) {
 			rfa.PrepareReturnHeaders(resourceRespWithExtendedHeaders),
 		)
 	})
+}
+
+func TestRequestFuncArgs_TemplateToURL(t *testing.T) {
+	rfa := &backend.RequestFuncArgs{}
+	tURL, err := rfa.TemplateToURL(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Exactly(t, ``, tURL, "Should return an empty string")
 
 }
