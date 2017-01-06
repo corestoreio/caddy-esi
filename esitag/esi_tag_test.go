@@ -46,6 +46,9 @@ func TestEntity_ParseRaw_Src_Template(t *testing.T) {
 func TestEntity_ParseRaw_Key_Template(t *testing.T) {
 	t.Parallel()
 
+	defer backend.RegisterRequestFunc("redisAWS1", backend.MockRequestContent("Any content")).DeferredDeregister()
+	defer backend.RegisterRequestFunc("redisAWS2", backend.MockRequestContent("Any content")).DeferredDeregister()
+
 	et := &esitag.Entity{
 		RawTag: []byte(`include
 			src="redisAWS1"
@@ -54,13 +57,13 @@ func TestEntity_ParseRaw_Key_Template(t *testing.T) {
 			timeout="40ms"`),
 	}
 	if err := et.ParseRaw(); err != nil {
-		t.Fatal(err)
+		t.Fatalf("%+v", err)
 	}
 	assert.Exactly(t, time.Millisecond*40, et.Timeout)
 
 	assert.Len(t, et.Resources, 2)
-	assert.Empty(t, et.Key)
-	assert.Exactly(t, `key_tpl`, et.KeyTemplate.ParseName)
+	assert.Exactly(t, `checkout_cart_{{ .r.Header.Get "User-Agent" }}`, et.Key)
+	assert.Exactly(t, `key_tpl`, et.KeyTemplate.Name())
 
 	assert.Exactly(t, `redisAWS1`, et.Resources[0].String())
 	assert.Exactly(t, 0, et.Resources[0].Index)
@@ -71,6 +74,10 @@ func TestEntity_ParseRaw_Key_Template(t *testing.T) {
 
 func TestESITag_ParseRaw(t *testing.T) {
 	t.Parallel()
+
+	defer backend.RegisterRequestFunc("awsRedis1", backend.MockRequestContent("Any content")).DeferredDeregister()
+	defer backend.RegisterRequestFunc("awsRedis2", backend.MockRequestContent("Any content")).DeferredDeregister()
+	defer backend.RegisterRequestFunc("awsRedis3", backend.MockRequestContent("Any content")).DeferredDeregister()
 
 	runner := func(rawTag []byte, wantErrBhf errors.BehaviourFunc, wantET *esitag.Entity) func(*testing.T) {
 		return func(t *testing.T) {
@@ -112,8 +119,8 @@ func TestESITag_ParseRaw(t *testing.T) {
 			assert.Exactly(t, wantET.Key, haveET.Key, "Key")
 			if wantET.KeyTemplate != nil {
 				assert.Exactly(t,
-					wantET.KeyTemplate.ParseName,
-					haveET.KeyTemplate.ParseName, "KeyTemplate.ParseName")
+					wantET.KeyTemplate.Name(),
+					haveET.KeyTemplate.Name(), "KeyTemplate.ParseName")
 			}
 
 		}
@@ -184,6 +191,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 			Resources: []*backend.Resource{
 				backend.MustNewResource(0, "awsRedis2"),
 			},
+			Key:               `product_234234_{{ .r.Header.Get "myHeaderKey" }}`,
 			KeyTemplate:       template.Must(template.New("key_tpl").Parse("unimportant")),
 			ReturnHeadersAll:  true,
 			ForwardHeadersAll: true,

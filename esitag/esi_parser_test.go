@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/corestoreio/errors"
 	"github.com/stretchr/testify/assert"
@@ -194,6 +195,12 @@ func BenchmarkParseESITags(b *testing.B) {
 }
 
 func TestParseESITags_String(t *testing.T) {
+	t.Parallel()
+
+	defer backend.RegisterRequestFunc("gopher1", backend.MockRequestContent("Any content")).DeferredDeregister()
+	defer backend.RegisterRequestFunc("url1", backend.MockRequestContent("Any content")).DeferredDeregister()
+	defer backend.RegisterRequestFunc("url2", backend.MockRequestContent("Any content")).DeferredDeregister()
+
 	t.Run("Five ESI Tags", testRunner(
 		(`@<esi:include   src="https://micro1.service1/esi/foo"
                                             />@<esi:include   src="https://micro2.service2/esi/foo"
@@ -272,6 +279,7 @@ src="https://micro4.service4/esi/foo"/>@<esi:include src="https://micro5.service
 		nil,
 		errors.IsNotValid,
 	))
+
 	t.Run("Multitags in Buffer", testRunner(
 		(`abcdefg<esi:include src="url1"/>u p<esi:include src="url2" />k`),
 		esitag.Entities{
