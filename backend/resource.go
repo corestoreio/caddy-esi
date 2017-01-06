@@ -240,6 +240,15 @@ func (a *RequestFuncArgs) PrepareReturnHeaders(fromBE http.Header) http.Header {
 	return ret
 }
 
+// TemplateVariables are used in RequestFuncArgs.TemplateToURL to be passed to
+// the internal Execute() function. Exported for documentation purposes.
+type TemplateVariables struct {
+	Req    *http.Request
+	URL    *url.URL
+	Header http.Header
+	// Cookie []*http.Cookie TODO add better cookie handling
+}
+
 // TemplateToURL renders a template into a string. A nil te returns an empty
 // string.
 func (a *RequestFuncArgs) TemplateToURL(te TemplateExecer) (string, error) {
@@ -251,14 +260,7 @@ func (a *RequestFuncArgs) TemplateToURL(te TemplateExecer) (string, error) {
 	buf := bufpool.Get()
 	defer bufpool.Put(buf)
 
-	if err := te.Execute(buf, struct {
-		// These are the currently available template variables. which is only "r" for
-		// the request object.
-		Req    *http.Request
-		URL    *url.URL
-		Header http.Header
-		// Cookie []*http.Cookie TODO add better cookie handling
-	}{
+	if err := te.Execute(buf, TemplateVariables{
 		Req:    a.ExternalReq,
 		URL:    a.ExternalReq.URL,
 		Header: a.ExternalReq.Header,

@@ -6,13 +6,13 @@ import (
 	"net/http/httptest"
 	"sort"
 	"testing"
-	"time"
-
 	"text/template"
+	"time"
 
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/corestoreio/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var _ fmt.Stringer = (*backend.Resource)(nil)
@@ -351,5 +351,34 @@ func TestRequestFuncArgs_TemplateToURL(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Exactly(t, ``, tURL, "Should return an empty string")
+}
 
+func BenchmarkRequestFuncArgs_TemplateToURL(b *testing.B) {
+	const key = `product_{{ .Req.Header.Get "X-Product-ID" }}`
+	const wantKey = `product_GopherPlushXXL`
+	tpl, err := template.New("key_tpl").Parse(key)
+	require.NoError(b, err)
+
+	rfa := &backend.RequestFuncArgs{
+		ExternalReq: func() *http.Request {
+			req := httptest.NewRequest("GET", "/", nil)
+			req.Header.Set("X-Product-ID", "GopherPlushXXL")
+			return req
+		}(),
+		Key:         key,
+		KeyTemplate: tpl,
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		have, err := rfa.TemplateToURL(tpl)
+		if err != nil {
+			b.Fatalf("%+v", err)
+		}
+		if have != wantKey {
+			b.Errorf("Have: %v Want: %v", have, wantKey)
+		}
+
+	}
 }
