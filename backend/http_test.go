@@ -1,13 +1,13 @@
 package backend_test
 
 import (
+	"bytes"
+	"context"
+	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
-
-	"bytes"
-	"io/ioutil"
-	"net/http/httptest"
 
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esitesting"
@@ -105,7 +105,28 @@ func TestFetchHTTP(t *testing.T) {
 		assert.True(t, errors.IsNotSupported(err), "%+v", err)
 	})
 
-	t.Run("Timeout", func(t *testing.T) {
-		t.Skip("Maybe todo")
+	t.Run("Request context deadline", func(t *testing.T) {
+		backend.TestClient = &http.Client{
+			Transport: esitesting.NewHTTPTrip(200, "A response longer than 15 bytes", errors.New("any weird error")),
+		}
+
+		rfa2 := new(backend.RequestFuncArgs)
+		*rfa2 = *rfa
+
+		rfa2.ReturnHeaders = nil
+		rfa2.MaxBodySize = 300
+		ctx, cancel := context.WithCancel(rfa2.ExternalReq.Context())
+		rfa2.ExternalReq = rfa2.ExternalReq.WithContext(ctx)
+		cancel()
+
+		hdr, content, err := backend.FetchHTTP(rfa2)
+
+		assert.Nil(t, hdr, "Header")
+		assert.Empty(t, content, "Content must be empty")
+		assert.EqualError(t, errors.Cause(err), context.Canceled.Error())
+	})
+
+	t.Run("HTTP Client Timeout", func(t *testing.T) {
+		t.Skip("Currently unsure how to test that. So TODO")
 	})
 }

@@ -78,8 +78,16 @@ func FetchHTTP(args *RequestFuncArgs) (http.Header, []byte, error) {
 		req.Header.Set(hdr[i], hdr[i+1])
 	}
 
-	resp, err := c.Do(req)
+	ctx := args.ExternalReq.Context()
+	resp, err := c.Do(req.WithContext(ctx))
+	// If we got an error, and the context has been canceled,
+	// the context's error is probably more useful.
 	if err != nil {
+		select {
+		case <-ctx.Done():
+			err = errors.Wrap(ctx.Err(), "[esibackend] Context Done")
+		default:
+		}
 		return nil, nil, errors.Wrapf(err, "[esibackend] FetchHTTP error for URL %q", args.URL)
 	}
 	defer resp.Body.Close()
