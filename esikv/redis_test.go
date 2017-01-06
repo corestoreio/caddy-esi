@@ -16,7 +16,10 @@ package esikv_test
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"text/template"
 
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esikv"
@@ -45,7 +48,7 @@ func TestNewRedis(t *testing.T) {
 		}
 		defer mr.Close()
 
-		if err := mr.Set("product_price_4711", "123,45 €"); err != nil {
+		if err := mr.Set("product_price_4711", "123,45 € Way too long"); err != nil {
 			t.Fatal(err)
 		}
 
@@ -53,7 +56,9 @@ func TestNewRedis(t *testing.T) {
 		assert.NoError(t, err, "%+v", err)
 
 		hdr, content, err := be(&backend.RequestFuncArgs{
-			Key: "product_price_4711",
+			ExternalReq: httptest.NewRequest("GET", "/", nil),
+			Key:         "product_price_4711",
+			MaxBodySize: 10,
 		})
 		require.NoError(t, err, "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
@@ -72,7 +77,8 @@ func TestNewRedis(t *testing.T) {
 		assert.NoError(t, err, "%+v", err)
 
 		hdr, content, err := be(&backend.RequestFuncArgs{
-			Key: "product_price_4711",
+			ExternalReq: httptest.NewRequest("GET", "/", nil),
+			Key:         "product_price_4711",
 		})
 		require.NoError(t, err, "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
@@ -94,6 +100,40 @@ func TestNewRedis(t *testing.T) {
 		require.True(t, errors.IsEmpty(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Nil(t, content, "Content must be nil")
+	})
+
+	t.Run("Key Template", func(t *testing.T) {
+
+		mr := miniredis.NewMiniRedis()
+		if err := mr.Start(); err != nil {
+			t.Fatal(err)
+		}
+		defer mr.Close()
+
+		const key = `product_{{ .Req.Header.Get "X-Product-ID" }}`
+		const wantContent = `<b>Awesome large Gopher plush toy</b>`
+		if err := mr.Set("product_GopherPlushXXL", wantContent); err != nil {
+			t.Fatal(err)
+		}
+
+		be, err := esikv.NewRequestFunc(fmt.Sprintf("redis://%s", mr.Addr()))
+		assert.NoError(t, err, "%+v", err)
+
+		tpl, err := template.New("key_tpl").Parse(key)
+		require.NoError(t, err)
+
+		hdr, content, err := be(&backend.RequestFuncArgs{
+			ExternalReq: func() *http.Request {
+				req := httptest.NewRequest("GET", "/", nil)
+				req.Header.Set("X-Product-ID", "GopherPlushXXL")
+				return req
+			}(),
+			Key:         key,
+			KeyTemplate: tpl,
+		})
+		require.NoError(t, err, "%+v", err)
+		assert.Nil(t, hdr, "Header return must be nil")
+		assert.Exactly(t, wantContent, string(content), "Content not equal")
 	})
 }
 

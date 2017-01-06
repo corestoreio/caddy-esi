@@ -102,13 +102,20 @@ func NewRedis(rawURL string) (backend.RequestFunc, error) {
 // supported.
 func (r *Redis) Get(args *backend.RequestFuncArgs) (_ http.Header, content []byte, err error) {
 
-	if args.Key == "" {
+	key := args.Key
+	if key == "" {
 		return nil, nil, errors.NewEmptyf("[esikv] Redis.Get Key is empty for resource %q", args.URL)
 	}
 
-	// todo args.KeyTemplate
+	nKey, err := args.TemplateToURL(args.KeyTemplate)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "[esikv] Redis.Get.TemplateToURL %q => %q", args.URL, r.cl.String())
+	}
+	if nKey != "" {
+		key = nKey
+	}
 
-	v, err := r.cl.Get(args.Key).Bytes()
+	v, err := r.cl.Get(key).Bytes()
 	if err == redis.Nil {
 		return nil, nil, nil
 	}
@@ -116,14 +123,11 @@ func (r *Redis) Get(args *backend.RequestFuncArgs) (_ http.Header, content []byt
 		return nil, nil, errors.Wrapf(err, "[esikv] Redis.Get %q => %q", args.URL, r.cl.String())
 	}
 
-	// todo: check max body size
+	if mbs := int(args.MaxBodySize); len(v) > mbs && mbs > 0 {
+		v = v[:mbs] // not the nicest solution but works for now
+	}
 
 	return nil, v, nil
-}
-
-func (r *Redis) Close() error {
-
-	return r.cl.Close()
 }
 
 var pathDBRegexp = regexp.MustCompile(`/(\d*)\z`)
