@@ -101,6 +101,7 @@ func NewRedis(rawURL string) (backend.RequestFunc, error) {
 // Get returns a value from the field Key in the args argument. Header is not
 // supported.
 func (r *Redis) Get(args *backend.RequestFuncArgs) (_ http.Header, content []byte, err error) {
+	// TODO context cancellation and deadline
 
 	key := args.Key
 	if key == "" {
@@ -142,6 +143,9 @@ var pathDBRegexp = regexp.MustCompile(`/(\d*)\z`)
 // 		redis://:6380/0 => connects to localhost:6380
 // 		redis:// => connects to localhost:6379 with DB 0
 // 		redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0
+//
+// TODO: More sophisticated to add also configuration values for the connection pool.
+// 		redis://localhost:6379/DatabaseID/ReadTimeout=2s/
 func ParseRedisURL(raw string) (address, password string, db int, err error) {
 	u, err := url.Parse(raw)
 	if err != nil {
