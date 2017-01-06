@@ -44,11 +44,11 @@ var httpClientPool = &sync.Pool{
 	},
 }
 
-func newHttpClient() *http.Client {
+func newHTTPClient() *http.Client {
 	return httpClientPool.Get().(*http.Client)
 }
 
-func putHttpClient(c *http.Client) {
+func putHTTPClient(c *http.Client) {
 	httpClientPool.Put(c)
 }
 
@@ -63,8 +63,8 @@ func FetchHTTP(args *RequestFuncArgs) (http.Header, []byte, error) {
 
 	var c = TestClient
 	if c == nil {
-		c = newHttpClient()
-		defer putHttpClient(c)
+		c = newHTTPClient()
+		defer putHTTPClient(c)
 	}
 
 	c.Timeout = args.Timeout

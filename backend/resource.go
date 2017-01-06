@@ -101,30 +101,29 @@ func LookupRequestFunc(scheme string) (rf RequestFunc, ok bool) {
 	return
 }
 
-type (
-	// RequestFuncArgs arguments to RequestFunc. Might get extended.
-	RequestFuncArgs struct {
-		ExternalReq *http.Request // required
-		URL         string        // required
-		Timeout     time.Duration // required
-		MaxBodySize uint64        // required
-		Log         log.Logger    // optional
-		// Key also in type esitag.Entity
-		Key string // optional (for KV Service)
-		// KeyTemplate also in type esitag.Entity
-		KeyTemplate       TemplateExecer // optional (for KV Service)
-		TTL               time.Duration  // optional
-		ForwardHeaders    []string       // optional, already treated with http.CanonicalHeaderKey
-		ForwardHeadersAll bool           // optional
-		ReturnHeaders     []string       // optional, already treated with http.CanonicalHeaderKey
-		ReturnHeadersAll  bool           // optional
-	}
-	// RequestFunc performs a request to a backend service via a specific
-	// protocol. Header might be nil depending on the underlying implementation.
-	// Any returned error may trigger the circuit breaker. So it may return 3x
-	// nil to signal neither an error nor content.
-	RequestFunc func(*RequestFuncArgs) (_ http.Header, content []byte, err error)
-)
+// RequestFuncArgs arguments to RequestFunc. Might get extended.
+type RequestFuncArgs struct {
+	ExternalReq *http.Request // required
+	URL         string        // required
+	Timeout     time.Duration // required
+	MaxBodySize uint64        // required
+	Log         log.Logger    // optional
+	// Key also in type esitag.Entity
+	Key string // optional (for KV Service)
+	// KeyTemplate also in type esitag.Entity
+	KeyTemplate       TemplateExecer // optional (for KV Service)
+	TTL               time.Duration  // optional
+	ForwardHeaders    []string       // optional, already treated with http.CanonicalHeaderKey
+	ForwardHeadersAll bool           // optional
+	ReturnHeaders     []string       // optional, already treated with http.CanonicalHeaderKey
+	ReturnHeadersAll  bool           // optional
+}
+
+// RequestFunc performs a request to a backend service via a specific
+// protocol. Header might be nil depending on the underlying implementation.
+// Any returned error may trigger the circuit breaker. So it may return 3x
+// nil to signal neither an error nor content.
+type RequestFunc func(*RequestFuncArgs) (_ http.Header, content []byte, err error)
 
 // Validate checks if required arguments have been set
 func (a *RequestFuncArgs) Validate() (err error) {
@@ -415,10 +414,13 @@ var CBThresholdCalc = func(failures uint64) time.Duration {
 	return time.Duration((1 << failures) * time.Second)
 }
 
+// CBFailures number of failures. Thread safe.
 func (r *Resource) CBFailures() uint64 {
 	return atomic.LoadUint64(r.cbFailures)
 }
 
+// CBState returns the current state of the circuit breaker and the last failure
+// time. Thread safe.
 func (r *Resource) CBState() (state int, lastFailure time.Time) {
 	var thresholdPassed bool
 
@@ -447,13 +449,17 @@ func (r *Resource) CBState() (state int, lastFailure time.Time) {
 	return state, lastFailure
 }
 
+// CBReset resets the circuit breaker. Thread safe.
 func (r *Resource) CBReset() {
 	atomic.StoreUint64(r.cbLastFailureTime, 0)
 	atomic.StoreUint64(r.cbFailures, 0)
 }
 
+// CBRecordFailure records a failure and increases the internal counter. Returns
+// the last failed time. Thread safe.
 func (r *Resource) CBRecordFailure() (failedUnixNano int64) {
 	atomic.AddUint64(r.cbFailures, 1)
+	// monotime.Now()
 	failedUnixNano = time.Now().UnixNano()
 	atomic.StoreUint64(r.cbLastFailureTime, uint64(failedUnixNano))
 	return failedUnixNano

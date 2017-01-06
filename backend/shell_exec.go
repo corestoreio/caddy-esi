@@ -23,8 +23,22 @@ import (
 	"github.com/corestoreio/errors"
 )
 
-// FetchShellExec TODO fetch from a local executable file.
-// Header is always nil
+func init() {
+	RegisterRequestFunc("sh", FetchShellExec)
+}
+
+// FetchShellExec executes a local program and returns the content or an error.
+// Header is always nil.
+//
+// To trigger shell exec the src attribute in an ESI tag must start with sh://.
+//
+// If the first character is a white space then we cut thru that white space and
+// treat the last characters as arguments.
+// 		sh://slow/php/script.php --arg1=1 --arg2=2
+//
+// This command won't work and creates a weird error:
+// 		sh://php slow/php/script.php --arg1=1 --arg2=2
+// Fixes welcome!
 func FetchShellExec(args *RequestFuncArgs) (http.Header, []byte, error) {
 	if err := args.Validate(); err != nil {
 		return nil, nil, errors.Wrap(err, "[esibackend] FetchShellExec.args.Validate")
@@ -38,6 +52,7 @@ func FetchShellExec(args *RequestFuncArgs) (http.Header, []byte, error) {
 	cmdName := args.URL[len(urlPrefix):]
 	firstWS := strings.IndexAny(cmdName, " \t")
 	if firstWS > 0 {
+		// this might lead to confusion
 		cmdName = cmdName[:firstWS]
 		cmdArgs = cmdName[firstWS+1:]
 	}
@@ -49,22 +64,25 @@ func FetchShellExec(args *RequestFuncArgs) (http.Header, []byte, error) {
 	stdIn := bufpool.Get()
 	defer bufpool.Put(stdIn)
 
-	// should be also in JSON
-	//for hdr, i := args.PrepareForwardHeaders(), 0; i < len(hdr); i = i + 2 {
-	//	stdIn.WriteString(hdr[i])
-	//	stdIn.WriteByte(':')
-	//	stdIn.WriteString(hdr[i+1])
-	//	stdIn.WriteByte('\n')
-	//}
-
 	cmd := exec.CommandContext(args.ExternalReq.Context(), cmdName, cmdArgs)
+
 	cmd.Stderr = stdErr
 	cmd.Stdout = stdOut
 	cmd.Stdin = stdIn
 
-	// todo debug log also with stderr
+	jData, err := args.MarshalJSON()
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "[esibackend] FetchShellExec MarshalJSON URL %q", args.URL)
+	}
+	_, _ = stdIn.Write(jData)
+
 	if err := cmd.Run(); err != nil {
+		cmd.Process.Release()
 		return nil, nil, errors.Wrapf(err, "[esibackend] FetchShellExec cmd.Run URL %q", args.URL)
+	}
+
+	if stdErr.Len() > 0 {
+		return nil, nil, errors.NewFatalf("[esibackend] FetchShellExec Process %q error: %q", args.URL, stdErr)
 	}
 
 	ret := make([]byte, stdOut.Len())

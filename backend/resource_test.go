@@ -11,12 +11,15 @@ import (
 
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/corestoreio/errors"
+	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var _ fmt.Stringer = (*backend.Resource)(nil)
 var _ backend.TemplateExecer = (*template.Template)(nil)
+var _ easyjson.Marshaler = (*backend.RequestFuncArgs)(nil)
+var _ easyjson.Unmarshaler = (*backend.RequestFuncArgs)(nil)
 
 func TestNewResource(t *testing.T) {
 	t.Run("URL", func(t *testing.T) {
@@ -380,5 +383,31 @@ func BenchmarkRequestFuncArgs_TemplateToURL(b *testing.B) {
 			b.Errorf("Have: %v Want: %v", have, wantKey)
 		}
 
+	}
+}
+
+// BenchmarkRequestFuncArgs_MarshalEasyJSON-4   	  300000	      4844 ns/op	    1922 B/op	       6 allocs/op
+func BenchmarkRequestFuncArgs_MarshalEasyJSON(b *testing.B) {
+
+	rfa := &backend.RequestFuncArgs{
+		URL:            "https://corestore.io",
+		ExternalReq:    getExternalReqWithExtendedHeaders(),
+		Timeout:        5 * time.Second,
+		MaxBodySize:    50000,
+		Key:            "a_r€dis_ky",
+		TTL:            33 * time.Second,
+		ForwardHeaders: []string{"X-Cart-Id", "Cookie"},
+		ReturnHeaders:  []string{"Set-Cookie"},
+	}
+	var haveData []byte
+	for i := 0; i < b.N; i++ {
+		var err error
+		haveData, err = rfa.MarshalJSON()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	if len(haveData) != 1176 {
+		b.Fatalf("Incorret JSON: Incorrect length %d", len(haveData))
 	}
 }
