@@ -1,3 +1,17 @@
+// Copyright 2016-2017, Cyrill @ Schumacher.fm and the CaddyESI Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
 package caddyesi_test
 
 import (
@@ -107,7 +121,7 @@ func mwTestRunner(caddyFile string, r *http.Request, bodyContains string) func(*
 }
 
 func TestMiddleware_ServeHTTP_StatusCodes(t *testing.T) {
-	defer backend.RegisterRequestFunc("mwtest01", backend.MockRequestContent("Hello 2017!")).DeferredDeregister()
+	defer backend.RegisterResourceHandler("mwtest01", backend.MockRequestContent("Hello 2017!")).DeferredDeregister()
 
 	t.Run("404 Code not allowed", func(t *testing.T) {
 
@@ -138,7 +152,7 @@ func TestMiddleware_ServeHTTP_StatusCodes(t *testing.T) {
 
 func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 
-	defer backend.RegisterRequestFunc("mwtest01", backend.MockRequestError(errors.NewWriteFailedf("write failed"))).DeferredDeregister()
+	defer backend.RegisterResourceHandler("mwtest01", backend.MockRequestError(errors.NewWriteFailedf("write failed"))).DeferredDeregister()
 
 	t.Run("Middleware inactive due to GET allowed but POST request supplied", mwTestRunner(
 		`esi {
@@ -175,9 +189,9 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 		caddyesi.DefaultOnError,
 	))
 
-	defer backend.RegisterRequestFunc("mwtest02a", backend.MockRequestContent("Micro1Service1")).DeferredDeregister()
-	defer backend.RegisterRequestFunc("mwtest02b", backend.MockRequestContent("Micro2Service2")).DeferredDeregister()
-	defer backend.RegisterRequestFunc("mwtest02c", backend.MockRequestContent("Micro3Service3")).DeferredDeregister()
+	defer backend.RegisterResourceHandler("mwtest02a", backend.MockRequestContent("Micro1Service1")).DeferredDeregister()
+	defer backend.RegisterResourceHandler("mwtest02b", backend.MockRequestContent("Micro2Service2")).DeferredDeregister()
+	defer backend.RegisterResourceHandler("mwtest02c", backend.MockRequestContent("Micro3Service3")).DeferredDeregister()
 	t.Run("Load from three resources in page02.html successfully", mwTestRunner(
 		`esi`,
 		httptest.NewRequest("GET", "/page02.html", nil),
@@ -201,15 +215,15 @@ func TestMiddleware_ServeHTTP_Parallel(t *testing.T) {
 	var reqCount2b = new(uint64)
 	var reqCount2c = new(uint64)
 
-	defer backend.RegisterRequestFunc("mwtest02a", backend.MockRequestContentCB("Micro1Service11", func() error {
+	defer backend.RegisterResourceHandler("mwtest02a", backend.MockRequestContentCB("Micro1Service11", func() error {
 		atomic.AddUint64(reqCount2a, 1)
 		return nil
 	})).DeferredDeregister()
-	defer backend.RegisterRequestFunc("mwtest02b", backend.MockRequestContentCB("Micro2Service22", func() error {
+	defer backend.RegisterResourceHandler("mwtest02b", backend.MockRequestContentCB("Micro2Service22", func() error {
 		atomic.AddUint64(reqCount2b, 1)
 		return nil
 	})).DeferredDeregister()
-	defer backend.RegisterRequestFunc("mwtest02c", backend.MockRequestContentCB("Micro3Service33", func() error {
+	defer backend.RegisterResourceHandler("mwtest02c", backend.MockRequestContentCB("Micro3Service33", func() error {
 		atomic.AddUint64(reqCount2c, 1)
 		return nil
 	})).DeferredDeregister()
@@ -243,7 +257,7 @@ func TestMiddleware_ServeHTTP_Parallel(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Exactly(t, 1, strings.Count(string(logContent), `caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse error: "<nil>"`), `caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse error: "<nil>" MUST only occur once!!!`)
-	assert.Exactly(t, 600, strings.Count(string(logContent), `esitag.Entity.QueryResources.RequestFunc.CBStateClosed`), `esitag.Entity.QueryResources.RequestFunc.CBStateClosed`)
+	assert.Exactly(t, 600, strings.Count(string(logContent), `esitag.Entity.QueryResources.ResourceHandler.CBStateClosed`), `esitag.Entity.QueryResources.ResourceHandler.CBStateClosed`)
 }
 
 func TestMiddleware_ServeHTTP_Redis(t *testing.T) {

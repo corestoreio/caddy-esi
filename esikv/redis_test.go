@@ -35,7 +35,7 @@ func TestNewRedis(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Ping fail", func(t *testing.T) {
-		be, err := esikv.NewRequestFunc("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0")
+		be, err := esikv.NewResourceHandler("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0")
 		assert.True(t, errors.IsFatal(err), "%+v", err)
 		assert.Nil(t, be)
 	})
@@ -52,10 +52,11 @@ func TestNewRedis(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		be, err := esikv.NewRequestFunc(fmt.Sprintf("redis://%s", mr.Addr()))
+		be, err := esikv.NewResourceHandler(fmt.Sprintf("redis://%s", mr.Addr()))
 		assert.NoError(t, err, "%+v", err)
+		defer be.Close()
 
-		hdr, content, err := be(&backend.RequestFuncArgs{
+		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
 			Key:         "product_price_4711",
 			MaxBodySize: 10,
@@ -73,10 +74,11 @@ func TestNewRedis(t *testing.T) {
 		}
 		defer mr.Close()
 
-		be, err := esikv.NewRequestFunc(fmt.Sprintf("redis://%s", mr.Addr()))
+		be, err := esikv.NewResourceHandler(fmt.Sprintf("redis://%s", mr.Addr()))
 		assert.NoError(t, err, "%+v", err)
+		defer be.Close()
 
-		hdr, content, err := be(&backend.RequestFuncArgs{
+		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
 			Key:         "product_price_4711",
 		})
@@ -93,10 +95,11 @@ func TestNewRedis(t *testing.T) {
 		}
 		defer mr.Close()
 
-		be, err := esikv.NewRequestFunc(fmt.Sprintf("redis://%s", mr.Addr()))
+		be, err := esikv.NewResourceHandler(fmt.Sprintf("redis://%s", mr.Addr()))
 		assert.NoError(t, err, "%+v", err)
+		defer be.Close()
 
-		hdr, content, err := be(&backend.RequestFuncArgs{})
+		hdr, content, err := be.DoRequest(&backend.ResourceArgs{})
 		require.True(t, errors.IsEmpty(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Nil(t, content, "Content must be nil")
@@ -116,13 +119,14 @@ func TestNewRedis(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		be, err := esikv.NewRequestFunc(fmt.Sprintf("redis://%s", mr.Addr()))
+		be, err := esikv.NewResourceHandler(fmt.Sprintf("redis://%s", mr.Addr()))
 		assert.NoError(t, err, "%+v", err)
+		defer be.Close()
 
 		tpl, err := template.New("key_tpl").Parse(key)
 		require.NoError(t, err)
 
-		hdr, content, err := be(&backend.RequestFuncArgs{
+		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
 			ExternalReq: func() *http.Request {
 				req := httptest.NewRequest("GET", "/", nil)
 				req.Header.Set("X-Product-ID", "GopherPlushXXL")
@@ -137,17 +141,17 @@ func TestNewRedis(t *testing.T) {
 	})
 }
 
-func TestNewRequestFunc(t *testing.T) {
+func TestNewResourceHandler(t *testing.T) {
 	t.Parallel()
 
 	t.Run("URL Error", func(t *testing.T) {
-		be, err := esikv.NewRequestFunc("redis//localhost")
+		be, err := esikv.NewResourceHandler("redis//localhost")
 		assert.Nil(t, be)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), `Unknown URL: "redis//localhost". Does not contain ://`)
 	})
 	t.Run("Scheme Error", func(t *testing.T) {
-		be, err := esikv.NewRequestFunc("mysql://localhost")
+		be, err := esikv.NewResourceHandler("mysql://localhost")
 		assert.Nil(t, be)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), `Unknown URL: "mysql://localhost". No driver defined for scheme: "mysql"`)

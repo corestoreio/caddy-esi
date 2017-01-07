@@ -27,16 +27,18 @@ import (
 )
 
 type esiRedis struct {
-	cl *redis.Client
+	url string
+	cl  *redis.Client
 }
 
 // NewRedis provides, for now, a basic implementation for simple key fetching.
-func NewRedis(rawURL string) (backend.RequestFunc, error) {
+func NewRedis(rawURL string) (backend.ResourceHandler, error) {
 	addr, pw, db, err := ParseRedisURL(rawURL)
 	if err != nil {
 		return nil, errors.Errorf("[esikv] Redis error parsing URL %q => %s", rawURL, err)
 	}
 	r := &esiRedis{
+		url: rawURL,
 		cl: redis.NewClient(&redis.Options{
 			// The network type, either tcp or unix.
 			// Default is tcp.
@@ -95,12 +97,18 @@ func NewRedis(rawURL string) (backend.RequestFunc, error) {
 		return nil, errors.NewFatalf("[esikv] Redis Ping not Pong: %q", pong)
 	}
 
-	return r.Get, nil
+	return r, nil
 }
 
-// Get returns a value from the field Key in the args argument. Header is not
+// Closes closes the resource when Caddy restarts or reloads. If supported
+// by the resource.
+func (et *esiRedis) Close() error {
+	return errors.Wrapf(et.cl.Close(), "[esikv] Redis Close. URL %q", et.url)
+}
+
+// DoRequest returns a value from the field Key in the args argument. Header is not
 // supported.
-func (r *esiRedis) Get(args *backend.RequestFuncArgs) (_ http.Header, content []byte, err error) {
+func (r *esiRedis) DoRequest(args *backend.ResourceArgs) (header http.Header, content []byte, err error) {
 	// TODO context cancellation and deadline
 
 	key := args.Key

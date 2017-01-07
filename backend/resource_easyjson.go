@@ -19,7 +19,7 @@ var (
 	_ *jwriter.Writer
 )
 
-func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend(in *jlexer.Lexer, out *RequestFuncArgs) {
+func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend(in *jlexer.Lexer, out *ResourceArgs) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -110,7 +110,7 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend(in *jlexer.Lexer
 		in.Consumed()
 	}
 }
-func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend(out *jwriter.Writer, in RequestFuncArgs) {
+func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend(out *jwriter.Writer, in ResourceArgs) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -224,26 +224,26 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend(out *jwriter.Wri
 }
 
 // MarshalJSON supports json.Marshaler interface
-func (v RequestFuncArgs) MarshalJSON() ([]byte, error) {
+func (v ResourceArgs) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
 	easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
-func (v RequestFuncArgs) MarshalEasyJSON(w *jwriter.Writer) {
+func (v ResourceArgs) MarshalEasyJSON(w *jwriter.Writer) {
 	easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
-func (v *RequestFuncArgs) UnmarshalJSON(data []byte) error {
+func (v *ResourceArgs) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
 	easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
-func (v *RequestFuncArgs) UnmarshalEasyJSON(l *jlexer.Lexer) {
+func (v *ResourceArgs) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend(l, v)
 }
 func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in *jlexer.Lexer, out *http.Request) {

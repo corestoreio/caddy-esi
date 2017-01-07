@@ -1,3 +1,17 @@
+// Copyright 2016-2017, Cyrill @ Schumacher.fm and the CaddyESI Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
 package esitag
 
 import (
@@ -148,7 +162,7 @@ type Entity struct {
 	// The first item which successfully returns data gets its content used in
 	// the response. If one item fails and we have multiple resources, the next
 	// resource gets queried. All resources share the same scheme/protocol which
-	// must handle the RequestFunc.
+	// must handle the ResourceHandler.
 	Resources []*backend.Resource // Any 3rd party servers
 
 	// Conditioner TODO(CyS) depending on a condition an ESI tag gets executed or not.
@@ -341,7 +355,7 @@ func (et *Entity) parseKey(val string) (err error) {
 // InitPoolRFA used in PathConfig.UpsertESITags and in Entity.ParseRaw to set
 // the pool function. When called in PathConfig.UpsertESITags all default config
 // values have been applied correctly.
-func (et *Entity) InitPoolRFA(defaultRFA *backend.RequestFuncArgs) {
+func (et *Entity) InitPoolRFA(defaultRFA *backend.ResourceArgs) {
 
 	if et.Log == nil && defaultRFA != nil {
 		et.Log = defaultRFA.Log
@@ -357,7 +371,7 @@ func (et *Entity) InitPoolRFA(defaultRFA *backend.RequestFuncArgs) {
 	}
 
 	et.resourceRFAPool.New = func() interface{} {
-		return &backend.RequestFuncArgs{
+		return &backend.ResourceArgs{
 			Log:               et.Log,
 			Key:               et.Key,
 			KeyTemplate:       et.KeyTemplate,
@@ -372,21 +386,21 @@ func (et *Entity) InitPoolRFA(defaultRFA *backend.RequestFuncArgs) {
 }
 
 // used in Entity.QueryResources
-func (et *Entity) poolGetRFA(externalReq *http.Request) *backend.RequestFuncArgs {
-	rfa := et.resourceRFAPool.Get().(*backend.RequestFuncArgs)
+func (et *Entity) poolGetRFA(externalReq *http.Request) *backend.ResourceArgs {
+	rfa := et.resourceRFAPool.Get().(*backend.ResourceArgs)
 	rfa.ExternalReq = externalReq
 	return rfa
 }
 
 // used in Entity.QueryResources
-func (et *Entity) poolPutRFA(rfa *backend.RequestFuncArgs) {
+func (et *Entity) poolPutRFA(rfa *backend.ResourceArgs) {
 	rfa.ExternalReq = nil
 	rfa.URL = ""
 	et.resourceRFAPool.Put(rfa)
 }
 
 // QueryResources iterates sequentially over the resources and executes requests
-// as defined in the RequestFunc. If one resource fails it will be
+// as defined in the ResourceHandler. If one resource fails it will be
 // marked as timed out and the next resource gets tried. The exponential
 // back-off stops when MaxBackOffs have been reached and then tries again.
 // Returns a Temporary error behaviour when all requests to all resources are
@@ -414,7 +428,7 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 				mErr = mErr.AppendErrors(errors.Errorf("\nIndex %d URL %q with %s\n", i, r.String(), err))
 				lastFailureTime := r.CBRecordFailure()
 				if et.Log.IsDebug() {
-					et.Log.Debug("esitag.Entity.QueryResources.RequestFunc.Error",
+					et.Log.Debug("esitag.Entity.QueryResources.ResourceHandler.Error",
 						log.Duration(log.KeyNameDuration, monotime.Since(timeStart)),
 						log.Err(err), log.Uint64("failure_count", r.CBFailures()), log.UnixNanoHuman("last_failure", lastFailureTime), lFields)
 				}
@@ -423,12 +437,12 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 			if state == backend.CBStateHalfOpen {
 				r.CBReset()
 				if et.Log.IsDebug() {
-					et.Log.Debug("esitag.Entity.QueryResources.RequestFunc.CBStateHalfOpen",
+					et.Log.Debug("esitag.Entity.QueryResources.ResourceHandler.CBStateHalfOpen",
 						log.Duration(log.KeyNameDuration, monotime.Since(timeStart)), log.String("content", string(data)),
 						log.Uint64("failure_count", r.CBFailures()), log.Stringer("last_failure", lastFailure), lFields)
 				}
 			} else if et.Log.IsDebug() {
-				et.Log.Debug("esitag.Entity.QueryResources.RequestFunc.CBStateClosed",
+				et.Log.Debug("esitag.Entity.QueryResources.ResourceHandler.CBStateClosed",
 					log.Duration(log.KeyNameDuration, monotime.Since(timeStart)), log.String("content", string(data)),
 					log.Uint64("failure_count", r.CBFailures()), log.Stringer("last_failure", lastFailure), lFields)
 			}
@@ -437,7 +451,7 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 
 		case backend.CBStateOpen:
 			if et.Log.IsDebug() {
-				et.Log.Debug("esitag.Entity.QueryResources.RequestFunc.CBStateOpen",
+				et.Log.Debug("esitag.Entity.QueryResources.ResourceHandler.CBStateOpen",
 					log.Duration(log.KeyNameDuration, monotime.Since(timeStart)),
 					log.Uint64("failure_count", r.CBFailures()), log.Stringer("last_failure", lastFailure), lFields)
 			}

@@ -22,9 +22,25 @@ import (
 	"github.com/corestoreio/errors"
 )
 
-// NewRequestFunc a given URL gets checked which service it should instantiate
+type resourceMock struct {
+	DoRequestFn func(args *backend.ResourceArgs) (http.Header, []byte, error)
+	CloseFn     func() error
+}
+
+func (rm resourceMock) DoRequest(a *backend.ResourceArgs) (http.Header, []byte, error) {
+	return rm.DoRequestFn(a)
+}
+
+func (rm resourceMock) Close() error {
+	if rm.CloseFn == nil {
+		return nil
+	}
+	return rm.CloseFn()
+}
+
+// NewResourceHandler a given URL gets checked which service it should instantiate
 // and connect to. Supported schemes: redis:// for now.
-func NewRequestFunc(url string) (backend.RequestFunc, error) {
+func NewResourceHandler(url string) (backend.ResourceHandler, error) {
 	idx := strings.Index(url, "://")
 	if idx < 0 {
 		return nil, errors.NewNotValidf("[esikv] Unknown URL: %q. Does not contain ://", url)
@@ -43,10 +59,12 @@ func NewRequestFunc(url string) (backend.RequestFunc, error) {
 		//case "pgsql":
 		//case "grpc":
 	case "mockTimeout":
-		return func(*backend.RequestFuncArgs) (_ http.Header, content []byte, err error) {
-			// it panics if the URI has not the format:
-			// mockTimeout://duration
-			return nil, nil, errors.NewTimeoutf("[esikv] Timeout after %q", url[idx+3:])
+		return resourceMock{
+			DoRequestFn: func(*backend.ResourceArgs) (_ http.Header, content []byte, err error) {
+				// it panics if the URI has not the format:
+				// mockTimeout://duration
+				return nil, nil, errors.NewTimeoutf("[esikv] Timeout after %q", url[idx+3:])
+			},
 		}, nil
 	}
 	return nil, errors.NewNotSupportedf("[esikv] Unknown URL: %q. No driver defined for scheme: %q", url, scheme)

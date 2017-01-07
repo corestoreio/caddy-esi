@@ -63,16 +63,16 @@ func ParseTemplate(name, text string) (TemplateExecer, error) {
 
 var rrfRegister = &struct {
 	sync.RWMutex
-	fetchers map[string]RequestFunc
+	fetchers map[string]ResourceHandler
 }{
-	fetchers: make(map[string]RequestFunc),
+	fetchers: make(map[string]ResourceHandler),
 }
 
-// RegisterRequestFunc scheme can be a protocol before the :// but also an alias
+// RegisterResourceHandler scheme can be a protocol before the :// but also an alias
 // to register a key-value service. This function returns a closure which lets
 // you deregister the scheme/alias once a test has finished. Use the defer word.
 // Scheme/alias will be transformed into an all lowercase string.
-func RegisterRequestFunc(scheme string, f RequestFunc) struct{ DeferredDeregister func() } {
+func RegisterResourceHandler(scheme string, f ResourceHandler) struct{ DeferredDeregister func() } {
 	scheme = strings.ToLower(scheme)
 	rrfRegister.Lock()
 	defer rrfRegister.Unlock()
@@ -80,20 +80,20 @@ func RegisterRequestFunc(scheme string, f RequestFunc) struct{ DeferredDeregiste
 	return struct {
 		DeferredDeregister func()
 	}{
-		DeferredDeregister: func() { DeregisterRequestFunc(scheme) },
+		DeferredDeregister: func() { DeregisterResourceHandler(scheme) },
 	}
 }
 
-// DeregisterRequestFunc removes a previously registered scheme/alias.
-func DeregisterRequestFunc(scheme string) {
+// DeregisterResourceHandler removes a previously registered scheme/alias.
+func DeregisterResourceHandler(scheme string) {
 	scheme = strings.ToLower(scheme)
 	rrfRegister.Lock()
 	defer rrfRegister.Unlock()
 	delete(rrfRegister.fetchers, scheme)
 }
 
-// LookupRequestFunc uses the scheme/alias to retrieve the backend request function.
-func LookupRequestFunc(scheme string) (rf RequestFunc, ok bool) {
+// LookupResourceHandler uses the scheme/alias to retrieve the backend request function.
+func LookupResourceHandler(scheme string) (rf ResourceHandler, ok bool) {
 	scheme = strings.ToLower(scheme)
 	rrfRegister.RLock()
 	defer rrfRegister.RUnlock()
@@ -101,8 +101,23 @@ func LookupRequestFunc(scheme string) (rf RequestFunc, ok bool) {
 	return
 }
 
-// RequestFuncArgs arguments to RequestFunc. Might get extended.
-type RequestFuncArgs struct {
+// CloseAllResourceHandler does what the function name says returns the first
+// occurred error.
+func CloseAllResourceHandler() error {
+	rrfRegister.Lock()
+	defer rrfRegister.Unlock()
+	for scheme, rh := range rrfRegister.fetchers {
+		if err := rh.Close(); err != nil {
+			return errors.Wrapf(err, "[esibackend] Failed to close %q", scheme)
+		}
+	}
+	return nil
+}
+
+// ResourceArgs arguments to ResourceHandler.DoRequest. Might get extended.
+// For now this structure and using it as an argument works quite well.
+// Maybe refactor.
+type ResourceArgs struct {
 	ExternalReq *http.Request // required
 	URL         string        // required
 	Timeout     time.Duration // required
@@ -119,29 +134,37 @@ type RequestFuncArgs struct {
 	ReturnHeadersAll  bool           // optional
 }
 
-// RequestFunc performs a request to a backend service via a specific
-// protocol. Header might be nil depending on the underlying implementation.
-// Any returned error may trigger the circuit breaker. So it may return 3x
-// nil to signal neither an error nor content.
-type RequestFunc func(*RequestFuncArgs) (_ http.Header, content []byte, err error)
+// ResourceHandler gets implemented by any client which is able to speak to any
+// remote backend. A handler gets registered in a global map and has a long
+// lived state.
+type ResourceHandler interface {
+	// DoRequest fires the request to the resource and it may return a header
+	// and content or an error. All three return values can be nil. Any returned error will trigger the increment of
+	// the circuit breaker. See the variable CBMaxFailures for the maximum
+	// amount of allowed failures until the circuit breaker opens.
+	DoRequest(*ResourceArgs) (header http.Header, content []byte, err error)
+	// Closes closes the resource when Caddy restarts or reloads. If supported
+	// by the resource.
+	Close() error
+}
 
 // Validate checks if required arguments have been set
-func (a *RequestFuncArgs) Validate() (err error) {
+func (a *ResourceArgs) Validate() (err error) {
 	switch {
 	case a.URL == "":
-		err = errors.NewEmptyf("[esibackend] For RequestFuncArgs %#v the URL value is empty", a)
+		err = errors.NewEmptyf("[esibackend] For ResourceArgs %#v the URL value is empty", a)
 	case a.ExternalReq == nil:
-		err = errors.NewEmptyf("[esibackend] For RequestFuncArgs %q the ExternalReq value is nil", a.URL)
+		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the ExternalReq value is nil", a.URL)
 	case a.Timeout < 1:
-		err = errors.NewEmptyf("[esibackend] For RequestFuncArgs %q the timeout value is empty", a.URL)
+		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the timeout value is empty", a.URL)
 	case a.MaxBodySize == 0:
-		err = errors.NewEmptyf("[esibackend] For RequestFuncArgs %q the maxBodySize value is empty", a.URL)
+		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the maxBodySize value is empty", a.URL)
 	}
 	return
 }
 
 // MaxBodySizeHumanized converts the bytes into a human readable format
-func (a *RequestFuncArgs) MaxBodySizeHumanized() string {
+func (a *ResourceArgs) MaxBodySizeHumanized() string {
 	return humanize.Bytes(a.MaxBodySize)
 }
 
@@ -182,7 +205,7 @@ var DropHeadersReturn = map[string]bool{
 // PrepareForwardHeaders returns all headers which must get forwarded to the
 // backend resource. Returns a non-nil slice when no headers should be
 // forwarded. Slice is balanced: i == key and i+1 == value
-func (a *RequestFuncArgs) PrepareForwardHeaders() []string {
+func (a *ResourceArgs) PrepareForwardHeaders() []string {
 	if !a.ForwardHeadersAll && len(a.ForwardHeaders) == 0 {
 		return []string{}
 	}
@@ -212,7 +235,7 @@ func (a *RequestFuncArgs) PrepareForwardHeaders() []string {
 // PrepareReturnHeaders extracts the required headers fromBE as defined in the
 // struct fields ReturnHeaders*. fromBE means: From Back End. These are the
 // headers from the queried backend resource. Might return a nil map.
-func (a *RequestFuncArgs) PrepareReturnHeaders(fromBE http.Header) http.Header {
+func (a *ResourceArgs) PrepareReturnHeaders(fromBE http.Header) http.Header {
 	if !a.ReturnHeadersAll && len(a.ReturnHeaders) == 0 {
 		return nil
 	}
@@ -239,7 +262,7 @@ func (a *RequestFuncArgs) PrepareReturnHeaders(fromBE http.Header) http.Header {
 	return ret
 }
 
-// TemplateVariables are used in RequestFuncArgs.TemplateToURL to be passed to
+// TemplateVariables are used in ResourceArgs.TemplateToURL to be passed to
 // the internal Execute() function. Exported for documentation purposes.
 type TemplateVariables struct {
 	Req    *http.Request
@@ -250,7 +273,7 @@ type TemplateVariables struct {
 
 // TemplateToURL renders a template into a string. A nil te returns an empty
 // string.
-func (a *RequestFuncArgs) TemplateToURL(te TemplateExecer) (string, error) {
+func (a *ResourceArgs) TemplateToURL(te TemplateExecer) (string, error) {
 
 	if te == nil {
 		return "", nil
@@ -271,39 +294,62 @@ func (a *RequestFuncArgs) TemplateToURL(te TemplateExecer) (string, error) {
 
 const mockRequestMsg = "%s %q Timeout %s MaxBody %s"
 
+type resourceMock struct {
+	DoRequestFn func(args *ResourceArgs) (http.Header, []byte, error)
+	CloseFn     func() error
+}
+
+func (rm resourceMock) DoRequest(a *ResourceArgs) (http.Header, []byte, error) {
+	return rm.DoRequestFn(a)
+}
+
+func (rm resourceMock) Close() error {
+	if rm.CloseFn == nil {
+		return nil
+	}
+	return rm.CloseFn()
+}
+
 // MockRequestContent for testing purposes only.
-func MockRequestContent(content string) RequestFunc {
-	return func(args *RequestFuncArgs) (http.Header, []byte, error) {
-		if args.URL == "" && args.Key == "" {
-			panic(fmt.Sprintf("[esibackend] URL and Key cannot be empty: %#v\n", args))
-		}
-		return nil, []byte(fmt.Sprintf(mockRequestMsg, content, args.URL, args.Timeout, args.MaxBodySizeHumanized())), nil
+func MockRequestContent(content string) ResourceHandler {
+	return resourceMock{
+		DoRequestFn: func(args *ResourceArgs) (http.Header, []byte, error) {
+			if args.URL == "" && args.Key == "" {
+				panic(fmt.Sprintf("[esibackend] URL and Key cannot be empty: %#v\n", args))
+			}
+			return nil, []byte(fmt.Sprintf(mockRequestMsg, content, args.URL, args.Timeout, args.MaxBodySizeHumanized())), nil
+		},
 	}
 }
 
 // MockRequestContentCB for testing purposes only. Call back gets executed
 // before the function returns.
-func MockRequestContentCB(content string, callback func() error) RequestFunc {
-	return func(args *RequestFuncArgs) (http.Header, []byte, error) {
-		if err := callback(); err != nil {
-			return nil, nil, errors.Wrapf(err, "MockRequestContentCB with URL %q", args.URL)
-		}
-		return nil, []byte(fmt.Sprintf(mockRequestMsg, content, args.URL, args.Timeout, args.MaxBodySizeHumanized())), nil
+func MockRequestContentCB(content string, callback func() error) ResourceHandler {
+	return resourceMock{
+		DoRequestFn: func(args *ResourceArgs) (http.Header, []byte, error) {
+			if err := callback(); err != nil {
+				return nil, nil, errors.Wrapf(err, "MockRequestContentCB with URL %q", args.URL)
+			}
+			return nil, []byte(fmt.Sprintf(mockRequestMsg, content, args.URL, args.Timeout, args.MaxBodySizeHumanized())), nil
+		},
 	}
-
 }
 
 // MockRequestError for testing purposes only.
-func MockRequestError(err error) RequestFunc {
-	return func(_ *RequestFuncArgs) (http.Header, []byte, error) {
-		return nil, nil, err
+func MockRequestError(err error) ResourceHandler {
+	return resourceMock{
+		DoRequestFn: func(_ *ResourceArgs) (http.Header, []byte, error) {
+			return nil, nil, err
+		},
 	}
 }
 
 // MockRequestPanic just panics
-func MockRequestPanic(msg interface{}) RequestFunc {
-	return func(_ *RequestFuncArgs) (http.Header, []byte, error) {
-		panic(msg)
+func MockRequestPanic(msg interface{}) ResourceHandler {
+	return resourceMock{
+		DoRequestFn: func(_ *ResourceArgs) (http.Header, []byte, error) {
+			panic(msg)
+		},
 	}
 }
 
@@ -323,7 +369,7 @@ type Resource struct {
 
 	// reqFunc performs a request to a backend service via a specific
 	// protocol.
-	reqFunc RequestFunc
+	handler ResourceHandler
 	// circuit breaker http://martinfowler.com/bliki/CircuitBreaker.html
 	cbFailures        *uint64
 	cbLastFailureTime *uint64 //  in UnixNano
@@ -362,7 +408,7 @@ func NewResource(idx int, url string) (*Resource, error) {
 	}
 
 	var ok bool
-	r.reqFunc, ok = LookupRequestFunc(schemeAlias)
+	r.handler, ok = LookupResourceHandler(schemeAlias)
 	if !ok {
 		return nil, errors.NewNotSupportedf("[esibackend] NewResource protocal or alias %q not yet supported for URL/Alias %q", schemeAlias, r.url)
 	}
@@ -381,8 +427,8 @@ func (r *Resource) String() string {
 }
 
 // DoRequest performs the request to the backend resource. It generates the URL
-// and then fires the request. DoRequest has the same signature as RequestFunc
-func (r *Resource) DoRequest(args *RequestFuncArgs) (http.Header, []byte, error) {
+// and then fires the request. DoRequest has the same signature as ResourceHandler
+func (r *Resource) DoRequest(args *ResourceArgs) (http.Header, []byte, error) {
 
 	tURL, err := args.TemplateToURL(r.urlTemplate)
 	if err != nil {
@@ -394,7 +440,7 @@ func (r *Resource) DoRequest(args *RequestFuncArgs) (http.Header, []byte, error)
 		args.URL = tURL
 	}
 
-	return r.reqFunc(args)
+	return r.handler.DoRequest(args)
 }
 
 // CBState declares the different states for the circuit breaker (CB)
@@ -459,7 +505,7 @@ func (r *Resource) CBReset() {
 // the last failed time. Thread safe.
 func (r *Resource) CBRecordFailure() (failedUnixNano int64) {
 	atomic.AddUint64(r.cbFailures, 1)
-	// monotime.Now()
+	// TODO(CyS) think about to switch to monotime.Now() for the whole CB
 	failedUnixNano = time.Now().UnixNano()
 	atomic.StoreUint64(r.cbLastFailureTime, uint64(failedUnixNano))
 	return failedUnixNano

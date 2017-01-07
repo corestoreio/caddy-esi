@@ -24,7 +24,15 @@ import (
 )
 
 func init() {
-	RegisterRequestFunc("sh", FetchShellExec)
+	RegisterResourceHandler("sh", NewFetchShellExec())
+}
+
+type fetchShellExec struct{}
+
+// NewFetchShellExec creates a new command line executor backend fetcher which
+// lives the whole application running time. Thread safe.
+func NewFetchShellExec() *fetchShellExec {
+	return &fetchShellExec{}
 }
 
 // FetchShellExec executes a local program and returns the content or an error.
@@ -39,7 +47,7 @@ func init() {
 // This command won't work and creates a weird error:
 // 		sh://php slow/php/script.php --arg1=1 --arg2=2
 // Fixes welcome!
-func FetchShellExec(args *RequestFuncArgs) (http.Header, []byte, error) {
+func (fs *fetchShellExec) DoRequest(args *ResourceArgs) (http.Header, []byte, error) {
 	if err := args.Validate(); err != nil {
 		return nil, nil, errors.Wrap(err, "[esibackend] FetchShellExec.args.Validate")
 	}
@@ -57,6 +65,7 @@ func FetchShellExec(args *RequestFuncArgs) (http.Header, []byte, error) {
 		cmdArgs = cmdName[firstWS+1:]
 	}
 
+	// remove bufpool and use exec.Cmd pool
 	stdErr := bufpool.Get()
 	defer bufpool.Put(stdErr)
 	stdOut := bufpool.Get()
@@ -64,7 +73,7 @@ func FetchShellExec(args *RequestFuncArgs) (http.Header, []byte, error) {
 	stdIn := bufpool.Get()
 	defer bufpool.Put(stdIn)
 
-	cmd := exec.CommandContext(args.ExternalReq.Context(), cmdName, cmdArgs)
+	cmd := exec.CommandContext(args.ExternalReq.Context(), cmdName, cmdArgs) // may be use a exec.Cmd pool
 
 	cmd.Stderr = stdErr
 	cmd.Stdout = stdOut
@@ -89,4 +98,9 @@ func FetchShellExec(args *RequestFuncArgs) (http.Header, []byte, error) {
 	copy(ret, stdOut.Bytes())
 
 	return nil, ret, nil
+}
+
+// Close noop function
+func (fs *fetchShellExec) Close() error {
+	return nil
 }

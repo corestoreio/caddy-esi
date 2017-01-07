@@ -1,3 +1,17 @@
+// Copyright 2016-2017, Cyrill @ Schumacher.fm and the CaddyESI Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
 package caddyesi
 
 import (
@@ -84,10 +98,10 @@ type PathConfig struct {
 	esiMU sync.RWMutex
 	// esiCache identifies all parsed ESI tags in a page for specific path
 	// prefix. uint64 represents the hash for the current request calculated by
-	// pageID function. TODO(CyS) Long term bug: Maybe we need here another
-	// algorithm instead of the map. Due to a higher granularity of the pageID
-	// the map gets filled fast without dropping old entries. This will blow up
-	// the memory.
+	// pageID function. Long term "bug": Maybe we need here another algorithm
+	// instead of the map. Due to a higher granularity of the pageID the map
+	// gets filled fast without dropping old entries. This will blow up the
+	// memory.
 	esiCache map[uint64]esitag.Entities
 }
 
@@ -146,7 +160,7 @@ func (pc *PathConfig) UpsertESITags(pageID uint64, entities esitag.Entities) {
 
 		// create sync.pool of arguments for the resources. Now with all correct
 		// default values.
-		et.InitPoolRFA(&backend.RequestFuncArgs{
+		et.InitPoolRFA(&backend.ResourceArgs{
 			Log:         pc.Log,
 			MaxBodySize: pc.MaxBodySize,
 			Timeout:     pc.Timeout,
@@ -267,4 +281,10 @@ func pageID(source []string, r *http.Request) (_ uint64, ok bool) {
 // String used for log information output
 func (pc *PathConfig) String() string {
 	return fmt.Sprintf("TODO(CyS) Nicer debug: %#v\n", pc)
+}
+
+func (pc *PathConfig) reInit() {
+	pc.esiMU.Lock()
+	defer pc.esiMU.Unlock()
+	pc.esiCache = make(map[uint64]esitag.Entities)
 }

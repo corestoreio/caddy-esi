@@ -1,3 +1,17 @@
+// Copyright 2016-2017, Cyrill @ Schumacher.fm and the CaddyESI Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
 package caddyesi
 
 import (
@@ -47,15 +61,14 @@ func PluginSetup(c *caddy.Controller) error {
 	})
 
 	c.OnShutdown(func() error {
-		// todo close all open connections to the backends
-		return nil
+		return errors.Wrap(backend.CloseAllResourceHandler(), "[caddyesi] OnShutdown")
 	})
 	c.OnRestart(func() error {
-		// todo clear all internal caches
-		//e.rc.mu.Lock()
-		//defer e.rc.mu.Unlock()
-		//e.rc.cache = make(map[uint64]esitag.Entities)
-		return nil
+		// really necessary? investigate later
+		for _, pc := range pcs {
+			pc.reInit()
+		}
+		return errors.Wrap(backend.CloseAllResourceHandler(), "[caddyesi] OnRestart")
 	})
 
 	return nil
@@ -63,8 +76,6 @@ func PluginSetup(c *caddy.Controller) error {
 
 func configEsiParse(c *caddy.Controller) (PathConfigs, error) {
 	pcs := make(PathConfigs, 0, 2)
-
-	// todo: parse it that way that only one pointer gets created for multiple equal resource/backend connections.
 
 	for c.Next() {
 		pc := NewPathConfig()
@@ -137,12 +148,13 @@ func setupLogger(pc *PathConfig) error {
 	default:
 		var err error
 		w, err = os.OpenFile(pc.LogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-		// todo handle file close on server restart or shutdown
+		// TODO(CyS) handle file close on server restart or shutdown
 		if err != nil {
 			return errors.NewFatalf("[caddyesi] Failed to open file %q with error: %s", pc.LogFile, err)
 		}
 	}
 
+	// TODO(CyS) the output format of the logger isn't very machine parsing friendly
 	pc.Log = logw.NewLog(logw.WithWriter(w), logw.WithLevel(lvl))
 	return nil
 }
@@ -232,11 +244,11 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 			return nil // continue
 		}
 
-		f, err := esikv.NewRequestFunc(c.Val())
+		f, err := esikv.NewResourceHandler(c.Val())
 		if err != nil {
 			return errors.Wrapf(err, "[caddyesi] KeyValue Service init failed for Key %q and Value %q", key, c.Val())
 		}
-		backend.RegisterRequestFunc(key, f)
+		backend.RegisterResourceHandler(key, f)
 	}
 
 	return nil

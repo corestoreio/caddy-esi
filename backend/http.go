@@ -1,3 +1,17 @@
+// Copyright 2016-2017, Cyrill @ Schumacher.fm and the CaddyESI Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
 package backend
 
 import (
@@ -13,13 +27,14 @@ import (
 )
 
 func init() {
-	RegisterRequestFunc("http", FetchHTTP)
-	RegisterRequestFunc("https", FetchHTTP)
+	f := NewFetchHTTP(DefaultClientTransport)
+	RegisterResourceHandler("http", f)
+	RegisterResourceHandler("https", f)
 }
 
 // DefaultClientTransport our own transport for all ESI tag resources instead of
 // relying on net/http.DefaultTransport. This transport gets also mocked for
-// tests.
+// tests. Only used in init(), see above.
 var DefaultClientTransport http.RoundTripper = &http.Transport{
 	Proxy: http.ProxyFromEnvironment,
 	DialContext: (&net.Dialer{
@@ -33,39 +48,44 @@ var DefaultClientTransport http.RoundTripper = &http.Transport{
 	ExpectContinueTimeout: 1 * time.Second,
 }
 
-// TestClient mocked out for testing
-var TestClient *http.Client
-
-var httpClientPool = &sync.Pool{
-	New: func() interface{} {
-		return &http.Client{
-			Transport: DefaultClientTransport,
-		}
-	},
+// NewFetchHTTP creates a new HTTP/S backend fetcher which lives the whole
+// application running time. Thread safe.
+func NewFetchHTTP(tr http.RoundTripper) *fetchHTTP {
+	f := &fetchHTTP{
+		clientPool: sync.Pool{
+			New: func() interface{} {
+				return &http.Client{
+					Transport: tr,
+				}
+			},
+		},
+	}
+	return f
 }
 
-func newHTTPClient() *http.Client {
-	return httpClientPool.Get().(*http.Client)
+type fetchHTTP struct {
+	clientPool sync.Pool
 }
 
-func putHTTPClient(c *http.Client) {
-	httpClientPool.Put(c)
+func (fh *fetchHTTP) newHTTPClient() *http.Client {
+	return fh.clientPool.Get().(*http.Client)
 }
 
-// FetchHTTP implements RequestFunc and is registered in RegisterRequestFunc for
+func (fh *fetchHTTP) putHTTPClient(c *http.Client) {
+	fh.clientPool.Put(c)
+}
+
+// DoRequest implements ResourceHandler and is registered in RegisterResourceHandler for
 // http and https scheme. The only allowed response code from the queried server
 // is http.StatusOK. All other response codes trigger a NotSupported error
 // behaviour.
-func FetchHTTP(args *RequestFuncArgs) (http.Header, []byte, error) {
+func (fh *fetchHTTP) DoRequest(args *ResourceArgs) (http.Header, []byte, error) {
 	if err := args.Validate(); err != nil {
 		return nil, nil, errors.Wrap(err, "[esibackend] FetchHTTP.args.Validate")
 	}
 
-	var c = TestClient
-	if c == nil {
-		c = newHTTPClient()
-		defer putHTTPClient(c)
-	}
+	c := fh.newHTTPClient()
+	defer fh.putHTTPClient(c)
 
 	c.Timeout = args.Timeout
 
@@ -110,4 +130,9 @@ func FetchHTTP(args *RequestFuncArgs) (http.Header, []byte, error) {
 	}
 
 	return args.PrepareReturnHeaders(resp.Header), buf.Bytes(), nil
+}
+
+// Close noop function
+func (fh *fetchHTTP) Close() error {
+	return nil
 }

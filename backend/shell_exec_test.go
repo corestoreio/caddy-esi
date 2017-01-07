@@ -34,13 +34,13 @@ func TestFetchShellExec(t *testing.T) {
 	t.Run("Bash script writes arg1 to a file", func(t *testing.T) {
 		defer os.Remove(stdOutFileName)
 
-		rfa := &backend.RequestFuncArgs{
+		rfa := &backend.ResourceArgs{
 			ExternalReq: getExternalReqWithExtendedHeaders(),
 			URL:         "sh://testdata/stdOutToFile.sh",
 			Timeout:     5 * time.Second,
 			MaxBodySize: 333,
 		}
-		header, content, err := backend.FetchShellExec(rfa)
+		header, content, err := backend.NewFetchShellExec().DoRequest(rfa)
 		require.NoError(t, err, "%+v", err)
 		assert.Nil(t, header)
 		assert.Exactly(t, []byte{}, content)
@@ -54,13 +54,13 @@ func TestFetchShellExec(t *testing.T) {
 
 	t.Run("Bash script writes to stdErr and triggers a fatal error", func(t *testing.T) {
 
-		rfa := &backend.RequestFuncArgs{
+		rfa := &backend.ResourceArgs{
 			ExternalReq: getExternalReqWithExtendedHeaders(),
 			URL:         "sh://testdata/stdErr.sh",
 			Timeout:     5 * time.Second,
 			MaxBodySize: 333,
 		}
-		header, content, err := backend.FetchShellExec(rfa)
+		header, content, err := backend.NewFetchShellExec().DoRequest(rfa)
 		require.Error(t, err, "%+v", err)
 		assert.True(t, errors.IsFatal(err))
 		assert.Contains(t, err.Error(), `I'm an evil error`)
@@ -71,13 +71,13 @@ func TestFetchShellExec(t *testing.T) {
 
 	t.Run("Bash script writes to stdOut = happy path", func(t *testing.T) {
 
-		rfa := &backend.RequestFuncArgs{
+		rfa := &backend.ResourceArgs{
 			ExternalReq: getExternalReqWithExtendedHeaders(),
 			URL:         "sh://testdata/stdOut.sh",
 			Timeout:     5 * time.Second,
 			MaxBodySize: 333,
 		}
-		header, content, err := backend.FetchShellExec(rfa)
+		header, content, err := backend.NewFetchShellExec().DoRequest(rfa)
 		require.NoError(t, err, "%+v", err)
 		assert.Nil(t, header)
 		assert.Contains(t, string(content), `datetime="2017-01-04T20:01:40Z"`)

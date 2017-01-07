@@ -1,3 +1,17 @@
+// Copyright 2016-2017, Cyrill @ Schumacher.fm and the CaddyESI Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
 package backend_test
 
 import (
@@ -18,8 +32,8 @@ import (
 
 var _ fmt.Stringer = (*backend.Resource)(nil)
 var _ backend.TemplateExecer = (*template.Template)(nil)
-var _ easyjson.Marshaler = (*backend.RequestFuncArgs)(nil)
-var _ easyjson.Unmarshaler = (*backend.RequestFuncArgs)(nil)
+var _ easyjson.Marshaler = (*backend.ResourceArgs)(nil)
+var _ easyjson.Unmarshaler = (*backend.ResourceArgs)(nil)
 
 func TestNewResource(t *testing.T) {
 	t.Run("URL", func(t *testing.T) {
@@ -31,7 +45,7 @@ func TestNewResource(t *testing.T) {
 	})
 
 	t.Run("URL is an alias", func(t *testing.T) {
-		backend.RegisterRequestFunc("awsRedisCartService", nil)
+		backend.RegisterResourceHandler("awsRedisCartService", nil)
 		r, err := backend.NewResource(0, "awsRedisCartService")
 		if err != nil {
 			t.Fatalf("%+v", err)
@@ -95,15 +109,15 @@ func TestResource_CircuitBreaker(t *testing.T) {
 	assert.True(t, lastFailure.UnixNano() > fail, "lastFailure greater than recorded failure")
 }
 
-func TestRequestFuncArgs_Validate(t *testing.T) {
+func TestResourceArgs_Validate(t *testing.T) {
 	t.Run("URL", func(t *testing.T) {
-		rfa := backend.RequestFuncArgs{}
+		rfa := backend.ResourceArgs{}
 		err := rfa.Validate()
 		assert.True(t, errors.IsEmpty(err), "%+v", err)
 		assert.Contains(t, err.Error(), `URL value`)
 	})
 	t.Run("ExternalReq", func(t *testing.T) {
-		rfa := backend.RequestFuncArgs{
+		rfa := backend.ResourceArgs{
 			URL: "http://www",
 		}
 		err := rfa.Validate()
@@ -111,7 +125,7 @@ func TestRequestFuncArgs_Validate(t *testing.T) {
 		assert.Contains(t, err.Error(), `ExternalReq value`)
 	})
 	t.Run("timeout", func(t *testing.T) {
-		rfa := backend.RequestFuncArgs{
+		rfa := backend.ResourceArgs{
 			URL:         "http://www",
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
 		}
@@ -120,7 +134,7 @@ func TestRequestFuncArgs_Validate(t *testing.T) {
 		assert.Contains(t, err.Error(), `timeout value`)
 	})
 	t.Run("maxBodySize", func(t *testing.T) {
-		rfa := backend.RequestFuncArgs{
+		rfa := backend.ResourceArgs{
 			URL:         "http://www",
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
 			Timeout:     time.Second,
@@ -130,7 +144,7 @@ func TestRequestFuncArgs_Validate(t *testing.T) {
 		assert.Contains(t, err.Error(), `maxBodySize value`)
 	})
 	t.Run("Correct", func(t *testing.T) {
-		rfa := backend.RequestFuncArgs{
+		rfa := backend.ResourceArgs{
 			URL:         "http://www",
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
 			Timeout:     time.Second,
@@ -141,8 +155,8 @@ func TestRequestFuncArgs_Validate(t *testing.T) {
 	})
 }
 
-func TestRequestFuncArgs_MaxBodySizeHumanized(t *testing.T) {
-	rfa := backend.RequestFuncArgs{
+func TestResourceArgs_MaxBodySizeHumanized(t *testing.T) {
+	rfa := backend.ResourceArgs{
 		MaxBodySize: 123456789,
 	}
 	assert.Exactly(t, `124 MB`, rfa.MaxBodySizeHumanized())
@@ -184,11 +198,11 @@ var resourceRespWithExtendedHeaders = http.Header{
 	"x-sdch-encode":             []string{"0"},
 }
 
-var benchmarkRequestFuncArgs_PrepareForwardHeaders []string
+var benchmarkResourceArgs_PrepareForwardHeaders []string
 
-func BenchmarkRequestFuncArgs_PrepareForwardHeaders(b *testing.B) {
+func BenchmarkResourceArgs_PrepareForwardHeaders(b *testing.B) {
 
-	rfa := &backend.RequestFuncArgs{
+	rfa := &backend.ResourceArgs{
 		ExternalReq:       getExternalReqWithExtendedHeaders(),
 		ForwardHeadersAll: true,
 	}
@@ -197,9 +211,9 @@ func BenchmarkRequestFuncArgs_PrepareForwardHeaders(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			benchmarkRequestFuncArgs_PrepareForwardHeaders = rfa.PrepareForwardHeaders()
+			benchmarkResourceArgs_PrepareForwardHeaders = rfa.PrepareForwardHeaders()
 		}
-		if have, want := len(benchmarkRequestFuncArgs_PrepareForwardHeaders), 20; have != want {
+		if have, want := len(benchmarkResourceArgs_PrepareForwardHeaders), 20; have != want {
 			b.Fatalf("Have: %v Want: %v", have, want)
 		}
 	})
@@ -210,19 +224,19 @@ func BenchmarkRequestFuncArgs_PrepareForwardHeaders(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			benchmarkRequestFuncArgs_PrepareForwardHeaders = rfa.PrepareForwardHeaders()
+			benchmarkResourceArgs_PrepareForwardHeaders = rfa.PrepareForwardHeaders()
 		}
-		if have, want := len(benchmarkRequestFuncArgs_PrepareForwardHeaders), 4; have != want {
+		if have, want := len(benchmarkResourceArgs_PrepareForwardHeaders), 4; have != want {
 			b.Fatalf("Have: %v Want: %v", have, want)
 		}
 	})
 }
 
-var benchmarkRequestFuncArgs_PrepareReturnHeaders http.Header
+var benchmarkResourceArgs_PrepareReturnHeaders http.Header
 
-func BenchmarkRequestFuncArgs_PrepareReturnHeaders(b *testing.B) {
+func BenchmarkResourceArgs_PrepareReturnHeaders(b *testing.B) {
 
-	rfa := &backend.RequestFuncArgs{
+	rfa := &backend.ResourceArgs{
 		ExternalReq:      getExternalReqWithExtendedHeaders(),
 		ReturnHeadersAll: true,
 	}
@@ -231,9 +245,9 @@ func BenchmarkRequestFuncArgs_PrepareReturnHeaders(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			benchmarkRequestFuncArgs_PrepareReturnHeaders = rfa.PrepareReturnHeaders(resourceRespWithExtendedHeaders)
+			benchmarkResourceArgs_PrepareReturnHeaders = rfa.PrepareReturnHeaders(resourceRespWithExtendedHeaders)
 		}
-		if have, want := len(benchmarkRequestFuncArgs_PrepareReturnHeaders), 6; have != want {
+		if have, want := len(benchmarkResourceArgs_PrepareReturnHeaders), 6; have != want {
 			b.Fatalf("Have: %v Want: %v", have, want)
 		}
 	})
@@ -244,17 +258,17 @@ func BenchmarkRequestFuncArgs_PrepareReturnHeaders(b *testing.B) {
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			benchmarkRequestFuncArgs_PrepareReturnHeaders = rfa.PrepareReturnHeaders(resourceRespWithExtendedHeaders)
+			benchmarkResourceArgs_PrepareReturnHeaders = rfa.PrepareReturnHeaders(resourceRespWithExtendedHeaders)
 		}
-		if have, want := len(benchmarkRequestFuncArgs_PrepareReturnHeaders), 2; have != want {
+		if have, want := len(benchmarkResourceArgs_PrepareReturnHeaders), 2; have != want {
 			b.Fatalf("Have: %v Want: %v", have, want)
 		}
 	})
 }
 
-func TestRequestFuncArgs_PrepareForwardHeaders(t *testing.T) {
+func TestResourceArgs_PrepareForwardHeaders(t *testing.T) {
 
-	rfa := &backend.RequestFuncArgs{
+	rfa := &backend.ResourceArgs{
 		URL:         "http://whatever.anydomain/page.html",
 		ExternalReq: getExternalReqWithExtendedHeaders(),
 		Timeout:     time.Second,
@@ -305,9 +319,9 @@ func TestRequestFuncArgs_PrepareForwardHeaders(t *testing.T) {
 	})
 }
 
-func TestRequestFuncArgs_PrepareReturnHeaders(t *testing.T) {
+func TestResourceArgs_PrepareReturnHeaders(t *testing.T) {
 
-	rfa := &backend.RequestFuncArgs{
+	rfa := &backend.ResourceArgs{
 		URL:         "http://whatever.anydomain/page.html",
 		ExternalReq: getExternalReqWithExtendedHeaders(),
 		Timeout:     time.Second,
@@ -347,8 +361,8 @@ func TestRequestFuncArgs_PrepareReturnHeaders(t *testing.T) {
 	})
 }
 
-func TestRequestFuncArgs_TemplateToURL(t *testing.T) {
-	rfa := &backend.RequestFuncArgs{}
+func TestResourceArgs_TemplateToURL(t *testing.T) {
+	rfa := &backend.ResourceArgs{}
 	tURL, err := rfa.TemplateToURL(nil)
 	if err != nil {
 		t.Fatal(err)
@@ -356,13 +370,13 @@ func TestRequestFuncArgs_TemplateToURL(t *testing.T) {
 	assert.Exactly(t, ``, tURL, "Should return an empty string")
 }
 
-func BenchmarkRequestFuncArgs_TemplateToURL(b *testing.B) {
+func BenchmarkResourceArgs_TemplateToURL(b *testing.B) {
 	const key = `product_{{ .Req.Header.Get "X-Product-ID" }}`
 	const wantKey = `product_GopherPlushXXL`
 	tpl, err := template.New("key_tpl").Parse(key)
 	require.NoError(b, err)
 
-	rfa := &backend.RequestFuncArgs{
+	rfa := &backend.ResourceArgs{
 		ExternalReq: func() *http.Request {
 			req := httptest.NewRequest("GET", "/", nil)
 			req.Header.Set("X-Product-ID", "GopherPlushXXL")
@@ -386,10 +400,10 @@ func BenchmarkRequestFuncArgs_TemplateToURL(b *testing.B) {
 	}
 }
 
-// BenchmarkRequestFuncArgs_MarshalEasyJSON-4   	  300000	      4844 ns/op	    1922 B/op	       6 allocs/op
-func BenchmarkRequestFuncArgs_MarshalEasyJSON(b *testing.B) {
+// BenchmarkResourceArgs_MarshalEasyJSON-4   	  300000	      4844 ns/op	    1922 B/op	       6 allocs/op
+func BenchmarkResourceArgs_MarshalEasyJSON(b *testing.B) {
 
-	rfa := &backend.RequestFuncArgs{
+	rfa := &backend.ResourceArgs{
 		URL:            "https://corestore.io",
 		ExternalReq:    getExternalReqWithExtendedHeaders(),
 		Timeout:        5 * time.Second,
