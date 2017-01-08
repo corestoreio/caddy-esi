@@ -15,17 +15,15 @@
 package backend_test
 
 import (
-	"html/template"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"text/template"
 	"time"
-
-	"io/ioutil"
 
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esitesting"
-	"github.com/stretchr/testify/require"
 )
 
 var benchmarkResourceArgs_PrepareForwardHeaders []string
@@ -100,7 +98,9 @@ func BenchmarkResourceArgs_TemplateToURL(b *testing.B) {
 	const key = `product_{{ .Req.Header.Get "X-Product-ID" }}`
 	const wantKey = `product_GopherPlushXXL`
 	tpl, err := template.New("key_tpl").Parse(key)
-	require.NoError(b, err)
+	if err != nil {
+		b.Fatalf("%+v", err)
+	}
 
 	rfa := &backend.ResourceArgs{
 		ExternalReq: func() *http.Request {
