@@ -15,6 +15,7 @@
 package backend
 
 import (
+	"context"
 	"net/http"
 	"os/exec"
 	"strings"
@@ -27,7 +28,8 @@ func init() {
 	RegisterResourceHandler("sh", NewFetchShellExec())
 }
 
-type fetchShellExec struct{}
+type fetchShellExec struct {
+}
 
 // NewFetchShellExec creates a new command line executor backend fetcher which
 // lives the whole application running time. Thread safe.
@@ -59,45 +61,58 @@ func (fs *fetchShellExec) DoRequest(args *ResourceArgs) (http.Header, []byte, er
 	cmdArgs := ""
 	cmdName := args.URL[len(urlPrefix):]
 	firstWS := strings.IndexAny(cmdName, " \t")
-	if firstWS > 0 {
-		// this might lead to confusion
-		cmdName = cmdName[:firstWS]
+	if firstWS > 0 && len(cmdName) >= firstWS+1 {
 		cmdArgs = cmdName[firstWS+1:]
+		cmdName = cmdName[:firstWS]
 	}
 
-	// remove bufpool and use exec.Cmd pool
-	stdErr := bufpool.Get()
-	defer bufpool.Put(stdErr)
-	stdOut := bufpool.Get()
-	defer bufpool.Put(stdOut)
-	stdIn := bufpool.Get()
-	defer bufpool.Put(stdIn)
+	var retContent []byte
+	var retErr error
+	done := make(chan struct{})
+	go func() {
+		defer func() {
+			done <- struct{}{}
+		}()
+		// remove bufpool and use exec.Cmd pool
+		stdErr := bufpool.Get()
+		defer bufpool.Put(stdErr)
+		stdOut := bufpool.Get()
+		defer bufpool.Put(stdOut)
+		stdIn := bufpool.Get()
+		defer bufpool.Put(stdIn)
 
-	cmd := exec.CommandContext(args.ExternalReq.Context(), cmdName, cmdArgs) // may be use a exec.Cmd pool
+		ctx, cancel := context.WithTimeout(args.ExternalReq.Context(), args.Timeout)
+		defer cancel()
 
-	cmd.Stderr = stdErr
-	cmd.Stdout = stdOut
-	cmd.Stdin = stdIn
+		cmd := exec.CommandContext(ctx, cmdName, cmdArgs) // may be use a exec.Cmd pool
 
-	jData, err := args.MarshalJSON()
-	if err != nil {
-		return nil, nil, errors.Wrapf(err, "[esibackend] FetchShellExec MarshalJSON URL %q", args.URL)
-	}
-	_, _ = stdIn.Write(jData)
+		cmd.Stderr = stdErr
+		cmd.Stdout = stdOut
+		cmd.Stdin = stdIn
 
-	if err := cmd.Run(); err != nil {
-		cmd.Process.Release()
-		return nil, nil, errors.Wrapf(err, "[esibackend] FetchShellExec cmd.Run URL %q", args.URL)
-	}
+		jData, err := args.MarshalJSON()
+		if err != nil {
+			retErr = errors.Wrapf(err, "[esibackend] FetchShellExec MarshalJSON URL %q", args.URL)
+			return
+		}
+		_, _ = stdIn.Write(jData)
 
-	if stdErr.Len() > 0 {
-		return nil, nil, errors.NewFatalf("[esibackend] FetchShellExec Process %q error: %q", args.URL, stdErr)
-	}
+		if err := cmd.Run(); err != nil {
+			cmd.Process.Release()
+			retErr = errors.Wrapf(err, "[esibackend] FetchShellExec cmd.Run URL %q", args.URL)
+			return
+		}
 
-	ret := make([]byte, stdOut.Len())
-	copy(ret, stdOut.Bytes())
+		if stdErr.Len() > 0 {
+			retErr = errors.NewFatalf("[esibackend] FetchShellExec Process %q error: %q", args.URL, stdErr)
+			return
+		}
 
-	return nil, ret, nil
+		retContent = make([]byte, stdOut.Len())
+		copy(retContent, stdOut.Bytes())
+	}()
+	<-done
+	return nil, retContent, errors.Wrap(retErr, "[esibackend] Returned from error")
 }
 
 // Close noop function

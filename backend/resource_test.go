@@ -27,7 +27,6 @@ import (
 	"github.com/corestoreio/errors"
 	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 var _ fmt.Stringer = (*backend.Resource)(nil)
@@ -198,74 +197,6 @@ var resourceRespWithExtendedHeaders = http.Header{
 	"x-sdch-encode":             []string{"0"},
 }
 
-var benchmarkResourceArgs_PrepareForwardHeaders []string
-
-func BenchmarkResourceArgs_PrepareForwardHeaders(b *testing.B) {
-
-	rfa := &backend.ResourceArgs{
-		ExternalReq:       getExternalReqWithExtendedHeaders(),
-		ForwardHeadersAll: true,
-	}
-
-	b.Run("All", func(b *testing.B) {
-		b.ResetTimer()
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			benchmarkResourceArgs_PrepareForwardHeaders = rfa.PrepareForwardHeaders()
-		}
-		if have, want := len(benchmarkResourceArgs_PrepareForwardHeaders), 20; have != want {
-			b.Fatalf("Have: %v Want: %v", have, want)
-		}
-	})
-
-	b.Run("Two", func(b *testing.B) {
-		rfa.ForwardHeadersAll = false
-		rfa.ForwardHeaders = []string{"Cookie", "user-agent"}
-		b.ResetTimer()
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			benchmarkResourceArgs_PrepareForwardHeaders = rfa.PrepareForwardHeaders()
-		}
-		if have, want := len(benchmarkResourceArgs_PrepareForwardHeaders), 4; have != want {
-			b.Fatalf("Have: %v Want: %v", have, want)
-		}
-	})
-}
-
-var benchmarkResourceArgs_PrepareReturnHeaders http.Header
-
-func BenchmarkResourceArgs_PrepareReturnHeaders(b *testing.B) {
-
-	rfa := &backend.ResourceArgs{
-		ExternalReq:      getExternalReqWithExtendedHeaders(),
-		ReturnHeadersAll: true,
-	}
-
-	b.Run("All", func(b *testing.B) {
-		b.ResetTimer()
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			benchmarkResourceArgs_PrepareReturnHeaders = rfa.PrepareReturnHeaders(resourceRespWithExtendedHeaders)
-		}
-		if have, want := len(benchmarkResourceArgs_PrepareReturnHeaders), 6; have != want {
-			b.Fatalf("Have: %v Want: %v", have, want)
-		}
-	})
-
-	b.Run("Two", func(b *testing.B) {
-		rfa.ReturnHeadersAll = false
-		rfa.ReturnHeaders = []string{"Set-Cookie", "x-sdch-encode"}
-		b.ResetTimer()
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			benchmarkResourceArgs_PrepareReturnHeaders = rfa.PrepareReturnHeaders(resourceRespWithExtendedHeaders)
-		}
-		if have, want := len(benchmarkResourceArgs_PrepareReturnHeaders), 2; have != want {
-			b.Fatalf("Have: %v Want: %v", have, want)
-		}
-	})
-}
-
 func TestResourceArgs_PrepareForwardHeaders(t *testing.T) {
 
 	rfa := &backend.ResourceArgs{
@@ -368,60 +299,4 @@ func TestResourceArgs_TemplateToURL(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Exactly(t, ``, tURL, "Should return an empty string")
-}
-
-func BenchmarkResourceArgs_TemplateToURL(b *testing.B) {
-	const key = `product_{{ .Req.Header.Get "X-Product-ID" }}`
-	const wantKey = `product_GopherPlushXXL`
-	tpl, err := template.New("key_tpl").Parse(key)
-	require.NoError(b, err)
-
-	rfa := &backend.ResourceArgs{
-		ExternalReq: func() *http.Request {
-			req := httptest.NewRequest("GET", "/", nil)
-			req.Header.Set("X-Product-ID", "GopherPlushXXL")
-			return req
-		}(),
-		Key:         key,
-		KeyTemplate: tpl,
-	}
-
-	b.ResetTimer()
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		have, err := rfa.TemplateToURL(tpl)
-		if err != nil {
-			b.Fatalf("%+v", err)
-		}
-		if have != wantKey {
-			b.Errorf("Have: %v Want: %v", have, wantKey)
-		}
-
-	}
-}
-
-// BenchmarkResourceArgs_MarshalEasyJSON-4   	  300000	      4844 ns/op	    1922 B/op	       6 allocs/op
-func BenchmarkResourceArgs_MarshalEasyJSON(b *testing.B) {
-
-	rfa := &backend.ResourceArgs{
-		URL:            "https://corestore.io",
-		ExternalReq:    getExternalReqWithExtendedHeaders(),
-		Timeout:        5 * time.Second,
-		MaxBodySize:    50000,
-		Key:            "a_r€dis_ky",
-		TTL:            33 * time.Second,
-		ForwardHeaders: []string{"X-Cart-Id", "Cookie"},
-		ReturnHeaders:  []string{"Set-Cookie"},
-	}
-	var haveData []byte
-	for i := 0; i < b.N; i++ {
-		var err error
-		haveData, err = rfa.MarshalJSON()
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-	if len(haveData) != 1176 {
-		b.Fatalf("Incorret JSON: Incorrect length %d", len(haveData))
-	}
 }

@@ -30,6 +30,22 @@ func NewHTTPTrip(code int, body string, err error) *HTTPTrip {
 	}
 }
 
+// NewHTTPTripBytes creates a new http.RoundTripper but body is a byte slice. In
+// benchmarks this performs better with large bodies.
+func NewHTTPTripBytes(code int, body []byte, err error) *HTTPTrip {
+	return &HTTPTrip{
+		// use buffer pool
+		GenerateResponse: func(_ *http.Request) *http.Response {
+			return &http.Response{
+				StatusCode: code,
+				Body:       ioutil.NopCloser(bytes.NewReader(body)),
+			}
+		},
+		Err:          err,
+		RequestCache: make(map[*http.Request]struct{}),
+	}
+}
+
 // RoundTrip implements http.RoundTripper and adds the Request to the
 // field Req for later inspection.
 func (tp *HTTPTrip) RoundTrip(r *http.Request) (*http.Response, error) {

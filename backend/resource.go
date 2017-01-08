@@ -31,6 +31,9 @@ import (
 	"github.com/dustin/go-humanize"
 )
 
+// DefaultTimeOut to a backend resource
+const DefaultTimeOut = 20 * time.Second
+
 // TemplateIdentifier if some strings contain these characters then a
 // template.Template will be created. For now a resource key or an URL is
 // supported.

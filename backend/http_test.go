@@ -23,14 +23,16 @@ import (
 	"testing"
 	"time"
 
+	"sync"
+
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esitesting"
 	"github.com/corestoreio/errors"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFetchHTTP(t *testing.T) {
-	// All tests modifying TestClient cannot be run in parallel.
+func TestNewFetchHTTP_Serial(t *testing.T) {
+	t.Parallel()
 
 	rfa := &backend.ResourceArgs{
 		URL: "http://whatever.anydomain/page.html",
@@ -54,7 +56,6 @@ func TestFetchHTTP(t *testing.T) {
 		rfa2.MaxBodySize = 3000
 
 		hdr, content, err := backend.NewFetchHTTP(&esitesting.HTTPTrip{
-			// use buffer pool
 			GenerateResponse: func(req *http.Request) *http.Response {
 
 				assert.Exactly(t, `1234567890`, req.Header.Get("X-Cart-Id"))
@@ -104,7 +105,7 @@ func TestFetchHTTP(t *testing.T) {
 		assert.True(t, errors.IsNotSupported(err), "%+v", err)
 	})
 
-	t.Run("Request context deadline", func(t *testing.T) {
+	t.Run("Request context cancel", func(t *testing.T) {
 
 		rfa2 := new(backend.ResourceArgs)
 		*rfa2 = *rfa
@@ -122,7 +123,73 @@ func TestFetchHTTP(t *testing.T) {
 		assert.EqualError(t, errors.Cause(err), context.Canceled.Error())
 	})
 
-	t.Run("HTTP Client Timeout", func(t *testing.T) {
-		t.Skip("Currently unsure how to test that. So TODO")
+	t.Run("HTTP Client Context Timeout", func(t *testing.T) {
+
+		t.Skip("Seems somehow not possible to test :-(((")
+
+		//rfa2 := new(backend.ResourceArgs)
+		//*rfa2 = *rfa
+		//
+		//rfa2.ReturnHeaders = nil
+		//rfa2.MaxBodySize = 300
+		//rfa2.Timeout = 10 * time.Millisecond
+		//
+		//hdr, content, err := backend.NewFetchHTTP(&esitesting.HTTPTrip{
+		//	GenerateResponse: func(req *http.Request) *http.Response {
+		//
+		//		time.Sleep(400 * time.Millisecond)
+		//
+		//		return &http.Response{
+		//			StatusCode: http.StatusOK,
+		//			Header:     http.Header{},
+		//			Body:       ioutil.NopCloser(bytes.NewBufferString(`Just a simple response`)),
+		//		}
+		//	},
+		//	RequestCache: make(map[*http.Request]struct{}),
+		//}).DoRequest(rfa2)
+		//
+		//assert.Nil(t, hdr, "Header")
+		//assert.Empty(t, string(content), "Content must be empty")
+		//assert.EqualError(t, errors.Cause(err), context.DeadlineExceeded.Error())
+
 	})
+}
+
+func TestNewFetchHTTP_Parallel(t *testing.T) {
+	t.Parallel()
+
+	wantContent := []byte(`Moral of the story: even insane-looking problems are sometimes r€al.`)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(wantContent)
+	}))
+	defer srv.Close()
+
+	fh := backend.NewFetchHTTP(backend.DefaultHTTPTransport)
+
+	const iterations = 10
+	var wg sync.WaitGroup
+	wg.Add(iterations)
+	for i := 0; i < iterations; i++ {
+		go func(wg *sync.WaitGroup) {
+			defer wg.Done()
+
+			hdr, content, err := fh.DoRequest(&backend.ResourceArgs{
+				ExternalReq: getExternalReqWithExtendedHeaders(),
+				URL:         srv.URL,
+				Timeout:     time.Second,
+				MaxBodySize: 300,
+			})
+			if err != nil {
+				t.Fatalf("%+v", err)
+			}
+			if !bytes.Equal(content, wantContent) {
+				t.Fatalf("Want %q\nHave %q", wantContent, content)
+			}
+			if hdr != nil {
+				t.Fatal("Header should be nil")
+			}
+
+		}(&wg)
+	}
+	wg.Wait()
 }
