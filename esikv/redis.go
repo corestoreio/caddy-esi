@@ -15,16 +15,19 @@
 package esikv
 
 import (
+	"context"
+	"github.com/SchumacherFM/caddyesi/backend"
+	"github.com/corestoreio/errors"
+	"gopkg.in/redis.v5"
 	"net"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
-
-	"github.com/SchumacherFM/caddyesi/backend"
-	"github.com/corestoreio/errors"
-	"gopkg.in/redis.v5"
 )
+
+// Maybe replace redis client with redigo even better if there is a redis client with build in context
+// https://github.com/garyburd/redigo/issues/207 <-- context to be added to the package: declined.
 
 type esiRedis struct {
 	url string
@@ -102,41 +105,113 @@ func NewRedis(rawURL string) (backend.ResourceHandler, error) {
 
 // Closes closes the resource when Caddy restarts or reloads. If supported
 // by the resource.
-func (et *esiRedis) Close() error {
-	return errors.Wrapf(et.cl.Close(), "[esikv] Redis Close. URL %q", et.url)
+func (er *esiRedis) Close() error {
+	return errors.Wrapf(er.cl.Close(), "[esikv] Redis Close. URL %q", er.url)
 }
 
-// DoRequest returns a value from the field Key in the args argument. Header is not
-// supported.
-func (r *esiRedis) DoRequest(args *backend.ResourceArgs) (header http.Header, content []byte, err error) {
-	// TODO context cancellation and deadline
+// DoRequest returns a value from the field Key in the args argument. Header is
+// not supported. Request cancellation through a timeout is NOT supported.
+//func (er *esiRedis) DoRequest(args *backend.ResourceArgs) (_ http.Header, content []byte, err error) {
+//	switch {
+//	case args.Key == "":
+//		err = errors.NewEmptyf("[esibackend] For ResourceArgs %#v the URL value is empty", args)
+//	case args.ExternalReq == nil:
+//		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the ExternalReq value is nil", args.URL)
+//	case args.Timeout < 1:
+//		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the timeout value is empty", args.URL)
+//	case args.MaxBodySize == 0:
+//		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the maxBodySize value is empty", args.URL)
+//	}
+//	if err != nil {
+//		return nil, nil, err
+//	}
+//
+//	key := args.Key
+//	if key == "" {
+//		return nil, nil, errors.NewEmptyf("[esikv] Redis.Get Key is empty for resource %q", args.URL)
+//	}
+//
+//	nKey, err := args.TemplateToURL(args.KeyTemplate)
+//	if err != nil {
+//		return nil, nil, errors.Wrapf(err, "[esikv] Redis.Get.TemplateToURL %q => %q", args.URL, er.cl.String())
+//	}
+//	if nKey != "" {
+//		key = nKey
+//	}
+//
+//	v, err := er.cl.Get(key).Bytes()
+//	if err == redis.Nil {
+//		return nil, nil, nil
+//	}
+//	if err != nil {
+//		return nil, nil, errors.Wrapf(err, "[esikv] Redis.Get %q => %q", args.URL, er.cl.String())
+//	}
+//
+//	if mbs := int(args.MaxBodySize); len(v) > mbs && mbs > 0 {
+//		v = v[:mbs] // not the nicest solution but works for now
+//	}
+//
+//	return nil, v, nil
+//}
+
+// DoRequest returns a value from the field Key in the args argument. Header is
+// not supported. Request cancellation through a timeout is supported.
+func (er *esiRedis) DoRequest(args *backend.ResourceArgs) (_ http.Header, content []byte, err error) {
+	switch {
+	case args.Key == "":
+		err = errors.NewEmptyf("[esibackend] For ResourceArgs %#v the URL value is empty", args)
+	case args.ExternalReq == nil:
+		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the ExternalReq value is nil", args.URL)
+	case args.Timeout < 1:
+		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the timeout value is empty", args.URL)
+	case args.MaxBodySize == 0:
+		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the maxBodySize value is empty", args.URL)
+	}
+	if err != nil {
+		return nil, nil, err
+	}
 
 	key := args.Key
-	if key == "" {
-		return nil, nil, errors.NewEmptyf("[esikv] Redis.Get Key is empty for resource %q", args.URL)
-	}
 
-	nKey, err := args.TemplateToURL(args.KeyTemplate)
-	if err != nil {
-		return nil, nil, errors.Wrapf(err, "[esikv] Redis.Get.TemplateToURL %q => %q", args.URL, r.cl.String())
-	}
-	if nKey != "" {
-		key = nKey
-	}
+	ctx, cancel := context.WithTimeout(args.ExternalReq.Context(), args.Timeout)
+	defer cancel()
 
-	v, err := r.cl.Get(key).Bytes()
-	if err == redis.Nil {
-		return nil, nil, nil
-	}
-	if err != nil {
-		return nil, nil, errors.Wrapf(err, "[esikv] Redis.Get %q => %q", args.URL, r.cl.String())
-	}
+	var retErr error
+	done := make(chan struct{})
+	go func() {
+		defer func() {
+			done <- struct{}{}
+		}()
 
-	if mbs := int(args.MaxBodySize); len(v) > mbs && mbs > 0 {
-		v = v[:mbs] // not the nicest solution but works for now
-	}
+		nKey, err := args.TemplateToURL(args.KeyTemplate)
+		if err != nil {
+			retErr = errors.Wrapf(err, "[esikv] Redis.Get.TemplateToURL %q => %q", args.URL, er.cl.String())
+			return
+		}
+		if nKey != "" {
+			key = nKey
+		}
 
-	return nil, v, nil
+		content, err = er.cl.Get(key).Bytes()
+		if err == redis.Nil {
+			return
+		}
+		if err != nil {
+			retErr = errors.Wrapf(err, "[esikv] Redis.Get %q => %q", args.URL, er.cl.String())
+			return
+		}
+
+		if mbs := int(args.MaxBodySize); len(content) > mbs && mbs > 0 {
+			content = content[:mbs] // not the nicest solution but works for now
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		retErr = errors.Wrapf(ctx.Err(), "[esikv] Redits Get Context cancelled. Previous possible error: %+v", retErr)
+	case <-done:
+	}
+	return nil, content, retErr
 }
 
 var pathDBRegexp = regexp.MustCompile(`/(\d*)\z`)

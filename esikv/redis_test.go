@@ -15,11 +15,13 @@
 package esikv_test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"text/template"
+	"time"
 
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esikv"
@@ -28,8 +30,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// https://github.com/alicebob/miniredis
 
 func TestNewRedis(t *testing.T) {
 	t.Parallel()
@@ -59,11 +59,39 @@ func TestNewRedis(t *testing.T) {
 		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
 			Key:         "product_price_4711",
+			Timeout:     time.Second,
 			MaxBodySize: 10,
 		})
 		require.NoError(t, err, "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Exactly(t, "123,45 €", string(content))
+	})
+
+	t.Run("Cancel Request towards Redis", func(t *testing.T) {
+
+		mr := miniredis.NewMiniRedis()
+		if err := mr.Start(); err != nil {
+			t.Fatal(err)
+		}
+		defer mr.Close()
+
+		if err := mr.Set("product_price_4711", "123,45 € Way too long"); err != nil {
+			t.Fatal(err)
+		}
+
+		be, err := esikv.NewResourceHandler(fmt.Sprintf("redis://%s", mr.Addr()))
+		assert.NoError(t, err, "%+v", err)
+		defer be.Close()
+
+		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
+			ExternalReq: httptest.NewRequest("GET", "/", nil),
+			Key:         "product_price_4711",
+			Timeout:     time.Microsecond,
+			MaxBodySize: 10,
+		})
+		require.EqualError(t, errors.Cause(err), context.DeadlineExceeded.Error(), "%+v", err)
+		assert.Nil(t, hdr, "Header return must be nil")
+		assert.Empty(t, string(content), "Content should be empty")
 	})
 
 	t.Run("Fetch Key OK but value not set, should return all nil", func(t *testing.T) {
@@ -81,25 +109,86 @@ func TestNewRedis(t *testing.T) {
 		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
 			Key:         "product_price_4711",
+			Timeout:     time.Second,
+			MaxBodySize: 100,
 		})
 		require.NoError(t, err, "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
-		assert.Nil(t, content, "Content must be nil")
+		assert.Empty(t, content, "Content must be empty")
 	})
 
 	t.Run("Key empty error", func(t *testing.T) {
-
 		mr := miniredis.NewMiniRedis()
 		if err := mr.Start(); err != nil {
 			t.Fatal(err)
 		}
 		defer mr.Close()
 
-		be, err := esikv.NewResourceHandler(fmt.Sprintf("redis://%s", mr.Addr()))
+		be, err := esikv.NewRedis(fmt.Sprintf("redis://%s", mr.Addr()))
 		assert.NoError(t, err, "%+v", err)
 		defer be.Close()
 
 		hdr, content, err := be.DoRequest(&backend.ResourceArgs{})
+		require.True(t, errors.IsEmpty(err), "%+v", err)
+		assert.Nil(t, hdr, "Header return must be nil")
+		assert.Nil(t, content, "Content must be nil")
+	})
+
+	t.Run("ExternalReq empty error", func(t *testing.T) {
+		mr := miniredis.NewMiniRedis()
+		if err := mr.Start(); err != nil {
+			t.Fatal(err)
+		}
+		defer mr.Close()
+
+		be, err := esikv.NewRedis(fmt.Sprintf("redis://%s", mr.Addr()))
+		assert.NoError(t, err, "%+v", err)
+		defer be.Close()
+
+		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
+			Key: "Hello",
+		})
+		require.True(t, errors.IsEmpty(err), "%+v", err)
+		assert.Nil(t, hdr, "Header return must be nil")
+		assert.Nil(t, content, "Content must be nil")
+	})
+
+	t.Run("Timeout empty error", func(t *testing.T) {
+		mr := miniredis.NewMiniRedis()
+		if err := mr.Start(); err != nil {
+			t.Fatal(err)
+		}
+		defer mr.Close()
+
+		be, err := esikv.NewRedis(fmt.Sprintf("redis://%s", mr.Addr()))
+		assert.NoError(t, err, "%+v", err)
+		defer be.Close()
+
+		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
+			Key:         "Hello",
+			ExternalReq: httptest.NewRequest("GET", "/", nil),
+		})
+		require.True(t, errors.IsEmpty(err), "%+v", err)
+		assert.Nil(t, hdr, "Header return must be nil")
+		assert.Nil(t, content, "Content must be nil")
+	})
+
+	t.Run("MaxBodySize empty error", func(t *testing.T) {
+		mr := miniredis.NewMiniRedis()
+		if err := mr.Start(); err != nil {
+			t.Fatal(err)
+		}
+		defer mr.Close()
+
+		be, err := esikv.NewRedis(fmt.Sprintf("redis://%s", mr.Addr()))
+		assert.NoError(t, err, "%+v", err)
+		defer be.Close()
+
+		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
+			Key:         "Hello",
+			ExternalReq: httptest.NewRequest("GET", "/", nil),
+			Timeout:     time.Second,
+		})
 		require.True(t, errors.IsEmpty(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Nil(t, content, "Content must be nil")
@@ -134,6 +223,8 @@ func TestNewRedis(t *testing.T) {
 			}(),
 			Key:         key,
 			KeyTemplate: tpl,
+			Timeout:     time.Second,
+			MaxBodySize: 100,
 		})
 		require.NoError(t, err, "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")

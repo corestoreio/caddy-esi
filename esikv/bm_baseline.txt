@@ -1,0 +1,12 @@
+BenchmarkNewRedis_Parallel-4   	   50000	     28228 ns/op	     941 B/op	      32 allocs/op
+BenchmarkNewRedis_Parallel-4   	   50000	     28224 ns/op	     941 B/op	      32 allocs/op
+BenchmarkNewRedis_Parallel-4   	   50000	     33787 ns/op	     941 B/op	      32 allocs/op
+BenchmarkNewRedis_Parallel-4   	   50000	     29152 ns/op	     940 B/op	      32 allocs/op
+BenchmarkNewRedis_Parallel-4   	   50000	     28996 ns/op	     940 B/op	      32 allocs/op
+BenchmarkNewRedis_Parallel-4   	   50000	     31911 ns/op	     941 B/op	      32 allocs/op
+BenchmarkNewRedis_Parallel-4   	   50000	     30215 ns/op	     941 B/op	      32 allocs/op
+BenchmarkNewRedis_Parallel-4   	   50000	     30171 ns/op	     941 B/op	      32 allocs/op
+BenchmarkNewRedis_Parallel-4   	   50000	     29859 ns/op	     941 B/op	      32 allocs/op
+BenchmarkNewRedis_Parallel-4   	   50000	     28110 ns/op	     940 B/op	      32 allocs/op
+PASS
+ok  	github.com/SchumacherFM/caddyesi/esikv	18.019s
