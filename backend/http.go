@@ -24,6 +24,7 @@ import (
 
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
+	loghttp "github.com/corestoreio/log/http"
 )
 
 func init() {
@@ -35,7 +36,7 @@ func init() {
 // DefaultHTTPTransport our own transport for all ESI tag resources instead of
 // relying on net/http.DefaultTransport. This transport gets also mocked for
 // tests. Only used in init(), see above.
-var DefaultHTTPTransport http.RoundTripper = &http.Transport{
+var DefaultHTTPTransport = &http.Transport{
 	Proxy: http.ProxyFromEnvironment,
 	DialContext: (&net.Dialer{
 		Timeout:   DefaultTimeOut,
@@ -58,6 +59,11 @@ func NewFetchHTTP(tr http.RoundTripper) *fetchHTTP {
 		},
 	}
 	return f
+}
+
+// requestCanceller implemented in http.Transport
+type requestCanceller interface {
+	CancelRequest(req *http.Request)
 }
 
 type fetchHTTP struct {
@@ -96,6 +102,14 @@ func (fh *fetchHTTP) DoRequest(args *ResourceArgs) (http.Header, []byte, error) 
 	if err != nil {
 		select {
 		case <-ctx.Done():
+			if cncl, ok := fh.client.Transport.(requestCanceller); ok {
+				if args.Log.IsInfo() {
+					args.Log.Info("esibackend.FetchHTTP.DoRequest.client.Transport.requestCanceller",
+						log.String("url", args.URL), loghttp.Request("backend_request", req),
+					)
+				}
+				cncl.CancelRequest(req)
+			}
 			err = errors.Wrap(ctx.Err(), "[esibackend] Context Done")
 		default:
 		}
