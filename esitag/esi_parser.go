@@ -46,7 +46,7 @@ func Parse(r io.Reader) (Entities, error) {
 	var tagIndex int
 	for sc.Scan() {
 		if sc.Err() != nil {
-			return nil, errors.Wrap(sc.Err(), "Parse scan failed")
+			return nil, errors.Wrap(sc.Err(), "[esitag] Parse scan failed")
 		}
 
 		ret = append(ret, &Entity{
@@ -134,7 +134,6 @@ func (e *finder) split(data []byte, atEOF bool) (advance int, token []byte, err 
 // /> tag was found in which case a call to data() reveals the what the ...
 // matched.
 func (e *finder) scan(b byte) (bool, error) {
-	// todo remove else
 	switch e.tagState {
 	case stateStart, stateFound:
 		if b == '<' {
@@ -176,7 +175,7 @@ func (e *finder) scan(b byte) (bool, error) {
 		e.buf.WriteByte(b)
 		e.tagState = stateData
 	default:
-		return false, errors.Errorf("Unknown state in machine: %d with Byte: %q", e.tagState, rune(b))
+		return false, errors.NewNotImplementedf("[esitag] Parser detected an unknown state in machine: %d with Byte: %q", e.tagState, rune(b))
 	}
 	e.n++
 	return false, nil
