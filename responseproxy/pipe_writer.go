@@ -50,7 +50,6 @@ func WrapPiped(iorf io.ReaderFrom, w http.ResponseWriter) PipedWriter {
 	mw := &pipedWriter{ResponseWriter: w, pw: pw}
 	mw.wg.Add(1)
 	go func() {
-		// todo fix race condition
 		if _, err := iorf.ReadFrom(pr); err != nil {
 			mw.err = err
 			pr.CloseWithError(err)

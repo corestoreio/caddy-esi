@@ -148,7 +148,7 @@ func setupLogger(pc *PathConfig) error {
 	default:
 		var err error
 		w, err = os.OpenFile(pc.LogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-		// TODO(CyS) handle file close on server restart or shutdown
+		// maybe handle file close on server restart or shutdown
 		if err != nil {
 			return errors.NewFatalf("[caddyesi] Failed to open file %q with error: %s", pc.LogFile, err)
 		}
