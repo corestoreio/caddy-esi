@@ -16,14 +16,15 @@ package esikv
 
 import (
 	"context"
-	"github.com/SchumacherFM/caddyesi/backend"
-	"github.com/corestoreio/errors"
-	"gopkg.in/redis.v5"
 	"net"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
+
+	"github.com/SchumacherFM/caddyesi/backend"
+	"github.com/corestoreio/errors"
+	"gopkg.in/redis.v5"
 )
 
 // Maybe replace redis client with redigo even better if there is a redis client with build in context

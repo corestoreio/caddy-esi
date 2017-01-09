@@ -134,7 +134,7 @@ func (pc *PathConfig) parseOnError(val string) (err error) {
 }
 
 // ESITagsByRequest selects in the ServeHTTP function all ESITags identified by
-// their pageIDs.
+// their pageIDs. Returns a nil t when the entry does not exists.
 func (pc *PathConfig) ESITagsByRequest(r *http.Request) (pageID uint64, t esitag.Entities) {
 	pageID = pc.pageID(r)
 	pc.esiMU.RLock()

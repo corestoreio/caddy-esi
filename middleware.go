@@ -16,12 +16,12 @@ package caddyesi
 
 import (
 	"bytes"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 
-	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/esitag"
-	"github.com/SchumacherFM/caddyesi/responseproxy"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	loghttp "github.com/corestoreio/log/http"
@@ -59,58 +59,40 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 		return mw.Next.ServeHTTP(w, r) // go on ...
 	}
 
-	// maybe use a hashing function to check if content changes ...
+	// maybe use a hashing function to check if content changes ... ?
 
-	fullRespBuf := bufpool.Get()
-	defer bufpool.Put(fullRespBuf)
+	//fullRespBuf := bufpool.Get()
+	//defer bufpool.Put(fullRespBuf)
 
 	// responseproxy should be a pipe writer to avoid blowing up the memory by
 	// writing everything into a buffer. We could uses here one or two pipes.
 	// One pipe only for InjectContent when the ESI entities are already
 	// available and two pipes when we first must analyze the HTML page (pipe1)
 	// and at the end InjectContent (pipe2).
-	code, err := mw.Next.ServeHTTP(responseproxy.WrapBuffered(fullRespBuf, w), r)
+
+	rec := httptest.NewRecorder()
+
+	//code, err := mw.Next.ServeHTTP(responseproxy.WrapBuffered(fullRespBuf, w), r)
+	code, err := mw.Next.ServeHTTP(rec, r)
 	if !cfg.IsStatusCodeAllowed(code) || err != nil {
 		return code, err
 	}
 
 	pageID, esiEntities := cfg.ESITagsByRequest(r)
-	if len(esiEntities) == 0 {
+	if esiEntities == nil {
 
-		// within this IF block we make sure with the Group.Do call that ESI
-		// tags to a specific page get only parsed once even if multiple
-		// requests are coming in to the same page. therefore make sure your
-		// pageID has been calculated correctly.
+		// Create a 2nd buffer just for reading in calculateESITags. this is stupid and must be refactored.
+		bodyBuf := new(bytes.Buffer)
+		*bodyBuf = *(rec.Body)
 
-		result, err, shared := mw.Group.Do(strconv.FormatUint(pageID, 10), func() (interface{}, error) {
-
-			entities, err := esitag.Parse(bytes.NewReader(fullRespBuf.Bytes())) // for now a NewReader, might be removed
-			if cfg.Log.IsDebug() {
-				cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse",
-					log.Err(err), log.Uint64("page_id", pageID), loghttp.Request("request", r),
-					log.Stringer("response_content", fullRespBuf), // lots of data here ...
-				)
-			}
-			if err != nil {
-				return nil, errors.Wrapf(err, "[caddyesi] Grouped parsing failed ID %d", pageID)
-			}
-			cfg.UpsertESITags(pageID, entities)
-
-			return entities, nil
-		})
+		esiEntities, err = mw.calculateESITags(pageID, bodyBuf, cfg)
 		if err != nil {
 			if cfg.Log.IsDebug() {
-				cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.Group.Do.Error",
-					log.Err(err), loghttp.Request("request", r), log.Stringer("config", cfg),
-					log.Bool("shared", shared), log.Uint64("page_id", pageID),
+				cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.calculateESITags",
+					log.Err(err), log.Uint64("page_id", pageID), loghttp.Request("request", r), log.Stringer("config", cfg),
 				)
 			}
 			return http.StatusInternalServerError, err
-		}
-		var ok bool
-		esiEntities, ok = result.(esitag.Entities)
-		if !ok {
-			return http.StatusInternalServerError, errors.NewFatalf("[caddyesi] A programmer made a terrible mistake: %#v", result)
 		}
 	}
 
@@ -129,11 +111,61 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 		}
 	}
 
+	//fmt.Printf("ResponseRecorder: %#v\n\n", rec.Result())
+
+	// TODO(CyS) copy the headers and status code from rec into w, i think
+
 	// Replace the esi tags with the content from the resources. After finishing
 	// the parsing and replacing we dump the output to the client.
-	if err := tags.InjectContent(fullRespBuf, w); err != nil {
+	if err := tags.InjectContent(rec.Body, w); err != nil {
 		return http.StatusInternalServerError, err
 	}
 
 	return code, nil
+}
+
+func (mw *Middleware) calculateESITags(pageID uint64, body io.Reader, cfg *PathConfig) (esitag.Entities, error) {
+	// within this IF block we make sure with the Group.Do call that ESI
+	// tags to a specific page get only parsed once even if multiple
+	// requests are coming in to the same page. therefore make sure your
+	// pageID has been calculated correctly.
+
+	// run a performance load test to see if it's worth to switch to Group.DoChan
+	result, err, shared := mw.Group.Do(strconv.FormatUint(pageID, 10), func() (interface{}, error) {
+
+		var bodyBuf *bytes.Buffer
+		if cfg.Log.IsDebug() {
+			bodyBuf = new(bytes.Buffer)
+			body = io.TeeReader(body, bodyBuf)
+		}
+
+		entities, err := esitag.Parse(body)
+		if cfg.Log.IsDebug() {
+			cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse",
+				log.Err(err), log.Uint64("page_id", pageID), log.Int("tag_count", len(entities)), log.Stringer("content", bodyBuf),
+			)
+		}
+		if err != nil {
+			return nil, errors.Wrapf(err, "[caddyesi] Grouped parsing failed ID %d", pageID)
+		}
+		cfg.UpsertESITags(pageID, entities)
+
+		return entities, nil
+	})
+
+	if err != nil {
+		if cfg.Log.IsDebug() {
+			cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.Group.Do.Error",
+				log.Err(err), log.Stringer("config", cfg),
+				log.Bool("shared", shared), log.Uint64("page_id", pageID),
+			)
+		}
+		return nil, err
+	}
+
+	esiEntities, ok := result.(esitag.Entities)
+	if !ok {
+		return nil, errors.NewFatalf("[caddyesi] A programmer made a terrible mistake: %#v", result)
+	}
+	return esiEntities, nil
 }

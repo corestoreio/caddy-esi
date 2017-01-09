@@ -438,13 +438,15 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 				r.CBReset()
 				if et.Log.IsDebug() {
 					et.Log.Debug("esitag.Entity.QueryResources.ResourceHandler.CBStateHalfOpen",
-						log.Duration(log.KeyNameDuration, monotime.Since(timeStart)), log.String("content", string(data)),
-						log.Uint64("failure_count", r.CBFailures()), log.Stringer("last_failure", lastFailure), lFields)
+						log.Duration(log.KeyNameDuration, monotime.Since(timeStart)),
+						log.Uint64("failure_count", r.CBFailures()), log.Stringer("last_failure", lastFailure),
+						lFields, log.String("content", string(data)))
 				}
 			} else if et.Log.IsDebug() {
 				et.Log.Debug("esitag.Entity.QueryResources.ResourceHandler.CBStateClosed",
-					log.Duration(log.KeyNameDuration, monotime.Since(timeStart)), log.String("content", string(data)),
-					log.Uint64("failure_count", r.CBFailures()), log.Stringer("last_failure", lastFailure), lFields)
+					log.Duration(log.KeyNameDuration, monotime.Since(timeStart)),
+					log.Uint64("failure_count", r.CBFailures()), log.Stringer("last_failure", lastFailure),
+					lFields, log.String("content", string(data)))
 			}
 			// TODO(CyS): Log header, create special function to log header; LOG rfa with special format
 			return data, nil
