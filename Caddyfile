@@ -1,0 +1,27 @@
+http://127.0.0.1:2017 {
+    root ./www_root/
+    tls off
+    # gzip
+    browse
+    ext    .html
+    log    testdata/cdy_test_2017_access.log
+
+    esi {
+        log_file testdata/cdy_test_2017_debug.log
+        log_level debug
+    }
+}
+
+# micro service (ms) end point
+http://127.0.0.1:3017 {
+    root ./www_root/
+    log    testdata/cdy_test_3017_access.log
+    tls off
+
+    # bug content not fully read
+    #esi {
+    #    log_file testdata/cdy_test_3017_debug.log
+    #    log_level debug
+    #}
+
+}
