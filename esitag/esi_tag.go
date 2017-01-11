@@ -505,6 +505,10 @@ func (et Entities) String() string {
 // via its context then all resource requests gets canceled too.
 func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 
+	if len(et) == 0 {
+		return DataTags{}, nil
+	}
+
 	tags := make(DataTags, 0, len(et))
 	g, ctx := errgroup.WithContext(r.Context())
 	cTag := make(chan DataTag)

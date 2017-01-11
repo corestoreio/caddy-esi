@@ -404,6 +404,9 @@ func TestDataTags_InjectContent(t *testing.T) {
 			}
 		}
 	}
+	t.Run("No Tags", runner("testdata/nocart.html",
+		[][]byte{},
+	))
 	t.Run("Page1", runner("testdata/page1.html",
 		[][]byte{
 			[]byte(`<p>Hello Jonathan Gopher. You're logged in.</p>`),
@@ -622,6 +625,15 @@ func TestEntity_QueryResources_Multi_Calls(t *testing.T) {
 }
 
 func TestEntities_QueryResources(t *testing.T) {
+
+	t.Run("Empty Entities returns not a nil DataTags slice", func(t *testing.T) {
+		ets := make(esitag.Entities, 0, 2)
+		dts, err := ets.QueryResources(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Exactly(t, esitag.DataTags{}, dts)
+	})
 
 	defer backend.RegisterResourceHandler("teste1", backend.MockRequestContent("Content")).DeferredDeregister()
 
