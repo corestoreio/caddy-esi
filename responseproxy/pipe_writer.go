@@ -45,27 +45,28 @@ func WrapPiped(iorf io.ReaderFrom, w http.ResponseWriter) PipedWriter {
 	_, fl := w.(http.Flusher)
 	_, hj := w.(http.Hijacker)
 	_, rf := w.(io.ReaderFrom)
+	// TODO add Pusher when Go 1.8 gets out
 
 	pr, pw := io.Pipe()
-	mw := &pipedWriter{ResponseWriter: w, pw: pw}
-	mw.wg.Add(1)
+	rwpw := &pipedWriter{ResponseWriter: w, pw: pw}
+	rwpw.wg.Add(1)
 	go func() {
 		if _, err := iorf.ReadFrom(pr); err != nil {
-			mw.err = err
+			rwpw.err = err
 			pr.CloseWithError(err)
 		} else {
 			pr.Close()
 		}
-		mw.wg.Done()
+		rwpw.wg.Done()
 	}()
 
 	if cn && fl && hj && rf {
-		return &pipedFancyWriter{mw}
+		return &pipedFancyWriter{rwpw}
 	}
 	if fl {
-		return &pipedFlushWriter{mw}
+		return &pipedFlushWriter{rwpw}
 	}
-	return mw
+	return rwpw
 }
 
 // bufferedWriter wraps a http.ResponseWriter that implements the minimal

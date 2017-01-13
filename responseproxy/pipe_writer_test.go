@@ -15,11 +15,12 @@
 package responseproxy_test
 
 import (
+	"bytes"
+	"io"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/SchumacherFM/caddyesi/responseproxy"
-	"github.com/corestoreio/log"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,20 +28,22 @@ func TestWrapPipe(t *testing.T) {
 	wOrg := httptest.NewRecorder()
 	data := []byte(`Commander Data encrypts the computer with a fractal algorithm to protect it from the Borgs.`)
 
-	buf := new(log.MutexBuffer)
+	buf := new(bytes.Buffer)
 	pw := responseproxy.WrapPiped(buf, wOrg)
 
 	n, err := pw.Write(data)
+	if err := pw.Close(); err != nil {
+		t.Fatal(err)
+	}
 
 	assert.NoError(t, err)
 	assert.Exactly(t, len(data), n)
 	assert.Exactly(t, 0, wOrg.Body.Len())
 
-	// assert.Exactly(t, len(data), buf.Len()) // race because of MutexBuffer
+	assert.Exactly(t, len(data), buf.Len()) // race because of MutexBuffer
 
-	// locks for ever ... something wrong, maybe with the mutexbuffer, a bytes.Buffer triggers a race condition
-	//if _, err := io.Copy(pw.Unwrap(), buf); err != nil {
-	//	t.Fatal(err)
-	//}
-	//assert.Exactly(t, len(data), wOrg.Body.Len())
+	if _, err := io.Copy(pw.Unwrap(), buf); err != nil {
+		t.Fatal(err)
+	}
+	assert.Exactly(t, len(data), wOrg.Body.Len())
 }
