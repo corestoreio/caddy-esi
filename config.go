@@ -95,6 +95,10 @@ type PathConfig struct {
 	// Log gets set up during setup
 	Log log.Logger
 
+	// TODO(CyS) skipped an internal flag which checks if a request is able to
+	// trigger the ESI parser.
+	skipped bool
+
 	esiMU sync.RWMutex
 	// esiCache identifies all parsed ESI tags in a page for specific path
 	// prefix. uint64 represents the hash for the current request calculated by
@@ -174,7 +178,11 @@ func (pc *PathConfig) UpsertESITags(pageID uint64, entities esitag.Entities) {
 }
 
 // IsRequestAllowed decides if a request should be processed.
+// TODO(CyS) Check for correct content type
 func (pc *PathConfig) IsRequestAllowed(r *http.Request) bool {
+	if pc.skipped == true {
+		return false
+	}
 	if len(pc.AllowedMethods) == 0 {
 		return r.Method == http.MethodGet
 	}
@@ -188,6 +196,7 @@ func (pc *PathConfig) IsRequestAllowed(r *http.Request) bool {
 
 // IsStatusCodeAllowed checks if the returned status code from a 3rd party
 // middleware is allowed to trigger the ESI middleware.
+// Deprecated not worth ... wrong architecture
 func (pc *PathConfig) IsStatusCodeAllowed(code int) bool {
 	if len(pc.AllowedStatusCodes) == 0 {
 		return code == http.StatusOK

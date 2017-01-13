@@ -18,10 +18,11 @@ import (
 	"bytes"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"strconv"
 
+	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/esitag"
+	"github.com/SchumacherFM/caddyesi/responseproxy"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	loghttp "github.com/corestoreio/log/http"
@@ -46,6 +47,9 @@ type Middleware struct {
 
 // ServeHTTP implements the http.Handler interface.
 func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
+	// maybe use a hashing function to check if content changes ... or another
+	// endpoint to clear the internal cache ESI tags ?
+
 	cfg := mw.PathConfigs.ConfigForPath(r)
 	if cfg == nil {
 		return mw.Next.ServeHTTP(w, r) // exit early
@@ -59,33 +63,34 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 		return mw.Next.ServeHTTP(w, r) // go on ...
 	}
 
-	// maybe use a hashing function to check if content changes ... ?
-
-	//fullRespBuf := bufpool.Get()
-	//defer bufpool.Put(fullRespBuf)
-
-	// responseproxy should be a pipe writer to avoid blowing up the memory by
-	// writing everything into a buffer. We could uses here one or two pipes.
-	// One pipe only for InjectContent when the ESI entities are already
-	// available and two pipes when we first must analyze the HTML page (pipe1)
-	// and at the end InjectContent (pipe2).
-
-	rec := httptest.NewRecorder()
-
-	//code, err := mw.Next.ServeHTTP(responseproxy.WrapBuffered(fullRespBuf, w), r)
-	code, err := mw.Next.ServeHTTP(rec, r)
-	if !cfg.IsStatusCodeAllowed(code) || err != nil {
-		return code, err
-	}
-
 	pageID, esiEntities := cfg.ESITagsByRequest(r)
 	if esiEntities == nil {
+		// Slow path because ESI cache tag is empty and we need to analyse the buffer.
 
-		// Create a 2nd buffer just for reading in calculateESITags. this is stupid and must be refactored.
-		bodyBuf := new(bytes.Buffer)
-		*bodyBuf = *(rec.Body)
+		buf := bufpool.Get()
+		defer bufpool.Put(buf)
 
-		esiEntities, err = mw.calculateESITags(pageID, bodyBuf, cfg)
+		bufResW := responseproxy.WrapBuffered(buf, w)
+
+		// We must wait until every single byte has been written into the buffer.
+		code, err := mw.Next.ServeHTTP(bufResW, r)
+		if err != nil {
+			return http.StatusInternalServerError, err
+		}
+		if !cfg.IsStatusCodeAllowed(code) {
+			// Headers and Status Code already written to the client but we need
+			// to flush the real content!
+			// TODO(CyS) make an entry in the ESI tag map that subsequent non-allowed requests to the same resource can be skipped
+			if _, err := w.Write(buf.Bytes()); err != nil {
+				return http.StatusInternalServerError, err
+			}
+			return code, nil
+		}
+
+		bufRdr := bytes.NewReader(buf.Bytes())
+
+		// Lets parse the buffer to find ESI tags. First Read
+		esiEntities, err = mw.calculateESITags(pageID, bufRdr, cfg)
 		if err != nil {
 			if cfg.Log.IsDebug() {
 				cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.calculateESITags",
@@ -94,13 +99,13 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 			}
 			return http.StatusInternalServerError, err
 		}
-	}
 
-	// trigger the DoRequests and query all backend resources in parallel.
-	// TODO(CyS) Coalesce requests
-	tags, err := esiEntities.QueryResources(r)
-	if err != nil {
+		// Trigger the queries to the resource backends in parallel
+		// TODO(CyS) Coalesce requests
+		tags, err := esiEntities.QueryResources(r)
+
 		if err != nil {
+			// wrong behaviour compared to below
 			if cfg.Log.IsDebug() {
 				cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.esiEntities.QueryResources.Error",
 					log.Err(err), loghttp.Request("request", r), log.Stringer("config", cfg),
@@ -109,19 +114,67 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 			}
 			return http.StatusInternalServerError, err
 		}
+
+		if _, err := bufRdr.Seek(0, 0); err != nil {
+			return http.StatusInternalServerError, err
+		}
+
+		// read the 2nd time from the buffer to finally inject the content from the resource backends
+		// into the HTML page
+		if _, err := tags.InjectContent(bufRdr, w); err != nil {
+			return http.StatusInternalServerError, err
+		}
+
+		return code, err
 	}
 
-	//fmt.Printf("ResponseRecorder: %#v\n\n", rec.Result())
+	////////////////////////////////////////////////////////////////////////////////
+	// Proceed from cache
 
-	// TODO(CyS) copy the headers and status code from rec into w, i think
+	chanTags := make(chan esitag.DataTags)
+	go func() {
+		// trigger the DoRequests and query all backend resources in parallel.
+		// TODO(CyS) Coalesce requests
+		tags, err := esiEntities.QueryResources(r)
+		if err != nil {
+			// todo better error handling and propagation
 
-	// Replace the esi tags with the content from the resources. After finishing
-	// the parsing and replacing we dump the output to the client.
-	if err := tags.InjectContent(rec.Body, w); err != nil {
-		return http.StatusInternalServerError, err
+			if cfg.Log.IsDebug() {
+				cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.esiEntities.QueryResources.Error",
+					log.Err(err), loghttp.Request("request", r), log.Stringer("config", cfg),
+					log.Uint64("page_id", pageID),
+				)
+			}
+		}
+		chanTags <- tags
+		close(chanTags)
+	}()
+
+	wpResW := responseproxy.WrapPiped( // this one would panic because error in ppr.CloseWithError
+		esitag.NewDataTagsInjector(chanTags, w), // runs in a goroutine
+		w,
+	)
+	defer func() {
+		if err := wpResW.Close(); err != nil {
+			panic(err) // only now during dev
+		}
+	}()
+
+	// Start Serving and writing into the pipe
+	code, err := mw.Next.ServeHTTP(wpResW, r)
+	if err != nil {
+		// discard the cErr channel to the GC ... hope that works
+		return http.StatusInternalServerError, errors.Wrap(err, "[caddyesi] Error from Next.ServeHTTP")
+	}
+	if !cfg.IsStatusCodeAllowed(code) {
+		// too late because the goroutine injectcontent has already written the data
+		cfg.skipped = true
+		// todo test it
+
 	}
 
-	return code, nil
+	return code, err
+
 }
 
 func (mw *Middleware) calculateESITags(pageID uint64, body io.Reader, cfg *PathConfig) (esitag.Entities, error) {

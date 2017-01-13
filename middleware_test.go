@@ -85,7 +85,7 @@ func mwTestHandler(t *testing.T, caddyFile string) httpserver.Handler {
 	return stack
 }
 
-func mwTestRunner(caddyFile string, r *http.Request, bodyContains string) func(*testing.T) {
+func mwTestRunner(caddyFile string, r *http.Request, bodyContains string, wantErrBhf errors.BehaviourFunc) func(*testing.T) {
 
 	// Add here the middlewares Header and Template just to make sure that
 	// caddyesi middleware processes the other middlewares correctly.
@@ -93,29 +93,35 @@ func mwTestRunner(caddyFile string, r *http.Request, bodyContains string) func(*
 	return func(t *testing.T) {
 
 		stack := mwTestHandler(t, caddyFile)
+		// first iteration loads the WrapBuffer ResponseWriter.
+		// second iteration loads the WrapPiped ResponseWriter to get the
+		// already parsed ESI tags from the internal map.
+		for ii := 1; ii <= 2; ii++ {
+			rec := httptest.NewRecorder()
+			code, err := stack.ServeHTTP(rec, r)
+			if wantErrBhf != nil {
+				assert.True(t, wantErrBhf(err), "Code %d Error: %s", code, err)
+				return
+			} else if err != nil {
+				t.Fatalf("Iteration %d Code %d\n%+v", ii, code, err)
+			}
 
-		rec := httptest.NewRecorder()
-		code, err := stack.ServeHTTP(rec, r)
-		if err != nil {
-			t.Fatalf("Code %d\n%+v", code, err)
-		}
+			for key := range mwTestHeaders {
+				val := mwTestHeaders.Get(key)
+				assert.Exactly(t, val, rec.Header().Get(key), "Iteration %d Header Key %q", ii, key)
+			}
 
-		for key := range mwTestHeaders {
-			val := mwTestHeaders.Get(key)
-			assert.Exactly(t, val, rec.Header().Get(key), "Header Key %q", key)
-		}
+			if rec.Body.Len() == 0 {
+				t.Errorf("Unexpected empty Body !Iteration %d ", ii)
+			}
 
-		if rec.Body.Len() == 0 {
-			t.Error("Unexpected empty Body!")
-		}
-
-		if bodyContains != "" {
-			assert.Contains(t, rec.Body.String(), bodyContains, "Body should contain in Test: %s", t.Name())
-		} else {
-
-			t.Logf("Code: %d", code)
-			t.Logf("Header: %#v", rec.Header())
-			t.Logf("Body: %q", rec.Body.String())
+			if bodyContains != "" {
+				assert.Contains(t, rec.Body.String(), bodyContains, "Iteration %d Body should contain in Test: %s", ii, t.Name())
+			} else {
+				t.Logf("Iteration %d Code: %d", ii, code)
+				t.Logf("Header: %#v", rec.Header())
+				t.Logf("Body: %q", rec.Body.String())
+			}
 		}
 	}
 }
@@ -151,8 +157,17 @@ func TestMiddleware_ServeHTTP_StatusCodes(t *testing.T) {
 }
 
 func TestMiddleware_ServeHTTP_Once(t *testing.T) {
+	const errMsg = `mwTest01: A random micro service error`
+	defer backend.RegisterResourceHandler("mwtest01", backend.MockRequestError(errors.NewWriteFailedf(errMsg))).DeferredDeregister()
 
-	defer backend.RegisterResourceHandler("mwtest01", backend.MockRequestError(errors.NewWriteFailedf("write failed"))).DeferredDeregister()
+	t.Run("Protocol scheme in ESI tag not supported triggers error", mwTestRunner(
+		`esi {
+			allowed_methods GET
+		}`,
+		httptest.NewRequest("GET", "/page06.html", nil),
+		"XXX<esi:include   src=\"unsupported://micro.service/esi/foo\"",
+		errors.IsNotSupported,
+	))
 
 	t.Run("Middleware inactive due to GET allowed but POST request supplied", mwTestRunner(
 		`esi {
@@ -160,6 +175,7 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 		}`,
 		httptest.NewRequest("POST", "/page01.html", nil),
 		"<esi:include   src=\"mwTest01://micro.service/esi/foo\"",
+		nil,
 	))
 
 	{
@@ -174,12 +190,13 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 		}`,
 			httptest.NewRequest("GET", "/page01.html", nil),
 			`my important global error message`,
+			nil,
 		))
 		logContent, err := ioutil.ReadFile(tmpLogFile)
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Contains(t, string(logContent), `error: "write failed"`)
+		assert.Contains(t, string(logContent), `error: "`+errMsg+`"`)
 		assert.Contains(t, string(logContent), `url: "mwTest01://micro.service/esi/foo"`)
 	}
 
@@ -187,6 +204,7 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 		`esi`,
 		httptest.NewRequest("GET", "/page01.html", nil),
 		caddyesi.DefaultOnError,
+		nil,
 	))
 
 	defer backend.RegisterResourceHandler("mwtest02a", backend.MockRequestContent("Micro1Service1")).DeferredDeregister()
@@ -198,6 +216,7 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 		`<p>Micro1Service1 "mwTest02A://microService1" Timeout 5ms MaxBody 10 kB</p>
 <p>Micro2Service2 "mwTest02B://microService2" Timeout 6ms MaxBody 20 kB</p>
 <p>Micro3Service3 "mwTest02C://microService3" Timeout 7ms MaxBody 30 kB</p>`,
+		nil,
 	))
 }
 
@@ -289,6 +308,7 @@ func TestMiddleware_ServeHTTP_Redis(t *testing.T) {
 		}(),
 		`<p>Gopher01</p>
 <p>Rustafarian02</p>`,
+		nil,
 	))
 
 	//tmpLogFile, _ := esitesting.Tempfile(t)
@@ -308,5 +328,6 @@ func TestMiddleware_ServeHTTP_Redis(t *testing.T) {
 		}(),
 		`<p>Gopher01</p>
 <p>Rustafarian02</p>`,
+		nil,
 	))
 }
