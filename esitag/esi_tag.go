@@ -67,21 +67,45 @@ type DataTag struct {
 	End   int // end position in the stream
 }
 
+// NewDataTagsInjector reads the data tag slice from the channel and writes the
+// data into w. This function wraps the DataTags.InjectContent method.
+func NewDataTagsInjector(dt <-chan DataTags, w io.Writer) io.ReaderFrom {
+	return dataTagsReaderFrom{
+		dt: dt,
+		w:  w,
+	}
+}
+
+type dataTagsReaderFrom struct {
+	dt <-chan DataTags
+	w  io.Writer
+}
+
+func (dr dataTagsReaderFrom) ReadFrom(r io.Reader) (int64, error) {
+	dt, ok := <-dr.dt
+	if !ok {
+		return 0, errors.NewFatalf("[esitag] NewDataTagsInjector.ReadFrom failed to read from channel")
+	}
+	n, err := dt.InjectContent(r, dr.w)
+	return int64(n), errors.Wrap(err, "[esitag] ReaderFrom InjectContent error")
+}
+
 // DataTags a list of tags with their position within a page and the content
 type DataTags []DataTag
 
 // InjectContent reads from r and uses the data in a Tag to get injected a the
 // current position and then writes the output to w. DataTags must be a sorted
 // slice. Usually this function receives the data from Entities.QueryResources()
-func (dts DataTags) InjectContent(r io.Reader, w io.Writer) error {
+func (dts DataTags) InjectContent(r io.Reader, w io.Writer) (bytesRead int, _ error) {
 	if len(dts) == 0 {
-		return nil
+		return 0, nil
 	}
 
 	dataBuf := bufpool.Get()
 	defer bufpool.Put(dataBuf)
 	data := dataBuf.Bytes()
 
+	var bytesWritten int
 	var prevBufDataSize int
 	for di, dt := range dts {
 		bufDataSize := dt.End - prevBufDataSize
@@ -93,28 +117,51 @@ func (dts DataTags) InjectContent(r io.Reader, w io.Writer) error {
 		data = data[:bufDataSize]
 
 		n, err := r.Read(data)
+		bytesRead += n
 		if err != nil && err != io.EOF {
-			return errors.NewFatalf("[esitag] Read failed: %s for tag index %d with start position %d and end position %d", err, di, dt.Start, dt.End)
+			return bytesRead, errors.NewReadFailedf("[esitag] Read failed: %s for tag index %d with start position %d and end position %d", err, di, dt.Start, dt.End)
 		}
 
 		if n > 0 {
 			esiStartPos := n - (dt.End - dt.Start)
-			if _, errW := w.Write(data[:esiStartPos]); errW != nil { // cuts off until End
-				return errors.NewWriteFailedf("[esitag] Failed to write page data to w: %s", errW)
+			wn, errW := w.Write(data[:esiStartPos])
+			if errW != nil { // cuts off until End
+				return bytesRead, errors.NewWriteFailedf("[esitag] Failed to write page data to w: %s", errW)
 			}
-			if _, errW := w.Write(dt.Data); errW != nil {
-				return errors.NewWriteFailedf("[esitag] Failed to write ESI data to w: %s", errW)
+			bytesWritten += wn
+
+			wn, errW = w.Write(dt.Data)
+			if errW != nil {
+				return bytesRead, errors.NewWriteFailedf("[esitag] Failed to write ESI data to w: %s", errW)
 			}
+			bytesWritten += wn
 		}
 		prevBufDataSize = dt.End
 	}
 
-	// during copy of the remaining bytes we'll hit EOF
-	if _, err := io.Copy(w, r); err != nil {
-		return errors.NewWriteFailedf("[esitag] Failed to copy remaining data to w: %s", err)
+	// io.Copy has more over head than the following code
+	data = data[:cap(data)]
+	for {
+		n, err := r.Read(data)
+		bytesRead += n
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return bytesRead, errors.NewReadFailedf("[esitag] InjectContent failed to read remaining data: %s", err)
+		}
+		data = data[:n]
+		n, err = w.Write(data)
+		bytesWritten += n
+		if err != nil {
+			return bytesRead, errors.NewWriteFailedf("[esitag] InjectContent failed to copy remaining data to w: %s", err)
+		}
 	}
 
-	return nil
+	// just for debugging purposes
+	// println("bytesRead bytesWritten", bytesRead, bytesWritten)
+
+	return bytesRead, nil
 }
 
 func (dts DataTags) Len() int           { return len(dts) }

@@ -391,7 +391,7 @@ func TestDataTags_InjectContent(t *testing.T) {
 			if _, err := page3F.Seek(0, 0); err != nil {
 				t.Fatal(err)
 			}
-			if err := tags.InjectContent(page3F, w); err != nil {
+			if _, err := tags.InjectContent(page3F, w); err != nil {
 				t.Fatalf("%+v", err)
 			}
 
@@ -468,7 +468,7 @@ func BenchmarkDataTags_InjectContent(b *testing.B) {
 				}
 				b.StartTimer()
 
-				if err := tags.InjectContent(page3F, w); err != nil {
+				if _, err := tags.InjectContent(page3F, w); err != nil {
 					b.Fatalf("%+v", err)
 				}
 
