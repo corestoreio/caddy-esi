@@ -1,3 +1,17 @@
+// Copyright 2016-2017, Cyrill @ Schumacher.fm and the CaddyESI Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
 package caddyesi
 
 import (
@@ -183,22 +197,22 @@ func TestPathConfig_isRequestAllowed(t *testing.T) {
 			assert.Exactly(t, want, pc.IsRequestAllowed(r))
 		}
 	}
-	t.Run("Default GET allowed", runner(
+	t.Run("Default GET benchIsResponseAllowed", runner(
 		nil,
 		httptest.NewRequest("GET", "/test", nil),
 		true,
 	))
-	t.Run("DELETE not allowed", runner(
+	t.Run("DELETE not benchIsResponseAllowed", runner(
 		nil,
 		httptest.NewRequest("DELETE", "/test", nil),
 		false,
 	))
-	t.Run("POST allowed", runner(
+	t.Run("POST benchIsResponseAllowed", runner(
 		[]string{"POST"},
 		httptest.NewRequest("POST", "/test", nil),
 		true,
 	))
-	t.Run("GET allowed but only POSt allowed", runner(
+	t.Run("GET benchIsResponseAllowed but only POSt benchIsResponseAllowed", runner(
 		[]string{"POST"},
 		httptest.NewRequest("GET", "/test", nil),
 		false,
@@ -296,4 +310,48 @@ func TestPathConfigs_ConfigForPath(t *testing.T) {
 		httptest.NewRequest("GET", "/checkout/cart", nil),
 		"/",
 	))
+}
+
+func TestIsResponseAllowed(t *testing.T) {
+	t.Run("HTML benchIsResponseAllowed", func(t *testing.T) {
+		assert.True(t, isResponseAllowed([]byte("\r\n<html>...")))
+	})
+	t.Run("MP4 not benchIsResponseAllowed", func(t *testing.T) {
+		assert.False(t, isResponseAllowed([]byte("\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom<\x06t\xbfmdat")))
+	})
+	t.Run("GIF not benchIsResponseAllowed", func(t *testing.T) {
+		assert.False(t, isResponseAllowed([]byte("GIF89a")))
+	})
+	t.Run("XML benchIsResponseAllowed", func(t *testing.T) {
+		assert.True(t, isResponseAllowed([]byte("\n<?xml!")))
+	})
+}
+
+var benchIsResponseAllowed bool
+
+// BenchmarkIsResponseAllowed/Detect_binary-4         	 3000000	       462 ns/op	       0 B/op	       0 allocs/op
+// BenchmarkIsResponseAllowed/Detect_html-4           	50000000	        37.3 ns/op	       0 B/op	       0 allocs/op
+func BenchmarkIsResponseAllowed(b *testing.B) {
+	mp4 := []byte("\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom<\x06t\xbfmdat")
+	html := []byte(`<!DOCTYPE html>  <html lang="en-US"><head>     <title>Caddy ESI Tag Demo</title> </head><body> <h1> Caddy ESI Tag Demo Page</h1> <table>    <tbody>    <tr>        <th> Name</th>        <th>Output</th>    </tr>    <tr>        <td>Should now a cart from ms_cart_tiny.html</td>        <td>            <esi:include src="http://127.0.0.1:3017/ms_cart_tiny.html"/>        </td>    </tr>    </tbody></table></body></html>`)
+
+	b.Run("Detect binary", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			benchIsResponseAllowed = isResponseAllowed(mp4)
+		}
+		if benchIsResponseAllowed {
+			b.Fatal("MP4 not benchIsResponseAllowed but received true")
+		}
+	})
+
+	b.Run("Detect html", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			benchIsResponseAllowed = isResponseAllowed(html)
+		}
+		if !benchIsResponseAllowed {
+			b.Fatal("HTML benchIsResponseAllowed but received false")
+		}
+	})
 }

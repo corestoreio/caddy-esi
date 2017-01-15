@@ -63,9 +63,6 @@ func (pc PathConfigs) ConfigForPath(r *http.Request) *PathConfig {
 type PathConfig struct {
 	// Base path to match used as path prefix
 	Scope string
-	// AllowedStatusCodes if a 3rd party middleware returns any of the not listed
-	// status codes then the ESI middleware will get skipped.
-	AllowedStatusCodes []int
 
 	// MaxBodySize defaults to 5MB and limits the size of the returned body from a
 	// backend resource.
@@ -83,7 +80,7 @@ type PathConfig struct {
 	// extract the values and calculate a unique hash for the current requested
 	// page to identify the already parsed ESI tags in the cache.
 	PageIDSource []string
-	// AllowedMethods list of all allowed methods, defaults to GET
+	// AllowedMethods list of all benchIsResponseAllowed methods, defaults to GET
 	AllowedMethods []string
 	// OnError gets output when a request to a backend service fails.
 	OnError []byte
@@ -94,10 +91,6 @@ type PathConfig struct {
 	LogLevel string
 	// Log gets set up during setup
 	Log log.Logger
-
-	// TODO(CyS) skipped an internal flag which checks if a request is able to
-	// trigger the ESI parser.
-	skipped bool
 
 	esiMU sync.RWMutex
 	// esiCache identifies all parsed ESI tags in a page for specific path
@@ -177,32 +170,15 @@ func (pc *PathConfig) UpsertESITags(pageID uint64, entities esitag.Entities) {
 	pc.esiMU.Unlock()
 }
 
-// IsRequestAllowed decides if a request should be processed.
-// TODO(CyS) Check for correct content type
+// IsRequestAllowed decides if a request should be processed based on the
+// request method. The benchIsResponseAllowed response content-type is text only.
 func (pc *PathConfig) IsRequestAllowed(r *http.Request) bool {
-	if pc.skipped == true {
-		return false
-	}
+
 	if len(pc.AllowedMethods) == 0 {
 		return r.Method == http.MethodGet
 	}
 	for _, m := range pc.AllowedMethods {
 		if r.Method == m {
-			return true
-		}
-	}
-	return false
-}
-
-// IsStatusCodeAllowed checks if the returned status code from a 3rd party
-// middleware is allowed to trigger the ESI middleware.
-// Deprecated not worth ... wrong architecture
-func (pc *PathConfig) IsStatusCodeAllowed(code int) bool {
-	if len(pc.AllowedStatusCodes) == 0 {
-		return code == http.StatusOK
-	}
-	for _, c := range pc.AllowedStatusCodes {
-		if code == c {
 			return true
 		}
 	}
@@ -296,4 +272,11 @@ func (pc *PathConfig) reInit() {
 	pc.esiMU.Lock()
 	defer pc.esiMU.Unlock()
 	pc.esiCache = make(map[uint64]esitag.Entities)
+}
+
+// isResponseAllowed uses https://golang.org/pkg/net/http/#DetectContentType
+// it must read at least 512 bytes.
+func isResponseAllowed(buf []byte) bool {
+	fileType := http.DetectContentType(buf)
+	return strings.HasPrefix(fileType, "text/")
 }

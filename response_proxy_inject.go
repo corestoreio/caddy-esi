@@ -21,7 +21,6 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	"sync"
 
 	"github.com/SchumacherFM/caddyesi/esitag"
 )
@@ -37,6 +36,7 @@ func responseWrapInjector(chanTags <-chan esitag.DataTags, w http.ResponseWriter
 		tags:   <-chanTags,
 		header: make(http.Header),
 	}
+
 	if cn && fl && hj && rf {
 		return &injectingFancyWriter{bw}
 	}
@@ -49,33 +49,12 @@ func responseWrapInjector(chanTags <-chan esitag.DataTags, w http.ResponseWriter
 // injectingWriter wraps a http.ResponseWriter that implements the minimal
 // http.ResponseWriter interface.
 type injectingWriter struct {
-	rw            http.ResponseWriter
-	tags          esitag.DataTags
-	flushedHeader bool
-	wroteHeader   bool
-	code          int
-	headerMu      sync.Mutex
-	header        http.Header
-}
-
-// flushHeader recalculates the content-length and flushes the header
-func (b *injectingWriter) flushHeader(addContentLength int) {
-	if b.flushedHeader {
-		return
-	}
-	b.headerMu.Lock()
-	defer b.headerMu.Unlock()
-
-	const clname = "Content-Length"
-	clRaw := b.header.Get(clname)
-	cl, _ := strconv.Atoi(clRaw) // ignoring that err ... for now
-	b.header.Set(clname, strconv.Itoa(cl+addContentLength))
-
-	for k, v := range b.header {
-		b.rw.Header()[k] = v
-	}
-	b.rw.WriteHeader(b.code)
-	b.flushedHeader = true
+	rw              http.ResponseWriter
+	tags            esitag.DataTags
+	responseAllowed uint8 // 0 not yet tested, 1 yes, 2 no
+	wroteHeader     bool
+	header          http.Header
+	lastWritePos    int
 }
 
 func (b *injectingWriter) Header() http.Header {
@@ -83,21 +62,52 @@ func (b *injectingWriter) Header() http.Header {
 }
 
 func (b *injectingWriter) WriteHeader(code int) {
-	if !b.wroteHeader {
-		b.code = code
-		b.wroteHeader = true
+	if b.wroteHeader {
+		return
 	}
-	b.flushHeader(b.tags.DataLen())
+	b.wroteHeader = true
+	dataTagLen := b.tags.DataLen()
+
+	if dataTagLen != 0 {
+		const clName = "Content-Length"
+		clRaw := b.header.Get(clName)
+		cl, _ := strconv.Atoi(clRaw) // ignoring that err ... for now
+		// What if cl runs negative?
+		b.header.Set(clName, strconv.Itoa(cl+dataTagLen))
+	}
+
+	for k, v := range b.header {
+		b.rw.Header()[k] = v
+	}
+	b.rw.WriteHeader(code)
 }
 
 // Write does not write to the client instead it writes in the underlying buffer.
 func (b *injectingWriter) Write(p []byte) (int, error) {
+	const (
+		notTested uint8 = iota
+		yes
+		no
+	)
 
-	// might be buggy on multiple calls to Write()
+	if b.responseAllowed == notTested {
+		// Only plain text response is benchIsResponseAllowed, so detect content type.
+		// Hopefully p is longer than 512 bytes ;-)
+		b.responseAllowed = yes
+		if !isResponseAllowed(p) {
+			b.responseAllowed = no
+		}
+	}
 
-	buf := bytes.NewBuffer(p)
-	_, nw, err := b.tags.InjectContent(buf, b.rw)
+	if b.responseAllowed == no {
+		return b.rw.Write(p)
+	}
 
+	// might be buggy in InjectContent on multiple calls to Write(). Fix is to a position counter to the InjectContent.
+	// The position is pos+=len(p)
+	buf := bytes.NewBuffer(p) // todo simplify and use our own type
+	_, nw, err := b.tags.InjectContent(buf, b.rw, b.lastWritePos)
+	b.lastWritePos += len(p)
 	return nw, err
 }
 
@@ -128,13 +138,6 @@ func (f *injectingFancyWriter) Push(target string, opts *http.PushOptions) error
 func (f *injectingFancyWriter) ReadFrom(r io.Reader) (int64, error) {
 	return io.Copy(&f.injectingWriter, r)
 }
-
-var _ http.CloseNotifier = &injectingFancyWriter{}
-var _ http.Flusher = &injectingFancyWriter{}
-var _ http.Hijacker = &injectingFancyWriter{}
-var _ http.Pusher = &injectingFancyWriter{}
-var _ io.ReaderFrom = &injectingFancyWriter{}
-var _ http.Flusher = &injectingFlushWriter{}
 
 // injectingFlushWriter implements only http.Flusher mostly used
 type injectingFlushWriter struct {

@@ -126,36 +126,6 @@ func mwTestRunner(caddyFile string, r *http.Request, bodyContains string, wantEr
 	}
 }
 
-func TestMiddleware_ServeHTTP_StatusCodes(t *testing.T) {
-	defer backend.RegisterResourceHandler("mwtest01", backend.MockRequestContent("Hello 2017!")).DeferredDeregister()
-
-	t.Run("404 Code not allowed", func(t *testing.T) {
-
-		hndl := mwTestHandler(t, `esi {		}`)
-
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest("GET", "/page0999.html", nil)
-		code, err := hndl.ServeHTTP(rec, req)
-		assert.Exactly(t, http.StatusNotFound, code)
-		assert.NoError(t, err)
-		assert.Empty(t, rec.Body.String())
-	})
-
-	t.Run("404 Code allowed", func(t *testing.T) {
-		// stupid test ... must be refactored
-		hndl := mwTestHandler(t, `esi {
-				allowed_status_codes 404
-			}`)
-
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest("GET", "/page0998.html", nil)
-		code, err := hndl.ServeHTTP(rec, req)
-		assert.Exactly(t, http.StatusNotFound, code)
-		assert.NoError(t, err)
-		assert.Empty(t, rec.Body.String())
-	})
-}
-
 func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 	// t.Parallel() not possible due to the global map in backend
 
@@ -218,6 +188,13 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 		`<p>Micro1Service1 "mwTest02A://microService1" Timeout 5ms MaxBody 10 kB</p>
 <p>Micro2Service2 "mwTest02B://microService2" Timeout 6ms MaxBody 20 kB</p>
 <p>Micro3Service3 "mwTest02C://microService3" Timeout 7ms MaxBody 30 kB</p>`,
+		nil,
+	))
+
+	t.Run("ESI tags not present in page07.html", mwTestRunner(
+		`esi`,
+		httptest.NewRequest("GET", "/page07.html", nil),
+		`<esi_include   src="whuuusaa://micro.service/esi/foo" />`,
 		nil,
 	))
 

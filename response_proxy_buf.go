@@ -20,7 +20,6 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	"sync"
 )
 
 type responseBufferWriter interface {
@@ -58,7 +57,6 @@ type bufferedWriter struct {
 	flushedHeader bool
 	wroteHeader   bool
 	code          int
-	headerMu      sync.Mutex
 	header        http.Header
 }
 
@@ -66,13 +64,13 @@ func (b *bufferedWriter) FlushHeader(addContentLength int) {
 	if b.flushedHeader {
 		return
 	}
-	b.headerMu.Lock()
-	defer b.headerMu.Unlock()
 
-	const clname = "Content-Length"
-	clRaw := b.header.Get(clname)
-	cl, _ := strconv.Atoi(clRaw) // ignoring that err ... for now
-	b.header.Set(clname, strconv.Itoa(cl+addContentLength))
+	if addContentLength > 0 {
+		const clName = "Content-Length"
+		clRaw := b.header.Get(clName)
+		cl, _ := strconv.Atoi(clRaw) // ignoring that err ... for now
+		b.header.Set(clName, strconv.Itoa(cl+addContentLength))
+	}
 
 	for k, v := range b.header {
 		b.rw.Header()[k] = v
@@ -129,13 +127,6 @@ func (f *bufferedFancyWriter) Push(target string, opts *http.PushOptions) error 
 func (f *bufferedFancyWriter) ReadFrom(r io.Reader) (int64, error) {
 	return io.Copy(&f.bufferedWriter, r)
 }
-
-var _ http.CloseNotifier = &bufferedFancyWriter{}
-var _ http.Flusher = &bufferedFancyWriter{}
-var _ http.Hijacker = &bufferedFancyWriter{}
-var _ http.Pusher = &bufferedFancyWriter{}
-var _ io.ReaderFrom = &bufferedFancyWriter{}
-var _ http.Flusher = &bufferedFlushWriter{}
 
 // bufferedFlushWriter implements only http.Flusher mostly used
 type bufferedFlushWriter struct {

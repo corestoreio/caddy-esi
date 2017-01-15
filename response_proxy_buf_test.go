@@ -17,11 +17,20 @@ package caddyesi
 import (
 	"bytes"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// Check if types have the interfaces implemented.
+var _ http.CloseNotifier = &bufferedFancyWriter{}
+var _ http.Flusher = &bufferedFancyWriter{}
+var _ http.Hijacker = &bufferedFancyWriter{}
+var _ http.Pusher = &bufferedFancyWriter{}
+var _ io.ReaderFrom = &bufferedFancyWriter{}
+var _ http.Flusher = &bufferedFlushWriter{}
 
 func TestWrapBuffered(t *testing.T) {
 	wOrg := httptest.NewRecorder()
