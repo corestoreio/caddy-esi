@@ -391,7 +391,7 @@ func TestDataTags_InjectContent(t *testing.T) {
 			if _, err := page3F.Seek(0, 0); err != nil {
 				t.Fatal(err)
 			}
-			if _, _, err := tags.InjectContent(page3F, w); err != nil {
+			if _, _, err := tags.InjectContent(page3F, w, 0); err != nil {
 				t.Fatalf("%+v", err)
 			}
 
@@ -468,7 +468,7 @@ func BenchmarkDataTags_InjectContent(b *testing.B) {
 				}
 				b.StartTimer()
 
-				if _, _, err := tags.InjectContent(page3F, w); err != nil {
+				if _, _, err := tags.InjectContent(page3F, w, 0); err != nil {
 					b.Fatalf("%+v", err)
 				}
 
@@ -628,11 +628,11 @@ func TestEntities_QueryResources(t *testing.T) {
 
 	t.Run("Empty Entities returns not a nil DataTags slice", func(t *testing.T) {
 		ets := make(esitag.Entities, 0, 2)
-		dts, err := ets.QueryResources(nil)
+		tags, err := ets.QueryResources(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Exactly(t, esitag.DataTags{}, dts)
+		assert.Exactly(t, esitag.DataTags{}, tags)
 	})
 
 	defer backend.RegisterResourceHandler("teste1", backend.MockRequestContent("Content")).DeferredDeregister()
@@ -660,7 +660,7 @@ func TestEntities_QueryResources(t *testing.T) {
 		// sometimes this test gets flaky because it seems the the cancel() does
 		// not work properly :-( No idea ...
 		assert.EqualError(t, errors.Cause(err), context.Canceled.Error())
-		assert.Nil(t, tags)
+		assert.Exactly(t, esitag.DataTags{}, tags)
 	})
 
 	defer backend.RegisterResourceHandler("teste2a", backend.MockRequestError(errors.NewAlreadyClosedf("Ups already closed"))).DeferredDeregister()

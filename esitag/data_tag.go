@@ -37,10 +37,19 @@ type DataTags []DataTag
 // InjectContent reads from r and uses the data in a Tag to get injected a the
 // current position and then writes the output to w. DataTags must be a sorted
 // slice. Usually this function receives the data from Entities.QueryResources()
-func (dts DataTags) InjectContent(r io.Reader, w io.Writer) (nRead, nWritten int, _ error) {
-	if len(dts) == 0 {
-		return 0, 0, nil
-	}
+func (dts DataTags) InjectContent(r io.Reader, w io.Writer, lastStreamPos int) (nRead, nWritten int, _ error) {
+	//if len(dts) == 0 {
+	//	println("dts is empty")
+	//	return 0, 0, nil
+	//}
+
+	// lastStreamPos: first call to InjectContent and the lastStreamPos equals 0
+	// because we're at the beginning of the stream. the next call to
+	// InjectContent and lastStreamPos gets incremented by the length of the
+	// previous data in the Reader. DataTags.InjectContent does not know it gets
+	// called multiple times and hence it can inject the ESI tag data in
+	// subsequent calls. So lastStreamPos protects recurring replacements.
+	// TODO(CyS) implement lastStreamPos
 
 	dataBuf := bufpool.Get()
 	defer bufpool.Put(dataBuf)
@@ -65,7 +74,7 @@ func (dts DataTags) InjectContent(r io.Reader, w io.Writer) (nRead, nWritten int
 			esiStartPos := n - (dt.End - dt.Start)
 			wn, errW := w.Write(data[:esiStartPos])
 			nWritten += wn
-			if errW != nil { // cuts off until End
+			if errW != nil {
 				return nRead, nWritten, errors.NewWriteFailedf("[esitag] DataTags.InjectContent: Failed to write middleware data to writer: %q for tag index %d with start position %d and end position %d", errW, di, dt.Start, dt.End)
 			}
 
@@ -78,13 +87,16 @@ func (dts DataTags) InjectContent(r io.Reader, w io.Writer) (nRead, nWritten int
 		prevBufDataSize = dt.End
 	}
 
-	// io.Copy has more over head than the following code
+	// io.Copy has more over head than the following code ;-)
 	data = data[:cap(data)]
+	if len(data) == 0 {
+		panic("TODO caddyesi esitag InjectContent should not be possible ;-(")
+	}
 	for {
 		n, err := r.Read(data)
 		nRead += n
 		if err == io.EOF {
-			break
+			break // or return here
 		}
 		if err != nil {
 			return nRead, nWritten, errors.NewReadFailedf("[esitag] InjectContent failed to read remaining data: %s", err)
@@ -98,18 +110,17 @@ func (dts DataTags) InjectContent(r io.Reader, w io.Writer) (nRead, nWritten int
 		}
 	}
 
-	// just for debugging purposes
-	// println("nRead nWritten", nRead, nWritten)
-
 	return nRead, nWritten, nil
 }
 
 // DataLen returns the total length of all data fields in bytes.
 func (dts DataTags) DataLen() (l int) {
 	for _, dt := range dts {
-		// subtract the length of the raw ESI tag (end-start) to get the correct length
-		// of the inserted data for the Content-Length header.
-		// End can never be smaller than Start.
+		// subtract the length of the raw ESI tag (end-start) from the data
+		// length to get the correct length of the inserted data for the
+		// Content-Length header. End can never be smaller than Start. The sum
+		// can be negative, means the returned data from the backend resource is
+		// shorter than the ESI tag itself.
 		l += len(dt.Data) - (dt.End - dt.Start)
 	}
 	return

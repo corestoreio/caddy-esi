@@ -419,9 +419,10 @@ func (et Entities) String() string {
 }
 
 // QueryResources runs in parallel to query all available backend services /
-// resources which are available in the current page. The returned Tag slice is
-// guaranteed to be sorted after Start position. If the request gets canceled
-// via its context then all resource requests gets canceled too.
+// resources which are available in the current page. The returned DataTags
+// slice is guaranteed to be sorted after Start positions and non-nil. If the
+// request gets canceled via its context then all resource requests gets
+// cancelled too.
 func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 
 	if len(et) == 0 {
@@ -469,7 +470,7 @@ func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 	// errors, we don't need to send them (or check for them) in the individual
 	// results sent on the channel.
 	if err := g.Wait(); err != nil {
-		return nil, errors.Wrap(err, "[esitag] Entities.QueryResources ErrGroup.Error")
+		return DataTags{}, errors.Wrap(err, "[esitag] Entities.QueryResources ErrGroup.Error")
 	}
 
 	sort.Stable(tags)
