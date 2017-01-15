@@ -157,6 +157,8 @@ func TestMiddleware_ServeHTTP_StatusCodes(t *testing.T) {
 }
 
 func TestMiddleware_ServeHTTP_Once(t *testing.T) {
+	// t.Parallel() not possible due to the global map in backend
+
 	const errMsg = `mwTest01: A random micro service error`
 	defer backend.RegisterResourceHandler("mwtest01", backend.MockRequestError(errors.NewWriteFailedf(errMsg))).DeferredDeregister()
 
@@ -218,9 +220,11 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 <p>Micro3Service3 "mwTest02C://microService3" Timeout 7ms MaxBody 30 kB</p>`,
 		nil,
 	))
+
 }
 
 func TestMiddleware_ServeHTTP_Parallel(t *testing.T) {
+	// t.Parallel() not possible due to the global map in backend
 
 	// This test delivers food for the race detector.
 	// This tests creates 10 requests for each of the 20 users. All 200 requests
@@ -254,8 +258,8 @@ func TestMiddleware_ServeHTTP_Parallel(t *testing.T) {
 		assert.Contains(t, rec.Body.String(), `<p>Micro3Service33 "mwTest02C://microService3" Timeout 7ms MaxBody 30 kB</p>`)
 	}
 
-	tmpLogFile, _ := esitesting.Tempfile(t)
-	//defer clean()
+	tmpLogFile, clean := esitesting.Tempfile(t)
+	defer clean()
 	t.Log(tmpLogFile)
 	hpu.ServeHTTPNewRequest(func() *http.Request {
 		return httptest.NewRequest("GET", "/page02.html", nil)

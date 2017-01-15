@@ -22,7 +22,6 @@ import (
 
 	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/esitag"
-	"github.com/SchumacherFM/caddyesi/responseproxy"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	loghttp "github.com/corestoreio/log/http"
@@ -66,66 +65,7 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 	pageID, esiEntities := cfg.ESITagsByRequest(r)
 	if esiEntities == nil {
 		// Slow path because ESI cache tag is empty and we need to analyse the buffer.
-
-		buf := bufpool.Get()
-		defer bufpool.Put(buf)
-
-		bufResW := responseproxy.WrapBuffered(buf, w)
-
-		// We must wait until every single byte has been written into the buffer.
-		code, err := mw.Next.ServeHTTP(bufResW, r)
-		if err != nil {
-			return http.StatusInternalServerError, err
-		}
-		if !cfg.IsStatusCodeAllowed(code) {
-			// Headers and Status Code already written to the client but we need
-			// to flush the real content!
-			// TODO(CyS) make an entry in the ESI tag map that subsequent non-allowed requests to the same resource can be skipped
-			if _, err := w.Write(buf.Bytes()); err != nil {
-				return http.StatusInternalServerError, err
-			}
-			return code, nil
-		}
-
-		bufRdr := bytes.NewReader(buf.Bytes())
-
-		// Lets parse the buffer to find ESI tags. First Read
-		esiEntities, err = mw.calculateESITags(pageID, bufRdr, cfg)
-		if err != nil {
-			if cfg.Log.IsDebug() {
-				cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.calculateESITags",
-					log.Err(err), log.Uint64("page_id", pageID), loghttp.Request("request", r), log.Stringer("config", cfg),
-				)
-			}
-			return http.StatusInternalServerError, err
-		}
-
-		// Trigger the queries to the resource backends in parallel
-		// TODO(CyS) Coalesce requests
-		tags, err := esiEntities.QueryResources(r)
-
-		if err != nil {
-			// wrong behaviour compared to below
-			if cfg.Log.IsDebug() {
-				cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.esiEntities.QueryResources.Error",
-					log.Err(err), loghttp.Request("request", r), log.Stringer("config", cfg),
-					log.Uint64("page_id", pageID),
-				)
-			}
-			return http.StatusInternalServerError, err
-		}
-
-		if _, err := bufRdr.Seek(0, 0); err != nil {
-			return http.StatusInternalServerError, err
-		}
-
-		// read the 2nd time from the buffer to finally inject the content from the resource backends
-		// into the HTML page
-		if _, err := tags.InjectContent(bufRdr, w); err != nil {
-			return http.StatusInternalServerError, err
-		}
-
-		return code, err
+		return mw.serveBuffered(cfg, pageID, w, r)
 	}
 
 	////////////////////////////////////////////////////////////////////////////////
@@ -146,46 +86,61 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 				)
 			}
 		}
+
 		chanTags <- tags
 		close(chanTags)
 	}()
 
-	wpResW := responseproxy.WrapPiped( // this one would panic because error in ppr.CloseWithError
-		esitag.NewDataTagsInjector(chanTags, w), // runs in a goroutine
-		w,
-	)
-	defer func() {
-		if err := wpResW.Close(); err != nil {
-			panic(err) // only now during dev
-		}
-	}()
+	code, err := mw.Next.ServeHTTP(responseWrapInjector(chanTags, w), r)
 
-	// Start Serving and writing into the pipe
-	code, err := mw.Next.ServeHTTP(wpResW, r)
-	if err != nil {
-		// discard the cErr channel to the GC ... hope that works
-		return http.StatusInternalServerError, errors.Wrap(err, "[caddyesi] Error from Next.ServeHTTP")
-	}
 	if !cfg.IsStatusCodeAllowed(code) {
 		// too late because the goroutine injectcontent has already written the data
 		cfg.skipped = true
 		// todo test it
-
 	}
 
 	return code, err
-
 }
 
-func (mw *Middleware) calculateESITags(pageID uint64, body io.Reader, cfg *PathConfig) (esitag.Entities, error) {
+// serveBuffered creates a http.ResponseWriter buffer, calls the next handler,
+// waits until the buffer has been filled, parses the buffer for ESI tags,
+// queries the resources and injects the data from the resources into the output
+// towards the http.ResponseWriter.Write.
+func (mw *Middleware) serveBuffered(cfg *PathConfig, pageID uint64, w http.ResponseWriter, r *http.Request) (int, error) {
+
+	buf := bufpool.Get()
+	defer bufpool.Put(buf)
+
+	bufResW := responseWrapBuffer(buf, w)
+
+	// We must wait until every single byte has been written into the buffer.
+	code, err := mw.Next.ServeHTTP(bufResW, r)
+	if err != nil {
+		return http.StatusInternalServerError, err
+	}
+	if !cfg.IsStatusCodeAllowed(code) {
+		// Headers and Status Code already written to the client but we need
+		// to flush the real content!
+		// TODO(CyS) make an entry in the ESI tag map that subsequent non-allowed requests to the same resource can be skipped
+		// flush header
+		if _, err := w.Write(buf.Bytes()); err != nil {
+			return http.StatusInternalServerError, err
+		}
+		return code, nil
+	}
+
+	bufRdr := bytes.NewReader(buf.Bytes())
+
+	// Lets parse the buffer to find ESI tags. First Read
 	// within this IF block we make sure with the Group.Do call that ESI
 	// tags to a specific page get only parsed once even if multiple
 	// requests are coming in to the same page. therefore make sure your
 	// pageID has been calculated correctly.
 
 	// run a performance load test to see if it's worth to switch to Group.DoChan
-	result, err, shared := mw.Group.Do(strconv.FormatUint(pageID, 10), func() (interface{}, error) {
+	groupEntitiesResult, err, shared := mw.Group.Do(strconv.FormatUint(pageID, 10), func() (interface{}, error) {
 
+		var body io.Reader = bufRdr
 		var bodyBuf *bytes.Buffer
 		if cfg.Log.IsDebug() {
 			bodyBuf = new(bytes.Buffer)
@@ -205,20 +160,42 @@ func (mw *Middleware) calculateESITags(pageID uint64, body io.Reader, cfg *PathC
 
 		return entities, nil
 	})
-
 	if err != nil {
 		if cfg.Log.IsDebug() {
 			cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.Group.Do.Error",
 				log.Err(err), log.Stringer("config", cfg),
-				log.Bool("shared", shared), log.Uint64("page_id", pageID),
+				log.Bool("shared", shared), log.Uint64("page_id", pageID), loghttp.Request("request", r),
 			)
 		}
-		return nil, err
+		return http.StatusInternalServerError, err
 	}
 
-	esiEntities, ok := result.(esitag.Entities)
-	if !ok {
-		return nil, errors.NewFatalf("[caddyesi] A programmer made a terrible mistake: %#v", result)
+	// Trigger the queries to the resource backends in parallel
+	// TODO(CyS) Coalesce requests
+
+	tags, err := (groupEntitiesResult.(esitag.Entities)).QueryResources(r)
+	if err != nil {
+		// wrong behaviour compared to below
+		if cfg.Log.IsDebug() {
+			cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.esiEntities.QueryResources.Error",
+				log.Err(err), loghttp.Request("request", r), log.Stringer("config", cfg),
+				log.Uint64("page_id", pageID),
+			)
+		}
+		return http.StatusInternalServerError, err
 	}
-	return esiEntities, nil
+
+	// Calculates the correct Content-Length
+	bufResW.FlushHeader(tags.DataLen())
+
+	if _, err := bufRdr.Seek(0, 0); err != nil {
+		return http.StatusInternalServerError, err
+	}
+	// read the 2nd time from the buffer to finally inject the content from the resource backends
+	// into the HTML page
+	if _, _, err := tags.InjectContent(bufRdr, w); err != nil {
+		return http.StatusInternalServerError, err
+	}
+
+	return code, err
 }

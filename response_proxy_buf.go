@@ -12,36 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package responseproxy
+package caddyesi
 
 import (
 	"bufio"
 	"io"
 	"net"
 	"net/http"
+	"strconv"
+	"sync"
 )
 
-// BufferedWriter is a proxy around an http.ResponseWriter that allows you write
-// the response body into a buffer instead of directly writing to the client.
-// You must take care that the buffer gets written to the client. Calls to
-// Flush() do not flush the buffer. Headers gets written directly to the client.
-type BufferedWriter interface {
+type responseBufferWriter interface {
 	http.ResponseWriter
-	// Unwrap returns the original proxied target.
-	Unwrap() http.ResponseWriter
+	FlushHeader(addContentLength int)
 }
 
-// WrapBuffered wraps an http.ResponseWriter, returning a proxy which only writes
+// responseWrapBuffer wraps an http.ResponseWriter, returning a proxy which only writes
 // into the provided io.Writer.
-func WrapBuffered(buf io.Writer, w http.ResponseWriter) BufferedWriter {
+func responseWrapBuffer(buf io.Writer, w http.ResponseWriter) responseBufferWriter {
 	_, cn := w.(http.CloseNotifier)
 	_, fl := w.(http.Flusher)
 	_, hj := w.(http.Hijacker)
 	_, rf := w.(io.ReaderFrom)
 
 	bw := bufferedWriter{
-		ResponseWriter: w,
-		buf:            buf,
+		rw:     w,
+		buf:    buf,
+		header: make(http.Header),
 	}
 	if cn && fl && hj && rf {
 		return &bufferedFancyWriter{bw}
@@ -55,19 +53,48 @@ func WrapBuffered(buf io.Writer, w http.ResponseWriter) BufferedWriter {
 // bufferedWriter wraps a http.ResponseWriter that implements the minimal
 // http.ResponseWriter interface.
 type bufferedWriter struct {
-	http.ResponseWriter
-	buf io.Writer
+	rw            http.ResponseWriter
+	buf           io.Writer
+	flushedHeader bool
+	wroteHeader   bool
+	code          int
+	headerMu      sync.Mutex
+	header        http.Header
+}
+
+func (b *bufferedWriter) FlushHeader(addContentLength int) {
+	if b.flushedHeader {
+		return
+	}
+	b.headerMu.Lock()
+	defer b.headerMu.Unlock()
+
+	const clname = "Content-Length"
+	clRaw := b.header.Get(clname)
+	cl, _ := strconv.Atoi(clRaw) // ignoring that err ... for now
+	b.header.Set(clname, strconv.Itoa(cl+addContentLength))
+
+	for k, v := range b.header {
+		b.rw.Header()[k] = v
+	}
+	b.rw.WriteHeader(b.code)
+	b.flushedHeader = true
+}
+
+func (b *bufferedWriter) Header() http.Header {
+	return b.header
+}
+
+func (b *bufferedWriter) WriteHeader(code int) {
+	if !b.wroteHeader {
+		b.code = code
+		b.wroteHeader = true
+	}
 }
 
 // Write does not write to the client instead it writes in the underlying buffer.
-func (b *bufferedWriter) Write(buf []byte) (int, error) {
-	b.WriteHeader(http.StatusOK)
-	return b.buf.Write(buf)
-}
-
-// Unwrap returns the original underlying ResponseWriter.
-func (b *bufferedWriter) Unwrap() http.ResponseWriter {
-	return b.ResponseWriter
+func (b *bufferedWriter) Write(p []byte) (int, error) {
+	return b.buf.Write(p)
 }
 
 // bufferedFancyWriter is a writer that additionally satisfies
@@ -80,19 +107,19 @@ type bufferedFancyWriter struct {
 }
 
 func (f *bufferedFancyWriter) CloseNotify() <-chan bool {
-	cn := f.bufferedWriter.ResponseWriter.(http.CloseNotifier)
+	cn := f.bufferedWriter.rw.(http.CloseNotifier)
 	return cn.CloseNotify()
 }
 func (f *bufferedFancyWriter) Flush() {
-	fl := f.bufferedWriter.ResponseWriter.(http.Flusher)
+	fl := f.bufferedWriter.rw.(http.Flusher)
 	fl.Flush()
 }
 func (f *bufferedFancyWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	hj := f.bufferedWriter.ResponseWriter.(http.Hijacker)
+	hj := f.bufferedWriter.rw.(http.Hijacker)
 	return hj.Hijack()
 }
 func (f *bufferedFancyWriter) Push(target string, opts *http.PushOptions) error {
-	if p, ok := f.bufferedWriter.ResponseWriter.(http.Pusher); ok {
+	if p, ok := f.bufferedWriter.rw.(http.Pusher); ok {
 		return p.Push(target, opts)
 	}
 	return nil
@@ -108,7 +135,7 @@ var _ http.Flusher = &bufferedFancyWriter{}
 var _ http.Hijacker = &bufferedFancyWriter{}
 var _ http.Pusher = &bufferedFancyWriter{}
 var _ io.ReaderFrom = &bufferedFancyWriter{}
-var _ http.Flusher = &flushWriter{}
+var _ http.Flusher = &bufferedFlushWriter{}
 
 // bufferedFlushWriter implements only http.Flusher mostly used
 type bufferedFlushWriter struct {
@@ -116,6 +143,6 @@ type bufferedFlushWriter struct {
 }
 
 func (f *bufferedFlushWriter) Flush() {
-	fl := f.bufferedWriter.ResponseWriter.(http.Flusher)
+	fl := f.bufferedWriter.rw.(http.Flusher)
 	fl.Flush()
 }
