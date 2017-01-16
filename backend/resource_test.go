@@ -25,6 +25,7 @@ import (
 
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/corestoreio/errors"
+	"github.com/corestoreio/log"
 	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 )
@@ -33,6 +34,7 @@ var _ fmt.Stringer = (*backend.Resource)(nil)
 var _ backend.TemplateExecer = (*template.Template)(nil)
 var _ easyjson.Marshaler = (*backend.ResourceArgs)(nil)
 var _ easyjson.Unmarshaler = (*backend.ResourceArgs)(nil)
+var _ log.Marshaler = (*backend.ResourceArgs)(nil)
 
 func TestNewResource(t *testing.T) {
 	t.Run("URL", func(t *testing.T) {

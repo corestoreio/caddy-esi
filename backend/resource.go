@@ -55,6 +55,8 @@ type TemplateExecer interface {
 	Name() string
 }
 
+// TODO(CyS) remove text.template and create the same as the Caddy replacer
+
 // ParseTemplate parses text as a template body for t. To implement a new
 // template engine just change the function body. We cannot return a pointer to
 // a struct because other functions use nil checks to the interface and a nil
@@ -293,6 +295,21 @@ func (a *ResourceArgs) TemplateToURL(te TemplateExecer) (string, error) {
 		return "", errors.NewTemporaryf("[esitag] Resource URL %q, Key %q: Template error: %s\nContent: %s", a.URL, a.Key, err, buf)
 	}
 	return buf.String(), nil
+}
+
+// MarshalLog special crafted log format
+func (a *ResourceArgs) MarshalLog(kv log.KeyValuer) error {
+	kv.AddString("ra_url", a.URL)
+	kv.AddInt64("ra_timeout", a.Timeout.Nanoseconds())
+	kv.AddUint64("ra_max_body_size", a.MaxBodySize)
+	kv.AddString("ra_max_body_size_h", a.MaxBodySizeHumanized())
+	kv.AddString("ra_key", a.Key)
+	kv.AddInt64("ra_ttl", a.TTL.Nanoseconds())
+	kv.AddString("ra_forward_headers", strings.Join(a.ForwardHeaders, "|"))
+	kv.AddBool("ra_forward_headers_all", a.ForwardHeadersAll)
+	kv.AddString("ra_return_headers", strings.Join(a.ReturnHeaders, "|"))
+	kv.AddBool("ra_return_headers_all", a.ReturnHeadersAll)
+	return nil
 }
 
 const mockRequestMsg = "%s %q Timeout %s MaxBody %s"
