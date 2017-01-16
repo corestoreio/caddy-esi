@@ -1,0 +1,21 @@
+{
+    Name: "Load page01 two times, TODO ask vdobler how to do two requests"
+
+    Request: {
+        Method: "GET"
+        URL:    "{{PROTOCOL}}://{{HOST}}/page01.html"
+        Header: {
+            "Accept":          "text/html"
+            "Accept-Encoding": "gzip, deflate, br"
+        }
+        Timeout: "1s"
+    }
+    Checks: [
+        {Check: "StatusCode", Expect: 200}
+        {Check: "Header", Header: "Etag", Min: 10}
+        {Check: "None", Of: [
+            {Check: "Body", Contains: "<esi:"}
+        ]}
+        {Check: "Body", Contains: "demo-store.shop/autumn-pullie.html", Count: 1}
+    ]
+}

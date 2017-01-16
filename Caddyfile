@@ -1,30 +1,24 @@
+# front facing webserver
 http://127.0.0.1:2017 {
-    root ./www_root/
     tls off
+    root ./www_root/
     # gzip
     browse
     ext    .html
-    log    testdata/cdy_test_2017_access.log
-    errors testdata/cdy_test_2017_errors.log
+    log    ./cdy_test_2017_access.log
+    errors ./cdy_test_2017_errors.log
     # errors visible
 
     esi {
-        log_file testdata/cdy_test_2017_debug.log
+        log_file ./cdy_test_2017_debug.log
         log_level debug
     }
 }
 
 # micro service (ms) end point
 http://127.0.0.1:3017 {
-    root ./www_root/
-    log    testdata/cdy_test_3017_access.log
-    errors testdata/cdy_test_3017_errors.log
     tls off
-
-    # bug content not fully read
-    #esi {
-    #    log_file testdata/cdy_test_3017_debug.log
-    #    log_level debug
-    #}
-
+    root ./www_root/
+    log    ./cdy_test_3017_access.log
+    errors ./cdy_test_3017_errors.log
 }
