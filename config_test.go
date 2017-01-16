@@ -39,7 +39,7 @@ func TestPathConfig_PageID(t *testing.T) {
 			pc.PageIDSource = pageIDSource
 
 			if have, want := pc.pageID(r), wantSum; have != want {
-				t.Errorf("Have: %x Want: %x", have, want)
+				t.Errorf("Test %q\nHave: %x Want: %x\nHave: %d Want: %d", t.Name(), have, want, have, want)
 			}
 		}
 	}
@@ -143,6 +143,17 @@ func TestPathConfig_PageID(t *testing.T) {
 		[]string{"url"},
 		httptest.NewRequest("GET", weirdLongURL, nil),
 		0x6c7360d1c2978e84, // full url
+	))
+
+	t.Run("default page01.html", runner(
+		nil,
+		httptest.NewRequest("GET", "http://127.0.0.1:2017/page01.html", nil),
+		0xe7fcc1b160b213c2,
+	))
+	t.Run("default page02.html", runner(
+		nil,
+		httptest.NewRequest("GET", "http://127.0.0.1:2017/page02.html", nil),
+		0xb5a0ad5009522352,
 	))
 
 }

@@ -146,7 +146,8 @@ func (mw *Middleware) serveBuffered(cfg *PathConfig, pageID uint64, w http.Respo
 		entities, err := esitag.Parse(body)
 		if cfg.Log.IsDebug() {
 			cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse",
-				log.Err(err), log.Uint64("page_id", pageID), log.Int("tag_count", len(entities)), log.Stringer("content", bodyBuf),
+				log.Err(err), log.Uint64("page_id", pageID), log.Int("tag_count", len(entities)),
+				loghttp.Request("request", r), log.Stringer("content", bodyBuf),
 			)
 		}
 		if err != nil {
