@@ -335,7 +335,7 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 
 		var lFields log.Fields
 		if et.Log.IsDebug() {
-			lFields = log.Fields{log.Int("resource_index", r.Index), log.String("url", r.String())}
+			lFields = log.Fields{log.Int("resource_index", r.Index), log.String("resource_url", r.String()), log.Marshal("resource_arguments", rfa)}
 		}
 
 		switch state, lastFailure := r.CBState(); state {
