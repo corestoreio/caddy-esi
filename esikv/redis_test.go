@@ -40,21 +40,26 @@ func TestNewRedis(t *testing.T) {
 		assert.Nil(t, be)
 	})
 
-	t.Run("Fetch Key OK", func(t *testing.T) {
+	t.Run("Authentication and Fetch Key OK", func(t *testing.T) {
 
 		mr := miniredis.NewMiniRedis()
 		if err := mr.Start(); err != nil {
 			t.Fatal(err)
 		}
 		defer mr.Close()
+		mr.RequireAuth("MyPa55w04d")
+
+		be, err := esikv.NewResourceHandler(fmt.Sprintf("redis://MrMiyagi:%s@%s", "MyPa55w04d", mr.Addr()))
+		if be == nil {
+			t.Fatalf("NewResourceHandler to %q returns nil %+v", mr.Addr(), err)
+		}
+		if err != nil {
+			t.Fatalf("Redis connection %q error: %+v", mr.Addr(), err)
+		}
 
 		if err := mr.Set("product_price_4711", "123,45 € Way too long"); err != nil {
 			t.Fatal(err)
 		}
-
-		be, err := esikv.NewResourceHandler(fmt.Sprintf("redis://%s", mr.Addr()))
-		assert.NoError(t, err, "%+v", err)
-		defer be.Close()
 
 		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
@@ -67,21 +72,50 @@ func TestNewRedis(t *testing.T) {
 		assert.Exactly(t, "123,45 €", string(content))
 	})
 
-	t.Run("Cancel Request towards Redis", func(t *testing.T) {
-
+	t.Run("Authentication failed", func(t *testing.T) {
 		mr := miniredis.NewMiniRedis()
 		if err := mr.Start(); err != nil {
 			t.Fatal(err)
 		}
 		defer mr.Close()
+		mr.RequireAuth("MyPasw04d")
 
-		if err := mr.Set("product_price_4711", "123,45 € Way too long"); err != nil {
+		be, err := esikv.NewRedis(fmt.Sprintf("redis://MrMiyagi:%s@%s", "MyPa55w04d", mr.Addr()))
+		if be != nil {
+			t.Fatalf("NewResourceHandler to %q returns not nil", mr.Addr())
+		}
+		assert.True(t, errors.IsFatal(err), "%+v", err)
+	})
+
+	getMrBee := func(t *testing.T) (*miniredis.Miniredis, backend.ResourceHandler, func()) {
+		mr := miniredis.NewMiniRedis()
+		if err := mr.Start(); err != nil {
 			t.Fatal(err)
 		}
 
 		be, err := esikv.NewResourceHandler(fmt.Sprintf("redis://%s", mr.Addr()))
-		assert.NoError(t, err, "%+v", err)
-		defer be.Close()
+		if be == nil {
+			t.Fatalf("NewResourceHandler to %q returns nil %+v", mr.Addr(), err)
+		}
+		if err != nil {
+			t.Fatalf("Redis connection %q error: %+v", mr.Addr(), err)
+		}
+
+		return mr, be, func() {
+			mr.Close()
+			if err := be.Close(); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	t.Run("Cancel Request towards Redis", func(t *testing.T) {
+		mr, be, closer := getMrBee(t)
+		defer closer()
+
+		if err := mr.Set("product_price_4711", "123,45 € Way too long"); err != nil {
+			t.Fatal(err)
+		}
 
 		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
@@ -95,16 +129,8 @@ func TestNewRedis(t *testing.T) {
 	})
 
 	t.Run("Fetch Key OK but value not set, should return all nil", func(t *testing.T) {
-
-		mr := miniredis.NewMiniRedis()
-		if err := mr.Start(); err != nil {
-			t.Fatal(err)
-		}
-		defer mr.Close()
-
-		be, err := esikv.NewResourceHandler(fmt.Sprintf("redis://%s", mr.Addr()))
-		assert.NoError(t, err, "%+v", err)
-		defer be.Close()
+		_, be, closer := getMrBee(t)
+		defer closer()
 
 		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
@@ -118,15 +144,8 @@ func TestNewRedis(t *testing.T) {
 	})
 
 	t.Run("Key empty error", func(t *testing.T) {
-		mr := miniredis.NewMiniRedis()
-		if err := mr.Start(); err != nil {
-			t.Fatal(err)
-		}
-		defer mr.Close()
-
-		be, err := esikv.NewRedis(fmt.Sprintf("redis://%s", mr.Addr()))
-		assert.NoError(t, err, "%+v", err)
-		defer be.Close()
+		_, be, closer := getMrBee(t)
+		defer closer()
 
 		hdr, content, err := be.DoRequest(&backend.ResourceArgs{})
 		require.True(t, errors.IsEmpty(err), "%+v", err)
@@ -135,15 +154,8 @@ func TestNewRedis(t *testing.T) {
 	})
 
 	t.Run("ExternalReq empty error", func(t *testing.T) {
-		mr := miniredis.NewMiniRedis()
-		if err := mr.Start(); err != nil {
-			t.Fatal(err)
-		}
-		defer mr.Close()
-
-		be, err := esikv.NewRedis(fmt.Sprintf("redis://%s", mr.Addr()))
-		assert.NoError(t, err, "%+v", err)
-		defer be.Close()
+		_, be, closer := getMrBee(t)
+		defer closer()
 
 		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
 			Key: "Hello",
@@ -154,15 +166,8 @@ func TestNewRedis(t *testing.T) {
 	})
 
 	t.Run("Timeout empty error", func(t *testing.T) {
-		mr := miniredis.NewMiniRedis()
-		if err := mr.Start(); err != nil {
-			t.Fatal(err)
-		}
-		defer mr.Close()
-
-		be, err := esikv.NewRedis(fmt.Sprintf("redis://%s", mr.Addr()))
-		assert.NoError(t, err, "%+v", err)
-		defer be.Close()
+		_, be, closer := getMrBee(t)
+		defer closer()
 
 		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
 			Key:         "Hello",
@@ -174,15 +179,8 @@ func TestNewRedis(t *testing.T) {
 	})
 
 	t.Run("MaxBodySize empty error", func(t *testing.T) {
-		mr := miniredis.NewMiniRedis()
-		if err := mr.Start(); err != nil {
-			t.Fatal(err)
-		}
-		defer mr.Close()
-
-		be, err := esikv.NewRedis(fmt.Sprintf("redis://%s", mr.Addr()))
-		assert.NoError(t, err, "%+v", err)
-		defer be.Close()
+		_, be, closer := getMrBee(t)
+		defer closer()
 
 		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
 			Key:         "Hello",
@@ -195,22 +193,14 @@ func TestNewRedis(t *testing.T) {
 	})
 
 	t.Run("Key Template", func(t *testing.T) {
-
-		mr := miniredis.NewMiniRedis()
-		if err := mr.Start(); err != nil {
-			t.Fatal(err)
-		}
-		defer mr.Close()
+		mr, be, closer := getMrBee(t)
+		defer closer()
 
 		const key = `product_{{ .Req.Header.Get "X-Product-ID" }}`
 		const wantContent = `<b>Awesome large Gopher plush toy</b>`
 		if err := mr.Set("product_GopherPlushXXL", wantContent); err != nil {
 			t.Fatal(err)
 		}
-
-		be, err := esikv.NewResourceHandler(fmt.Sprintf("redis://%s", mr.Addr()))
-		assert.NoError(t, err, "%+v", err)
-		defer be.Close()
 
 		tpl, err := template.New("key_tpl").Parse(key)
 		require.NoError(t, err)

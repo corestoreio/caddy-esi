@@ -21,18 +21,19 @@ import (
 	"net/url"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/corestoreio/errors"
-	"gopkg.in/redis.v5"
+	"github.com/garyburd/redigo/redis"
 )
 
 // Maybe replace redis client with redigo even better if there is a redis client with build in context
 // https://github.com/garyburd/redigo/issues/207 <-- context to be added to the package: declined.
 
 type esiRedis struct {
-	url string
-	cl  *redis.Client
+	url  string
+	pool *redis.Pool
 }
 
 // NewRedis provides, for now, a basic implementation for simple key fetching.
@@ -43,62 +44,39 @@ func NewRedis(rawURL string) (backend.ResourceHandler, error) {
 	}
 	r := &esiRedis{
 		url: rawURL,
-		cl: redis.NewClient(&redis.Options{
-			// The network type, either tcp or unix.
-			// Default is tcp.
-			Network: "tcp",
-			// host:port address.
-			Addr: addr,
-
-			// Optional password. Must match the password specified in the
-			// requirepass server configuration option.
-			Password: pw,
-			// Database to be selected after connecting to the server.
-			DB: db,
-
-			//// Maximum number of retries before giving up.
-			//// Default is to not retry failed commands.
-			//MaxRetries int
-			//
-			//// Dial timeout for establishing new connections.
-			//// Default is 5 seconds.
-			//DialTimeout time.Duration
-			//// Timeout for socket reads. If reached, commands will fail
-			//// with a timeout instead of blocking.
-			//// Default is 3 seconds.
-			//ReadTimeout time.Duration
-			//// Timeout for socket writes. If reached, commands will fail
-			//// with a timeout instead of blocking.
-			//// Default is 3 seconds.
-			//WriteTimeout time.Duration
-			//
-			//// Maximum number of socket connections.
-			//// Default is 10 connections.
-			//PoolSize int
-			//// Amount of time client waits for connection if all connections
-			//// are busy before returning an error.
-			//// Default is ReadTimeout + 1 second.
-			//PoolTimeout time.Duration
-			//// Amount of time after which client closes idle connections.
-			//// Should be less than server's timeout.
-			//// Default is to not close idle connections.
-			//IdleTimeout time.Duration
-			//// Frequency of idle checks.
-			//// Default is 1 minute.
-			//// When minus value is set, then idle check is disabled.
-			//IdleCheckFrequency time.Duration
-			//
-			//// TLS Config to use. When set TLS will be negotiated.
-			//TLSConfig *tls.Config
-		}),
+		pool: &redis.Pool{
+			MaxActive:   5,                 // just guessed that number, make it configurable in the connection URI
+			MaxIdle:     40,                // just guessed that number, make it configurable in the connection URI
+			IdleTimeout: 240 * time.Second, // make it configurable in the connection URI
+			Dial: func() (redis.Conn, error) {
+				c, err := redis.Dial("tcp", addr)
+				if err != nil {
+					return nil, errors.Wrap(err, "[esikv] Redis Dial failed")
+				}
+				if pw != "" {
+					if _, err := c.Do("AUTH", pw); err != nil {
+						c.Close()
+						return nil, errors.Wrap(err, "[esikv] Redis AUTH failed")
+					}
+				}
+				if _, err := c.Do("SELECT", db); err != nil {
+					c.Close()
+					return nil, errors.Wrap(err, "[esikv] Redis DB select failed")
+				}
+				return c, nil
+			},
+		},
 	}
 
-	pong, err := r.cl.Ping().Result()
-	if err != nil {
+	conn := r.pool.Get()
+	defer conn.Close()
+
+	pong, err := redis.String(conn.Do("PING"))
+	if err != nil && err != redis.ErrNil {
 		return nil, errors.NewFatalf("[esikv] Redis Ping failed: %s", err)
 	}
 	if pong != "PONG" {
-		return nil, errors.NewFatalf("[esikv] Redis Ping not Pong: %q", pong)
+		return nil, errors.NewFatalf("[esikv] Redis Ping not Pong: %#v", pong)
 	}
 
 	return r, nil
@@ -107,56 +85,12 @@ func NewRedis(rawURL string) (backend.ResourceHandler, error) {
 // Closes closes the resource when Caddy restarts or reloads. If supported
 // by the resource.
 func (er *esiRedis) Close() error {
-	return errors.Wrapf(er.cl.Close(), "[esikv] Redis Close. URL %q", er.url)
+	return errors.Wrapf(er.pool.Close(), "[esikv] Redis Close. URL %q", er.url)
 }
 
 // DoRequest returns a value from the field Key in the args argument. Header is
-// not supported. Request cancellation through a timeout is NOT supported.
-//func (er *esiRedis) DoRequest(args *backend.ResourceArgs) (_ http.Header, content []byte, err error) {
-//	switch {
-//	case args.Key == "":
-//		err = errors.NewEmptyf("[esibackend] For ResourceArgs %#v the URL value is empty", args)
-//	case args.ExternalReq == nil:
-//		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the ExternalReq value is nil", args.URL)
-//	case args.Timeout < 1:
-//		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the timeout value is empty", args.URL)
-//	case args.MaxBodySize == 0:
-//		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the maxBodySize value is empty", args.URL)
-//	}
-//	if err != nil {
-//		return nil, nil, err
-//	}
-//
-//	key := args.Key
-//	if key == "" {
-//		return nil, nil, errors.NewEmptyf("[esikv] Redis.Get Key is empty for resource %q", args.URL)
-//	}
-//
-//	nKey, err := args.TemplateToURL(args.KeyTemplate)
-//	if err != nil {
-//		return nil, nil, errors.Wrapf(err, "[esikv] Redis.Get.TemplateToURL %q => %q", args.URL, er.cl.String())
-//	}
-//	if nKey != "" {
-//		key = nKey
-//	}
-//
-//	v, err := er.cl.Get(key).Bytes()
-//	if err == redis.Nil {
-//		return nil, nil, nil
-//	}
-//	if err != nil {
-//		return nil, nil, errors.Wrapf(err, "[esikv] Redis.Get %q => %q", args.URL, er.cl.String())
-//	}
-//
-//	if mbs := int(args.MaxBodySize); len(v) > mbs && mbs > 0 {
-//		v = v[:mbs] // not the nicest solution but works for now
-//	}
-//
-//	return nil, v, nil
-//}
-
-// DoRequest returns a value from the field Key in the args argument. Header is
-// not supported. Request cancellation through a timeout is supported.
+// not supported. Request cancellation through a timeout (when the client
+// request gets cancelled) is supported.
 func (er *esiRedis) DoRequest(args *backend.ResourceArgs) (_ http.Header, content []byte, err error) {
 	switch {
 	case args.Key == "":
@@ -174,6 +108,7 @@ func (er *esiRedis) DoRequest(args *backend.ResourceArgs) (_ http.Header, conten
 
 	key := args.Key
 
+	// See git history for a version without context.WithTimeout. A bit faster and less allocs.
 	ctx, cancel := context.WithTimeout(args.ExternalReq.Context(), args.Timeout)
 	defer cancel()
 
@@ -184,21 +119,24 @@ func (er *esiRedis) DoRequest(args *backend.ResourceArgs) (_ http.Header, conten
 			done <- struct{}{}
 		}()
 
+		conn := er.pool.Get()
+		defer conn.Close()
+
 		nKey, err := args.TemplateToURL(args.KeyTemplate)
 		if err != nil {
-			retErr = errors.Wrapf(err, "[esikv] Redis.Get.TemplateToURL %q => %q", args.URL, er.cl.String())
+			retErr = errors.Wrapf(err, "[esikv] Redis.Get.TemplateToURL %q => %q", args.URL, er.url)
 			return
 		}
 		if nKey != "" {
 			key = nKey
 		}
 
-		content, err = er.cl.Get(key).Bytes()
-		if err == redis.Nil {
+		content, err = redis.Bytes(conn.Do("GET", key))
+		if err == redis.ErrNil {
 			return
 		}
 		if err != nil {
-			retErr = errors.Wrapf(err, "[esikv] Redis.Get %q => %q", args.URL, er.cl.String())
+			retErr = errors.Wrapf(err, "[esikv] Redis.Get %q => %q", args.URL, er.url)
 			return
 		}
 
