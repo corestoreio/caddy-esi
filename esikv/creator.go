@@ -61,7 +61,6 @@ func NewResourceHandler(url string) (backend.ResourceHandler, error) {
 	case "mockTimeout":
 		return resourceMock{
 			DoRequestFn: func(*backend.ResourceArgs) (_ http.Header, content []byte, err error) {
-				// it panics if the URI has not the format:
 				// mockTimeout://duration
 				return nil, nil, errors.NewTimeoutf("[esikv] Timeout after %q", url[idx+3:])
 			},

@@ -19,7 +19,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"time"
 
@@ -28,26 +27,41 @@ import (
 	"github.com/garyburd/redigo/redis"
 )
 
-// Maybe replace redis client with redigo even better if there is a redis client with build in context
 // https://github.com/garyburd/redigo/issues/207 <-- context to be added to the package: declined.
 
 type esiRedis struct {
-	url  string
-	pool *redis.Pool
+	isCancellable bool
+	url           string
+	pool          *redis.Pool
 }
 
 // NewRedis provides, for now, a basic implementation for simple key fetching.
 func NewRedis(rawURL string) (backend.ResourceHandler, error) {
-	addr, pw, db, err := ParseRedisURL(rawURL)
+	addr, pw, params, err := ParseRedisURL(rawURL)
 	if err != nil {
 		return nil, errors.Errorf("[esikv] Redis error parsing URL %q => %s", rawURL, err)
 	}
+
+	maxActive, err := strconv.Atoi(params.Get("max_active"))
+	if err != nil {
+		return nil, errors.NewNotValidf("[esikv] NewRedis.ParseRedisURL. Parameter max_active not valid in  %q", rawURL)
+	}
+	max_idle, err := strconv.Atoi(params.Get("max_idle"))
+	if err != nil {
+		return nil, errors.NewNotValidf("[esikv] NewRedis.ParseRedisURL. Parameter max_idle not valid in  %q", rawURL)
+	}
+	idle_timeout, err := time.ParseDuration(params.Get("idle_timeout"))
+	if err != nil {
+		return nil, errors.NewNotValidf("[esikv] NewRedis.ParseRedisURL. Parameter idle_timeout not valid in  %q", rawURL)
+	}
+
 	r := &esiRedis{
-		url: rawURL,
+		isCancellable: params.Get("cancellable") == "1",
+		url:           rawURL,
 		pool: &redis.Pool{
-			MaxActive:   5,                 // just guessed that number, make it configurable in the connection URI
-			MaxIdle:     40,                // just guessed that number, make it configurable in the connection URI
-			IdleTimeout: 240 * time.Second, // make it configurable in the connection URI
+			MaxActive:   maxActive,
+			MaxIdle:     max_idle,
+			IdleTimeout: idle_timeout,
 			Dial: func() (redis.Conn, error) {
 				c, err := redis.Dial("tcp", addr)
 				if err != nil {
@@ -59,7 +73,7 @@ func NewRedis(rawURL string) (backend.ResourceHandler, error) {
 						return nil, errors.Wrap(err, "[esikv] Redis AUTH failed")
 					}
 				}
-				if _, err := c.Do("SELECT", db); err != nil {
+				if _, err := c.Do("SELECT", params.Get("db")); err != nil {
 					c.Close()
 					return nil, errors.Wrap(err, "[esikv] Redis DB select failed")
 				}
@@ -85,25 +99,74 @@ func NewRedis(rawURL string) (backend.ResourceHandler, error) {
 // Closes closes the resource when Caddy restarts or reloads. If supported
 // by the resource.
 func (er *esiRedis) Close() error {
-	return errors.Wrapf(er.pool.Close(), "[esikv] Redis Close. URL %q", er.url)
+	return errors.Wrapf(er.pool.Close(), "[esikv] Redis Close. URI %q", er.url)
 }
 
 // DoRequest returns a value from the field Key in the args argument. Header is
 // not supported. Request cancellation through a timeout (when the client
 // request gets cancelled) is supported.
-func (er *esiRedis) DoRequest(args *backend.ResourceArgs) (_ http.Header, content []byte, err error) {
+func (er *esiRedis) DoRequest(args *backend.ResourceArgs) (_ http.Header, _ []byte, err error) {
+	if er.isCancellable {
+		// 50000	     28794 ns/op	    1026 B/op	      33 allocs/op
+		return er.doRequestCancel(args)
+	}
+	// 50000	     25071 ns/op	     529 B/op	      25 allocs/op
+	return er.doRequest(args)
+}
+
+func (er *esiRedis) validateArgs(args *backend.ResourceArgs) (err error) {
 	switch {
 	case args.Key == "":
 		err = errors.NewEmptyf("[esibackend] For ResourceArgs %#v the URL value is empty", args)
 	case args.ExternalReq == nil:
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the ExternalReq value is nil", args.URL)
+		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q => %q the ExternalReq value is nil", er.url, args.Key)
 	case args.Timeout < 1:
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the timeout value is empty", args.URL)
+		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q => %q the timeout value is empty", er.url, args.Key)
 	case args.MaxBodySize == 0:
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the maxBodySize value is empty", args.URL)
+		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q => %q the maxBodySize value is empty", er.url, args.Key)
+	}
+	return
+}
+
+func (er *esiRedis) doRequest(args *backend.ResourceArgs) (_ http.Header, _ []byte, err error) {
+	if err := er.validateArgs(args); err != nil {
+		return nil, nil, errors.Wrap(err, "[esikv] doRequest.validateArgs")
+	}
+
+	key := args.Key
+
+	conn := er.pool.Get()
+	defer conn.Close()
+
+	nKey, err := args.TemplateToURL(args.KeyTemplate)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "[esikv] Redis.Get.TemplateToURL %q => %q", er.url, args.Key)
+	}
+	if nKey != "" {
+		key = nKey
+	}
+
+	value, err := redis.Bytes(conn.Do("GET", key))
+	if err == redis.ErrNil {
+		return nil, nil, nil
 	}
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrapf(err, "[esikv] Redis.Get %q => %q", er.url, args.Key)
+	}
+
+	if mbs := int(args.MaxBodySize); len(value) > mbs && mbs > 0 {
+		value = value[:mbs]
+	}
+
+	return nil, value, err
+}
+
+// DoRequest returns a value from the field Key in the args argument. Header is
+// not supported. Request cancellation through a timeout (when the client
+// request gets cancelled) is supported.
+func (er *esiRedis) doRequestCancel(args *backend.ResourceArgs) (_ http.Header, _ []byte, err error) {
+	if err := er.validateArgs(args); err != nil {
+		return nil, nil, errors.Wrap(err, "[esikv] doRequestCancel.validateArgs")
 	}
 
 	key := args.Key
@@ -112,48 +175,50 @@ func (er *esiRedis) DoRequest(args *backend.ResourceArgs) (_ http.Header, conten
 	ctx, cancel := context.WithTimeout(args.ExternalReq.Context(), args.Timeout)
 	defer cancel()
 
-	var retErr error
-	done := make(chan struct{})
+	content := make(chan []byte)
+	retErr := make(chan error)
 	go func() {
-		defer func() {
-			done <- struct{}{}
-		}()
 
 		conn := er.pool.Get()
 		defer conn.Close()
 
 		nKey, err := args.TemplateToURL(args.KeyTemplate)
 		if err != nil {
-			retErr = errors.Wrapf(err, "[esikv] Redis.Get.TemplateToURL %q => %q", args.URL, er.url)
+			retErr <- errors.Wrapf(err, "[esikv] Redis.Get.TemplateToURL %q => %q", er.url, args.Key)
 			return
 		}
 		if nKey != "" {
 			key = nKey
 		}
 
-		content, err = redis.Bytes(conn.Do("GET", key))
+		value, err := redis.Bytes(conn.Do("GET", key))
 		if err == redis.ErrNil {
+			content <- []byte{}
 			return
 		}
 		if err != nil {
-			retErr = errors.Wrapf(err, "[esikv] Redis.Get %q => %q", args.URL, er.url)
+			retErr <- errors.Wrapf(err, "[esikv] Redis.Get %q => %q", er.url, args.Key)
 			return
 		}
 
-		if mbs := int(args.MaxBodySize); len(content) > mbs && mbs > 0 {
-			content = content[:mbs] // not the nicest solution but works for now
+		if mbs := int(args.MaxBodySize); len(value) > mbs && mbs > 0 {
+			value = value[:mbs]
 		}
+		content <- value
 	}()
 
+	var value []byte
 	select {
 	case <-ctx.Done():
-		retErr = errors.Wrapf(ctx.Err(), "[esikv] Redits Get Context cancelled. Previous possible error: %+v", retErr)
-	case <-done:
+		err = errors.Wrapf(ctx.Err(), "[esikv] Redits Get Context cancelled. Previous possible error: %+v", retErr)
+	case value = <-content:
+	case err = <-retErr:
 	}
-	return nil, content, retErr
+	return nil, value, err
 }
 
-var pathDBRegexp = regexp.MustCompile(`/(\d*)\z`)
+// defaultPoolConnectionParameters this var also exists in the test file
+var defaultPoolConnectionParameters = [...]string{"db", "0", "max_active", "10", "max_idle", "400", "idle_timeout", "240s", "cancellable", "0"}
 
 // ParseRedisURL parses a given URL using the Redis
 // URI scheme. URLs should follow the draft IANA specification for the
@@ -161,28 +226,28 @@ var pathDBRegexp = regexp.MustCompile(`/(\d*)\z`)
 //
 //
 // For example:
-// 		redis://localhost:6379/3
-// 		redis://:6380/0 => connects to localhost:6380
+// 		redis://localhost:6379/?db=3
+// 		redis://:6380/?db=0 => connects to localhost:6380
 // 		redis:// => connects to localhost:6379 with DB 0
-// 		redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0
-//
-// TODO: More sophisticated to add also configuration values for the connection pool.
-// 		redis://localhost:6379/DatabaseID/ReadTimeout=2s/
-func ParseRedisURL(raw string) (address, password string, db int, err error) {
+// 		redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/?db=0
+// Available parameters: db, max_active (int, Connections), max_idle (int,
+// Connections), idle_timeout (time.Duration, Connection), cancellable (0,1
+// request towards redis)
+func ParseRedisURL(raw string) (address, password string, params url.Values, err error) {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return "", "", 0, errors.Errorf("[esikv] url.Parse: %s", err)
+		return "", "", nil, errors.Errorf("[esikv] url.Parse: %s", err)
 	}
 
 	if u.Scheme != "redis" {
-		return "", "", 0, errors.Errorf("[esikv] Invalid Redis URL scheme: %q", u.Scheme)
+		return "", "", nil, errors.Errorf("[esikv] Invalid Redis URL scheme: %q", u.Scheme)
 	}
 
 	// As per the IANA draft spec, the host defaults to localhost and
 	// the port defaults to 6379.
 	host, port, err := net.SplitHostPort(u.Host)
 	if sErr, ok := err.(*net.AddrError); ok && sErr != nil && sErr.Err == "too many colons in address" {
-		return "", "", 0, errors.Errorf("[esikv] SplitHostPort: %s", err)
+		return "", "", nil, errors.Errorf("[esikv] SplitHostPort: %s", err)
 	}
 	if err != nil {
 		// assume port is missing
@@ -199,17 +264,16 @@ func ParseRedisURL(raw string) (address, password string, db int, err error) {
 		password, _ = u.User.Password()
 	}
 
-	match := pathDBRegexp.FindStringSubmatch(u.Path)
-	if len(match) == 2 {
-		if len(match[1]) > 0 {
-			db64, err := strconv.ParseInt(match[1], 10, 64)
-			if err != nil {
-				return "", "", 0, errors.Errorf("[esikv] Invalid database: %q in %q", u.Path[1:], match[1])
-			}
-			db = int(db64)
-		}
-	} else if u.Path != "" {
-		return "", "", 0, errors.Errorf("[esikv] Invalid database: %q", u.Path[1:])
+	params, err = url.ParseQuery(u.RawQuery)
+	if err != nil {
+		return "", "", nil, errors.NewNotValidf("[esikv] ParseRedisURL: Failed to parse %q for parameters in URL %q with error %s", u.RawQuery, raw, err)
 	}
+
+	for i := 0; i < len(defaultPoolConnectionParameters); i = i + 2 {
+		if params.Get(defaultPoolConnectionParameters[i]) == "" {
+			params.Set(defaultPoolConnectionParameters[i], defaultPoolConnectionParameters[i+1])
+		}
+	}
+
 	return
 }

@@ -27,6 +27,8 @@ import (
 
 // 50000	     34904 ns/op	     941 B/op	      32 allocs/op <-- with deadline ctx
 // 50000	     30739 ns/op	     492 B/op	      23 allocs/op <-- without deadline
+// 50000	     28794 ns/op	    1026 B/op	      33 allocs/op <-- with deadline and goroutine
+// 50000	     25071 ns/op	     529 B/op	      25 allocs/op
 func BenchmarkNewRedis_Parallel(b *testing.B) {
 	mr := miniredis.NewMiniRedis()
 	if err := mr.Start(); err != nil {

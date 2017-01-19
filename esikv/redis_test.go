@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 	"text/template"
 	"time"
@@ -34,13 +36,35 @@ import (
 func TestNewRedis(t *testing.T) {
 	t.Parallel()
 
+	t.Run("Failed to parse max_active", func(t *testing.T) {
+		t.Parallel()
+		be, err := esikv.NewRedis(fmt.Sprint("redis://localHorst/?max_active=∏"))
+		assert.Nil(t, be)
+		assert.Error(t, err)
+	})
+	t.Run("Failed to parse max_idle", func(t *testing.T) {
+		t.Parallel()
+		be, err := esikv.NewRedis(fmt.Sprint("redis://localHorst/?max_idle=∏"))
+		assert.Nil(t, be)
+		assert.Error(t, err)
+	})
+	t.Run("Failed to parse idle_timeout", func(t *testing.T) {
+		t.Parallel()
+		be, err := esikv.NewRedis(fmt.Sprint("redis://localHorst/?idle_timeout=∏"))
+		assert.Nil(t, be)
+		assert.Error(t, err)
+	})
+
 	t.Run("Ping fail", func(t *testing.T) {
+		t.Parallel()
+
 		be, err := esikv.NewResourceHandler("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0")
 		assert.True(t, errors.IsFatal(err), "%+v", err)
 		assert.Nil(t, be)
 	})
 
 	t.Run("Authentication and Fetch Key OK", func(t *testing.T) {
+		t.Parallel()
 
 		mr := miniredis.NewMiniRedis()
 		if err := mr.Start(); err != nil {
@@ -73,6 +97,8 @@ func TestNewRedis(t *testing.T) {
 	})
 
 	t.Run("Authentication failed", func(t *testing.T) {
+		t.Parallel()
+
 		mr := miniredis.NewMiniRedis()
 		if err := mr.Start(); err != nil {
 			t.Fatal(err)
@@ -87,13 +113,13 @@ func TestNewRedis(t *testing.T) {
 		assert.True(t, errors.IsFatal(err), "%+v", err)
 	})
 
-	getMrBee := func(t *testing.T) (*miniredis.Miniredis, backend.ResourceHandler, func()) {
+	getMrBee := func(t *testing.T, params ...string) (*miniredis.Miniredis, backend.ResourceHandler, func()) {
 		mr := miniredis.NewMiniRedis()
 		if err := mr.Start(); err != nil {
 			t.Fatal(err)
 		}
 
-		be, err := esikv.NewResourceHandler(fmt.Sprintf("redis://%s", mr.Addr()))
+		be, err := esikv.NewResourceHandler(fmt.Sprintf("redis://%s%s", mr.Addr(), strings.Join(params, "&")))
 		if be == nil {
 			t.Fatalf("NewResourceHandler to %q returns nil %+v", mr.Addr(), err)
 		}
@@ -110,7 +136,9 @@ func TestNewRedis(t *testing.T) {
 	}
 
 	t.Run("Cancel Request towards Redis", func(t *testing.T) {
-		mr, be, closer := getMrBee(t)
+		t.Parallel()
+
+		mr, be, closer := getMrBee(t, "?cancellable=1")
 		defer closer()
 
 		if err := mr.Set("product_price_4711", "123,45 € Way too long"); err != nil {
@@ -129,6 +157,8 @@ func TestNewRedis(t *testing.T) {
 	})
 
 	t.Run("Fetch Key OK but value not set, should return all nil", func(t *testing.T) {
+		t.Parallel()
+
 		_, be, closer := getMrBee(t)
 		defer closer()
 
@@ -242,114 +272,110 @@ func TestNewResourceHandler(t *testing.T) {
 func TestParseRedisURL(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		raw          string
-		wantAddress  string
-		wantPassword string
-		wantDB       int
-		wantErr      bool
-	}{
-		{
-			"localhost",
-			"",
-			"",
-			0,
-			true, // "invalid redis URL scheme",
-		},
-		// The error message for invalid hosts is diffferent in different
-		// versions of Go, so just check that there is an error message.
-		{
-			"redis://weird url",
-			"",
-			"",
-			0,
-			true,
-		},
-		{
-			"redis://foo:bar:baz",
-			"",
-			"",
-			0,
-			true,
-		},
-		{
-			"http://www.google.com",
-			"",
-			"",
-			0,
-			true, // "invalid redis URL scheme: http",
-		},
-		{
-			"redis://localhost:6379/abc123",
-			"",
-			"",
-			0,
-			true, // "invalid database: abc123",
-		},
-		{
-			"redis://localhost:6379/123",
-			"localhost:6379",
-			"",
-			123,
-			false,
-		},
-		{
-			"redis://:6379/123",
-			"localhost:6379",
-			"",
-			123,
-			false,
-		},
-		{
-			"redis://",
-			"localhost:6379",
-			"",
-			0,
-			false,
-		},
-		{
-			"redis://192.168.0.234/123",
-			"192.168.0.234:6379",
-			"",
-			123,
-			false,
-		},
-		{
-			"redis://192.168.0.234/",
-			"",
-			"",
-			0,
-			true,
-		},
-		{
-			"redis://empty:SuperSecurePa55w0rd@192.168.0.234/3",
-			"192.168.0.234:6379",
-			"SuperSecurePa55w0rd",
-			3,
-			false,
-		},
+	var defaultPoolConnectionParameters = map[string][]string{
+		"db":           {"0"},
+		"max_active":   {"10"},
+		"max_idle":     {"400"},
+		"idle_timeout": {"240s"},
+		"cancellable":  {"0"},
 	}
-	for i, test := range tests {
 
-		haveAddress, havePW, haveDB, haveErr := esikv.ParseRedisURL(test.raw)
+	runner := func(raw string, wantAddress string, wantPassword string, wantParams url.Values, wantErr bool) func(*testing.T) {
+		return func(t *testing.T) {
+			t.Parallel()
 
-		if have, want := haveAddress, test.wantAddress; have != want {
-			t.Errorf("(%d) Address: Have: %v Want: %v", i, have, want)
-		}
-		if have, want := havePW, test.wantPassword; have != want {
-			t.Errorf("(%d) Password: Have: %v Want: %v", i, have, want)
-		}
-		if have, want := haveDB, test.wantDB; have != want {
-			t.Errorf("(%d) DB: Have: %v Want: %v", i, have, want)
-		}
-		if test.wantErr {
-			if have, want := test.wantErr, haveErr != nil; have != want {
-				t.Errorf("(%d) Error: Have: %v Want: %v", i, have, want)
+			haveAddress, havePW, params, haveErr := esikv.ParseRedisURL(raw)
+			if wantErr {
+				if have, want := wantErr, haveErr != nil; have != want {
+					t.Errorf("(%q)\nError: Have: %v Want: %v\n%+v", t.Name(), have, want, haveErr)
+				}
+				return
 			}
-		} else {
+
 			if haveErr != nil {
-				t.Errorf("(%d) Did not expect an Error: %+v", i, haveErr)
+				t.Errorf("(%q) Did not expect an Error: %+v", t.Name(), haveErr)
+			}
+
+			if have, want := haveAddress, wantAddress; have != want {
+				t.Errorf("(%q) Address: Have: %v Want: %v", t.Name(), have, want)
+			}
+			if have, want := havePW, wantPassword; have != want {
+				t.Errorf("(%q) Password: Have: %v Want: %v", t.Name(), have, want)
+			}
+			if wantParams == nil {
+				wantParams = defaultPoolConnectionParameters
+			}
+
+			for k := range wantParams {
+				assert.Exactly(t, wantParams.Get(k), params.Get(k), "Test %q Parameter %q", t.Name(), k)
 			}
 		}
 	}
+	t.Run("invalid redis URL scheme none", runner("localhost", "", "", nil, true))
+	t.Run("invalid redis URL scheme http", runner("http://www.google.com", "", "", nil, true))
+	t.Run("invalid redis URL string", runner("redis://weird url", "", "", nil, true))
+	t.Run("too many colons in URL", runner("redis://foo:bar:baz", "", "", nil, true))
+	t.Run("ignore path in URL", runner("redis://localhost:6379/abc123", "localhost:6379", "", nil, false))
+	t.Run("URL contains only scheme", runner("redis://", "localhost:6379", "", nil, false))
+
+	t.Run("set DB with hostname", runner(
+		"redis://localh0Rst:6379/?db=123",
+		"localh0Rst:6379",
+		"",
+		map[string][]string{
+			"db":           {"123"},
+			"max_active":   {"10"},
+			"max_idle":     {"400"},
+			"idle_timeout": {"240s"},
+			"cancellable":  {"0"},
+		},
+		false))
+	t.Run("set DB without hostname", runner(
+		"redis://:6379/?db=345",
+		"localhost:6379",
+		"",
+		map[string][]string{
+			"db":           {"345"},
+			"max_active":   {"10"},
+			"max_idle":     {"400"},
+			"idle_timeout": {"240s"},
+			"cancellable":  {"0"},
+		},
+		false))
+	t.Run("URL contains IP address", runner(
+		"redis://192.168.0.234/?db=123",
+		"192.168.0.234:6379",
+		"",
+		map[string][]string{
+			"db":           {"123"},
+			"max_active":   {"10"},
+			"max_idle":     {"400"},
+			"idle_timeout": {"240s"},
+			"cancellable":  {"0"},
+		},
+		false))
+	t.Run("URL contains password", runner(
+		"redis://empty:SuperSecurePa55w0rd@192.168.0.234/?db=3",
+		"192.168.0.234:6379",
+		"SuperSecurePa55w0rd",
+		map[string][]string{
+			"db":           {"3"},
+			"max_active":   {"10"},
+			"max_idle":     {"400"},
+			"idle_timeout": {"240s"},
+			"cancellable":  {"0"},
+		},
+		false))
+	t.Run("Apply all params", runner(
+		"redis://empty:SuperSecurePa55w0rd@192.168.0.234/?db=4&max_active=2718&max_idle=3141&idle_timeout=5h3s&cancellable=1",
+		"192.168.0.234:6379",
+		"SuperSecurePa55w0rd",
+		map[string][]string{
+			"db":           {"4"},
+			"max_active":   {"2718"},
+			"max_idle":     {"3141"},
+			"idle_timeout": {"5h3s"},
+			"cancellable":  {"1"},
+		},
+		false))
 }
