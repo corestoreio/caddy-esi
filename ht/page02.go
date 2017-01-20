@@ -10,18 +10,18 @@ import (
 )
 
 func init() {
-	RegisterTest(page01(), page01(), page01())
+	RegisterTest(page02(), page02())
 }
 
-var page01Counter = new(int32)
+var page02Counter = new(int32)
 
-func page01() *ht.Test {
+func page02() *ht.Test {
 	return &ht.Test{
-		Name:        fmt.Sprintf("Page01 Iteration %d", atomic.AddInt32(page01Counter, 1)),
-		Description: `Page01 loads ms_cart_tiny from a micro service and embeds the checkout cart into its page01 HTML`,
+		Name:        fmt.Sprintf("Page02 Iteration %d", atomic.AddInt32(page02Counter, 1)),
+		Description: `Page02 tries to load from a nonexisitent micro service and displays a custom error message`,
 		Request: ht.Request{
 			Method: "GET",
-			URL:    caddyAddress + "page01.html",
+			URL:    caddyAddress + "page02.html",
 			Header: http.Header{
 				"Accept":          []string{"text/html"},
 				"Accept-Encoding": []string{"gzip, deflate, br"},
@@ -41,8 +41,8 @@ func page01() *ht.Test {
 						Text:     []string{"<esi:"},
 					}}},
 			&ht.Body{
-				Contains: "demo-store.shop/autumn-pullie.html",
-				Count:    2,
+				Contains: "MS9999 not available",
+				Count:    1,
 			},
 		},
 	}

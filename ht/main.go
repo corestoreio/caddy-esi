@@ -8,17 +8,15 @@ import (
 	"github.com/vdobler/ht/ht"
 )
 
+const caddyAddress = `http://127.0.0.1:2017/`
+
 func main() {
 	jar, err := cookiejar.New(&cookiejar.Options{})
 	if err != nil {
 		panic(err)
 	}
 	c := ht.Collection{
-		Tests: []*ht.Test{
-			page01(),
-			page01(),
-			page01(),
-		},
+		Tests: testCollection,
 	}
 
 	var exitStatus int
@@ -37,3 +35,10 @@ func main() {
 	// will fail the build.
 	os.Exit(exitStatus)
 }
+
+// RegisterTest adds a set of tests to the collection
+func RegisterTest(tests ...*ht.Test) {
+	testCollection = append(testCollection, tests...)
+}
+
+var testCollection []*ht.Test

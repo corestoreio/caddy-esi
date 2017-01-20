@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <title>Caddy ESI Tag Page02</title>
+</head>
+<body>
+
+
+<h1> Caddy ESI Tag Page02</h1>
+
+<table>
+    <tbody>
+    <tr>
+        <th>Name</th>
+        <th>Output</th>
+    </tr>
+    <tr>
+        <td>Should an error message because micro service is not available</td>
+        <td>
+            <esi:include src="http://127.0.0.1:9999/unavailable.html" onerror="MS9999 not available" timeout="10ms"/>
+        </td>
+    </tr>
+    </tbody>
+</table>
+
+
+</body>
+</html>
