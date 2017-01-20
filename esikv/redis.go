@@ -46,11 +46,11 @@ func NewRedis(rawURL string) (backend.ResourceHandler, error) {
 	if err != nil {
 		return nil, errors.NewNotValidf("[esikv] NewRedis.ParseRedisURL. Parameter max_active not valid in  %q", rawURL)
 	}
-	max_idle, err := strconv.Atoi(params.Get("max_idle"))
+	maxIdle, err := strconv.Atoi(params.Get("max_idle"))
 	if err != nil {
 		return nil, errors.NewNotValidf("[esikv] NewRedis.ParseRedisURL. Parameter max_idle not valid in  %q", rawURL)
 	}
-	idle_timeout, err := time.ParseDuration(params.Get("idle_timeout"))
+	idleTimeout, err := time.ParseDuration(params.Get("idle_timeout"))
 	if err != nil {
 		return nil, errors.NewNotValidf("[esikv] NewRedis.ParseRedisURL. Parameter idle_timeout not valid in  %q", rawURL)
 	}
@@ -60,8 +60,8 @@ func NewRedis(rawURL string) (backend.ResourceHandler, error) {
 		url:           rawURL,
 		pool: &redis.Pool{
 			MaxActive:   maxActive,
-			MaxIdle:     max_idle,
-			IdleTimeout: idle_timeout,
+			MaxIdle:     maxIdle,
+			IdleTimeout: idleTimeout,
 			Dial: func() (redis.Conn, error) {
 				c, err := redis.Dial("tcp", addr)
 				if err != nil {
@@ -253,7 +253,6 @@ func ParseRedisURL(raw string) (address, password string, params url.Values, err
 		// assume port is missing
 		host = u.Host
 		port = "6379"
-		err = nil
 	}
 	if host == "" {
 		host = "localhost"
