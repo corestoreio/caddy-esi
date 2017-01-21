@@ -29,6 +29,9 @@ func main() {
 		if err := test.PrintReport(os.Stdout); err != nil {
 			panic(err)
 		}
+		if test.Status > ht.Pass {
+			exitStatus = 33 // line number ;-)
+		}
 	}
 
 	// Travis CI requires an exit code for the build to fail. Anything not 0
