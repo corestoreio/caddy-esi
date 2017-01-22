@@ -18,9 +18,9 @@ func init() {
 
 var page01Counter int
 
-func page01() *ht.Test {
+func page01() (t *ht.Test) {
 	page01Counter++
-	return &ht.Test{
+	t = &ht.Test{
 		Name:        fmt.Sprintf("Page MS Cart Tiny Iteration %d", page01Counter),
 		Description: `Request loads ms_cart_tiny.html from a micro service and embeds the checkout cart into its HTML`,
 		Request: ht.Request{
@@ -37,7 +37,15 @@ func page01() *ht.Test {
 			&ht.Header{
 				Header: "Etag",
 				Condition: ht.Condition{
-					Min: 10}},
+					Min: 14, Max: 18}},
+			&ht.Header{
+				Header: "Accept-Ranges",
+				Condition: ht.Condition{
+					Equals: `bytes`}},
+			&ht.Header{
+				Header: "Last-Modified",
+				Condition: ht.Condition{
+					Min: 29, Max: 29}},
 			&ht.None{
 				Of: ht.CheckList{
 					&ht.HTMLContains{
@@ -54,4 +62,5 @@ func page01() *ht.Test {
 			},
 		},
 	}
+	return
 }

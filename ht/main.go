@@ -43,7 +43,7 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
-			fmt.Fprintf(os.Stdout, "Response:\n%s\nBody: %q\nError: %s\n", resData, test.Response.BodyStr, test.Response.BodyErr)
+			fmt.Fprintf(os.Stdout, "Response:\n%s\nError: %s\n\n", resData, test.Response.BodyErr)
 		}
 	}
 

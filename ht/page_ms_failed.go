@@ -14,9 +14,9 @@ func init() {
 
 var page02Counter int
 
-func page02() *ht.Test {
+func page02() (t *ht.Test) {
 	page02Counter++
-	return &ht.Test{
+	t = &ht.Test{
 		Name:        fmt.Sprintf("Request to micro service failed, iteration %d", page02Counter),
 		Description: `Tries to load from a nonexisitent micro service and displays a custom error message`,
 		Request: ht.Request{
@@ -33,7 +33,15 @@ func page02() *ht.Test {
 			&ht.Header{
 				Header: "Etag",
 				Condition: ht.Condition{
-					Min: 10}},
+					Min: 14, Max: 18}},
+			&ht.Header{
+				Header: "Accept-Ranges",
+				Condition: ht.Condition{
+					Equals: `bytes`}},
+			&ht.Header{
+				Header: "Last-Modified",
+				Condition: ht.Condition{
+					Min: 29, Max: 29}},
 			&ht.None{
 				Of: ht.CheckList{
 					&ht.HTMLContains{
@@ -50,4 +58,5 @@ func page02() *ht.Test {
 			},
 		},
 	}
+	return
 }
