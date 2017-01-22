@@ -6,6 +6,9 @@ go:
 os:
   - linux
   - osx
+services:
+  - redis-server
+  - memcached
 
 matrix:
   # failure is not an option
