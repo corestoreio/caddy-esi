@@ -31,9 +31,9 @@ func responseWrapInjector(chanTags <-chan esitag.DataTags, w http.ResponseWriter
 	_, rf := w.(io.ReaderFrom)
 
 	bw := injectingWriter{
-		rw:     w,
-		tags:   <-chanTags,
-		header: make(http.Header),
+		rw:       w,
+		chanTags: chanTags,
+		header:   make(http.Header),
 	}
 
 	if cn && fl && hj && rf {
@@ -49,11 +49,20 @@ func responseWrapInjector(chanTags <-chan esitag.DataTags, w http.ResponseWriter
 // http.ResponseWriter interface.
 type injectingWriter struct {
 	rw              http.ResponseWriter
-	tags            esitag.DataTags
+	chanTags        <-chan esitag.DataTags
+	lazyTags        esitag.DataTags
 	responseAllowed uint8 // 0 not yet tested, 1 yes, 2 no
 	wroteHeader     bool
 	header          http.Header
 	lastWritePos    int
+}
+
+// initLazyTags reads only once from the chanTags and blocks until data is
+// available.
+func (b *injectingWriter) initLazyTags() {
+	if b.lazyTags == nil {
+		b.lazyTags = <-b.chanTags
+	}
 }
 
 func (b *injectingWriter) Header() http.Header {
@@ -65,7 +74,8 @@ func (b *injectingWriter) WriteHeader(code int) {
 		return
 	}
 	b.wroteHeader = true
-	dataTagLen := b.tags.DataLen()
+	b.initLazyTags()
+	dataTagLen := b.lazyTags.DataLen()
 
 	if dataTagLen != 0 {
 		const clName = "Content-Length"
@@ -106,10 +116,11 @@ func (b *injectingWriter) Write(p []byte) (int, error) {
 	if b.responseAllowed == no {
 		return b.rw.Write(p)
 	}
+	b.initLazyTags()
 
 	// might be buggy in InjectContent on multiple calls to Write(). Fix is to a
 	// position counter to the InjectContent. The position is pos+=len(data)
-	_, _, err := b.tags.InjectContent(newSimpleReader(p), b.rw, b.lastWritePos)
+	_, _, err := b.lazyTags.InjectContent(newSimpleReader(p), b.rw, b.lastWritePos)
 	// The write of InjectContent is invisible as we write more data as
 	// sometimes the bytes.Buffer.WriteTo checks
 	b.lastWritePos += len(p)
