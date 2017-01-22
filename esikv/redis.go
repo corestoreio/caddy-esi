@@ -82,6 +82,10 @@ func NewRedis(rawURL string) (backend.ResourceHandler, error) {
 		},
 	}
 
+	if params.Get("lazy") == "1" {
+		return r, nil
+	}
+
 	conn := r.pool.Get()
 	defer conn.Close()
 
@@ -218,13 +222,18 @@ func (er *esiRedis) doRequestCancel(args *backend.ResourceArgs) (_ http.Header, 
 }
 
 // defaultPoolConnectionParameters this var also exists in the test file
-var defaultPoolConnectionParameters = [...]string{"db", "0", "max_active", "10", "max_idle", "400", "idle_timeout", "240s", "cancellable", "0"}
+var defaultPoolConnectionParameters = [...]string{
+	"db", "0",
+	"max_active", "10",
+	"max_idle", "400",
+	"idle_timeout", "240s",
+	"cancellable", "0",
+	"lazy", "0", // if 1 disables the ping to redis during caddy startup
+}
 
 // ParseRedisURL parses a given URL using the Redis
 // URI scheme. URLs should follow the draft IANA specification for the
 // scheme (https://www.iana.org/assignments/uri-schemes/prov/redis).
-//
-//
 // For example:
 // 		redis://localhost:6379/?db=3
 // 		redis://:6380/?db=0 => connects to localhost:6380
@@ -232,7 +241,7 @@ var defaultPoolConnectionParameters = [...]string{"db", "0", "max_active", "10",
 // 		redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/?db=0
 // Available parameters: db, max_active (int, Connections), max_idle (int,
 // Connections), idle_timeout (time.Duration, Connection), cancellable (0,1
-// request towards redis)
+// request towards redis), lazy (0, 1 disables ping during connection setup).
 func ParseRedisURL(raw string) (address, password string, params url.Values, err error) {
 	u, err := url.Parse(raw)
 	if err != nil {

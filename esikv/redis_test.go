@@ -58,9 +58,28 @@ func TestNewRedis(t *testing.T) {
 	t.Run("Ping fail", func(t *testing.T) {
 		t.Parallel()
 
-		be, err := esikv.NewResourceHandler("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0")
+		be, err := esikv.NewResourceHandler("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379")
 		assert.True(t, errors.IsFatal(err), "%+v", err)
 		assert.Nil(t, be)
+	})
+
+	t.Run("Ping does not fail because lazy", func(t *testing.T) {
+		t.Parallel()
+
+		be, err := esikv.NewResourceHandler("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/?lazy=1")
+		if err != nil {
+			t.Fatalf("There should be no error but got: %s", err)
+		}
+		assert.NotNil(t, be)
+		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
+			ExternalReq: httptest.NewRequest("GET", "/", nil),
+			Key:         "product_price_76",
+			Timeout:     time.Second,
+			MaxBodySize: 10,
+		})
+		assert.Nil(t, hdr, "header must be nil")
+		assert.Nil(t, content, "content must be nil")
+		assert.Contains(t, err.Error(), `dial tcp: lookup`)
 	})
 
 	t.Run("Authentication and Fetch Key OK", func(t *testing.T) {
