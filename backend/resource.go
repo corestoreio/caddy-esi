@@ -144,9 +144,10 @@ type ResourceArgs struct {
 // lived state.
 type ResourceHandler interface {
 	// DoRequest fires the request to the resource and it may return a header
-	// and content or an error. All three return values can be nil. Any returned error will trigger the increment of
-	// the circuit breaker. See the variable CBMaxFailures for the maximum
-	// amount of allowed failures until the circuit breaker opens.
+	// and content or an error. All three return values can be nil. Any returned
+	// error will trigger the increment of the circuit breaker. See the variable
+	// CBMaxFailures for the maximum amount of allowed failures until the
+	// circuit breaker opens.
 	DoRequest(*ResourceArgs) (header http.Header, content []byte, err error)
 	// Closes closes the resource when Caddy restarts or reloads. If supported
 	// by the resource.
@@ -430,7 +431,7 @@ func NewResource(idx int, url string) (*Resource, error) {
 	var ok bool
 	r.handler, ok = LookupResourceHandler(schemeAlias)
 	if !ok {
-		return nil, errors.NewNotSupportedf("[esibackend] NewResource protocal or alias %q not yet supported for URL/Alias %q", schemeAlias, r.url)
+		return nil, errors.NewNotSupportedf("[esibackend] NewResource protocol or alias %q not yet supported for URL/Alias %q", schemeAlias, r.url)
 	}
 
 	return r, nil
