@@ -13,5 +13,9 @@ nohup ./caddy.bin -conf ./Caddyfile &
 sleep 5
 ./ht.bin
 
+# temporary debug
+curl -s 'http://127.0.0.1:2017/page02.html' | wc
+curl -i 'http://127.0.0.1:2017/page02.html'
+
 killall caddy.bin
 rm -f *.bin nohup.out
