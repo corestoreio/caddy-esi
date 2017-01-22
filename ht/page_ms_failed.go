@@ -17,11 +17,11 @@ var page02Counter int
 func page02() *ht.Test {
 	page02Counter++
 	return &ht.Test{
-		Name:        fmt.Sprintf("Page02 Iteration %d", page02Counter),
-		Description: `Page02 tries to load from a nonexisitent micro service and displays a custom error message`,
+		Name:        fmt.Sprintf("Request to micro service failed, iteration %d", page02Counter),
+		Description: `Tries to load from a nonexisitent micro service and displays a custom error message`,
 		Request: ht.Request{
 			Method: "GET",
-			URL:    caddyAddress + "page02.html",
+			URL:    caddyAddress + "page_ms_failed.html",
 			Header: http.Header{
 				"Accept":          []string{"text/html"},
 				"Accept-Encoding": []string{"gzip, deflate, br"},

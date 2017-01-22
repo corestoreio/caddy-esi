@@ -21,11 +21,11 @@ var page01Counter int
 func page01() *ht.Test {
 	page01Counter++
 	return &ht.Test{
-		Name:        fmt.Sprintf("Page01 Iteration %d", page01Counter),
-		Description: `Page01 loads ms_cart_tiny from a micro service and embeds the checkout cart into its page01 HTML`,
+		Name:        fmt.Sprintf("Page MS Cart Tiny Iteration %d", page01Counter),
+		Description: `Request loads ms_cart_tiny.html from a micro service and embeds the checkout cart into its HTML`,
 		Request: ht.Request{
 			Method: "GET",
-			URL:    caddyAddress + "page01.html",
+			URL:    caddyAddress + "page_cart_tiny.html",
 			Header: http.Header{
 				"Accept":          []string{"text/html"},
 				"Accept-Encoding": []string{"gzip, deflate, br"},

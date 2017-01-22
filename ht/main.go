@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"net/http/httputil"
 	"os"
 	"runtime"
 
@@ -31,6 +33,17 @@ func main() {
 		}
 		if test.Status > ht.Pass {
 			exitStatus = 33 // line number ;-)
+
+			reqData, err := httputil.DumpRequest(test.Request.Request, true)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Fprintf(os.Stdout, "\nRequest:\n%s\n\n", reqData)
+			resData, err := httputil.DumpResponse(test.Response.Response, true)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Fprintf(os.Stdout, "\nResponse:\n%s\nError: %s\n\n", resData, test.Response.BodyErr)
 		}
 	}
 
