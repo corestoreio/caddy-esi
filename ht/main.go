@@ -39,11 +39,11 @@ func main() {
 				panic(err)
 			}
 			fmt.Fprintf(os.Stdout, "\nRequest:\n%s\n\n", reqData)
-			resData, err := httputil.DumpResponse(test.Response.Response, true)
+			resData, err := httputil.DumpResponse(test.Response.Response, false)
 			if err != nil {
 				panic(err)
 			}
-			fmt.Fprintf(os.Stdout, "\nResponse:\n%s\nError: %s\n\n", resData, test.Response.BodyErr)
+			fmt.Fprintf(os.Stdout, "\nResponse:\n%s\n\nBody: %q\nError: %s\n\n", resData, test.Response.BodyStr, test.Response.BodyErr)
 		}
 	}
 
