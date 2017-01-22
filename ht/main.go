@@ -23,7 +23,7 @@ func main() {
 
 	var exitStatus int
 	if err := c.ExecuteConcurrent(runtime.NumCPU(), jar); err != nil {
-		exitStatus = 24 // line number ;-)
+		exitStatus = 26 // line number ;-)
 		println("ExecuteConcurrent:", err.Error())
 	}
 
@@ -32,18 +32,18 @@ func main() {
 			panic(err)
 		}
 		if test.Status > ht.Pass {
-			exitStatus = 33 // line number ;-)
+			exitStatus = 35 // line number ;-)
 
 			reqData, err := httputil.DumpRequest(test.Request.Request, true)
 			if err != nil {
 				panic(err)
 			}
-			fmt.Fprintf(os.Stdout, "\nRequest:\n%s\n\n", reqData)
+			fmt.Fprintf(os.Stdout, "Request:\n%s\n", reqData)
 			resData, err := httputil.DumpResponse(test.Response.Response, false)
 			if err != nil {
 				panic(err)
 			}
-			fmt.Fprintf(os.Stdout, "\nResponse:\n%s\n\nBody: %q\nError: %s\n\n", resData, test.Response.BodyStr, test.Response.BodyErr)
+			fmt.Fprintf(os.Stdout, "Response:\n%s\nBody: %q\nError: %s\n", resData, test.Response.BodyStr, test.Response.BodyErr)
 		}
 	}
 
