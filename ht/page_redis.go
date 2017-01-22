@@ -23,19 +23,19 @@ import (
 )
 
 func init() {
-	RegisterTest(page02(), page02())
+	RegisterTest(pageRedis(), pageRedis())
 }
 
-var page02Counter int
+var pageRedisCounter int
 
-func page02() (t *ht.Test) {
-	page02Counter++
+func pageRedis() (t *ht.Test) {
+	pageRedisCounter++
 	t = &ht.Test{
-		Name:        fmt.Sprintf("Request to micro service failed, iteration %d", page02Counter),
-		Description: `Tries to load from a nonexisitent micro service and displays a custom error message`,
+		Name:        fmt.Sprintf("Page Redis success %d", pageRedisCounter),
+		Description: `Request loads two keys from a redis server`,
 		Request: ht.Request{
 			Method: "GET",
-			URL:    caddyAddress + "page_ms_failed.html",
+			URL:    caddyAddress + "page_redis.html",
 			Header: http.Header{
 				"Accept":          []string{"text/html"},
 				"Accept-Encoding": []string{"gzip, deflate, br"},
@@ -63,12 +63,20 @@ func page02() (t *ht.Test) {
 						Text:     []string{"<esi:"},
 					}}},
 			&ht.Body{
-				Contains: "MS9999 not available",
+				Contains: "Catalog Product 001", // see integration.sh
 				Count:    1,
 			},
 			&ht.Body{
-				Contains: `class="page02ErrMsg18MS"`,
+				Contains: "Catalog Category Tree", // see integration.sh
 				Count:    1,
+			},
+			&ht.Body{
+				Contains: "You have 10 items in your cart", // see integration.sh
+				Count:    1,
+			},
+			&ht.Body{
+				Contains: ` class="redisSuccess"`,
+				Count:    3,
 			},
 		},
 	}

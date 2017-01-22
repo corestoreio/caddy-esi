@@ -161,7 +161,7 @@ func (mw *Middleware) serveBuffered(cfg *PathConfig, pageID uint64, w http.Respo
 	if err != nil {
 		if cfg.Log.IsDebug() {
 			cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.Group.Do.Error",
-				log.Err(err), log.Stringer("config", cfg),
+				log.Err(err), log.String("scope", cfg.Scope),
 				log.Bool("shared", shared), log.Uint64("page_id", pageID), loghttp.Request("request", r),
 			)
 		}

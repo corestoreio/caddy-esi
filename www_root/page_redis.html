@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en-US" xmlns:esi="http://www.w3.org/2001/XMLSchema">
+<head>
+    <title>Caddy ESI Tag Redis</title>
+</head>
+<body>
+
+    <h1> Caddy ESI Tag Redis</h1>
+
+    <table border="1">
+        <tr>
+            <th>Name</th>
+            <th>Output</th>
+        </tr>
+        <tr>
+            <td class="redisSuccess">Should load key 1</td>
+            <td><esi:include src="redisLocalhostDB0" key="product_001"/></td>
+        </tr>
+        <tr>
+            <td class="redisSuccess">Should load key 2</td>
+            <td><esi:include src="redisLocalhostDB0" key="category_tree"/></td>
+        </tr>
+        <tr>
+            <td class="redisSuccess">Should load key 3 which does not exists in DB0 but in DB1</td>
+            <td><esi:include src="redisLocalhostDB0" src="redisLocalhostDB1" key="checkout_cart"/></td>
+        </tr>
+    </table>
+
+</body>
+</html>

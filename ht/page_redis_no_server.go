@@ -23,19 +23,19 @@ import (
 )
 
 func init() {
-	RegisterTest(page02(), page02())
+	RegisterTest(pageRedisNoServer(), pageRedisNoServer())
 }
 
-var page02Counter int
+var pageRedisNoServerCounter int
 
-func page02() (t *ht.Test) {
-	page02Counter++
+func pageRedisNoServer() (t *ht.Test) {
+	pageRedisNoServerCounter++
 	t = &ht.Test{
-		Name:        fmt.Sprintf("Request to micro service failed, iteration %d", page02Counter),
-		Description: `Tries to load from a nonexisitent micro service and displays a custom error message`,
+		Name:        fmt.Sprintf("Page Redis no server %d", pageRedisNoServerCounter),
+		Description: `Request to redis server fails because the server URI was misspelled and lazy loaded`,
 		Request: ht.Request{
 			Method: "GET",
-			URL:    caddyAddress + "page_ms_failed.html",
+			URL:    caddyAddress + "page_redis_no_server.html",
 			Header: http.Header{
 				"Accept":          []string{"text/html"},
 				"Accept-Encoding": []string{"gzip, deflate, br"},
@@ -63,12 +63,23 @@ func page02() (t *ht.Test) {
 						Text:     []string{"<esi:"},
 					}}},
 			&ht.Body{
-				Contains: "MS9999 not available",
+				Contains: "<td>Redis on google cloud platform one not found</td>",
 				Count:    1,
 			},
 			&ht.Body{
-				Contains: `class="page02ErrMsg18MS"`,
+				Contains: `<td>Resource not available</td>`,
 				Count:    1,
+			},
+			&ht.Body{
+				Contains: `<td><b>
+    We're sorry but the requested service cannot be reach€d!
+</b>
+</td>`,
+				Count: 1,
+			},
+			&ht.Body{
+				Contains: ` class="redisfailure01"`,
+				Count:    3,
 			},
 		},
 	}
