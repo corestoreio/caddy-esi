@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"sync/atomic"
 	"time"
 
 	"github.com/vdobler/ht/ht"
@@ -13,11 +12,12 @@ func init() {
 	RegisterTest(page02(), page02())
 }
 
-var page02Counter = new(int32)
+var page02Counter int
 
 func page02() *ht.Test {
+	page02Counter++
 	return &ht.Test{
-		Name:        fmt.Sprintf("Page02 Iteration %d", atomic.AddInt32(page02Counter, 1)),
+		Name:        fmt.Sprintf("Page02 Iteration %d", page02Counter),
 		Description: `Page02 tries to load from a nonexisitent micro service and displays a custom error message`,
 		Request: ht.Request{
 			Method: "GET",
@@ -42,6 +42,10 @@ func page02() *ht.Test {
 					}}},
 			&ht.Body{
 				Contains: "MS9999 not available",
+				Count:    1,
+			},
+			&ht.Body{
+				Contains: `class="page02ErrMsg18MS"`,
 				Count:    1,
 			},
 		},

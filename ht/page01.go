@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"sync/atomic"
 	"time"
 
 	"github.com/vdobler/ht/ht"
@@ -17,11 +16,12 @@ func init() {
 	RegisterTest(page01(), page01(), page01())
 }
 
-var page01Counter = new(int32)
+var page01Counter int
 
 func page01() *ht.Test {
+	page01Counter++
 	return &ht.Test{
-		Name:        fmt.Sprintf("Page01 Iteration %d", atomic.AddInt32(page01Counter, 1)),
+		Name:        fmt.Sprintf("Page01 Iteration %d", page01Counter),
 		Description: `Page01 loads ms_cart_tiny from a micro service and embeds the checkout cart into its page01 HTML`,
 		Request: ht.Request{
 			Method: "GET",
@@ -47,6 +47,10 @@ func page01() *ht.Test {
 			&ht.Body{
 				Contains: "demo-store.shop/autumn-pullie.html",
 				Count:    2,
+			},
+			&ht.Body{
+				Contains: ` class="page01CartLoaded"`,
+				Count:    1,
 			},
 		},
 	}
