@@ -24,7 +24,7 @@ import (
 
 type responseBufferWriter interface {
 	http.ResponseWriter
-	FlushHeader(addContentLength int)
+	TriggerRealWrite(addContentLength int)
 }
 
 // responseWrapBuffer wraps an http.ResponseWriter, returning a proxy which only writes
@@ -52,31 +52,23 @@ func responseWrapBuffer(buf io.Writer, w http.ResponseWriter) responseBufferWrit
 // bufferedWriter wraps a http.ResponseWriter that implements the minimal
 // http.ResponseWriter interface.
 type bufferedWriter struct {
-	rw            http.ResponseWriter
-	buf           io.Writer
-	flushedHeader bool
-	wroteHeader   bool
-	code          int
-	header        http.Header
+	rw  http.ResponseWriter
+	buf io.Writer
+	// writeReal does not write to the buffer and writes directly to the original
+	// rw.
+	writeReal bool
+	// addContentLength rewrites the Content-Length header to the correct
+	// returned length. Value can also be negative when the error message in an
+	// ESI tag is shorter than the length of the ESI tag.
+	addContentLength int
+	wroteHeader      bool
+	code             int
+	header           http.Header
 }
 
-func (b *bufferedWriter) FlushHeader(addContentLength int) {
-	if b.flushedHeader {
-		return
-	}
-
-	if addContentLength > 0 {
-		const clName = "Content-Length"
-		clRaw := b.header.Get(clName)
-		cl, _ := strconv.Atoi(clRaw) // ignoring that err ... for now
-		b.header.Set(clName, strconv.Itoa(cl+addContentLength))
-	}
-
-	for k, v := range b.header {
-		b.rw.Header()[k] = v
-	}
-	b.rw.WriteHeader(b.code)
-	b.flushedHeader = true
+func (b *bufferedWriter) TriggerRealWrite(addContentLength int) {
+	b.writeReal = true
+	b.addContentLength = addContentLength
 }
 
 func (b *bufferedWriter) Header() http.Header {
@@ -84,14 +76,29 @@ func (b *bufferedWriter) Header() http.Header {
 }
 
 func (b *bufferedWriter) WriteHeader(code int) {
-	if !b.wroteHeader {
-		b.code = code
-		b.wroteHeader = true
+	if b.wroteHeader {
+		return
 	}
+	b.wroteHeader = true
+
+	if b.addContentLength != 0 {
+		const clName = "Content-Length"
+		clRaw := b.header.Get(clName)
+		cl, _ := strconv.Atoi(clRaw) // ignoring that err ... for now
+		b.header.Set(clName, strconv.Itoa(cl+b.addContentLength))
+	}
+
+	for k, v := range b.header {
+		b.rw.Header()[k] = v
+	}
+	b.rw.WriteHeader(code)
 }
 
 // Write does not write to the client instead it writes in the underlying buffer.
 func (b *bufferedWriter) Write(p []byte) (int, error) {
+	if b.writeReal {
+		return b.rw.Write(p)
+	}
 	return b.buf.Write(p)
 }
 

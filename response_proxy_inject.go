@@ -71,7 +71,6 @@ func (b *injectingWriter) WriteHeader(code int) {
 		const clName = "Content-Length"
 		clRaw := b.header.Get(clName)
 		cl, _ := strconv.Atoi(clRaw) // ignoring that err ... for now
-		// What if cl runs negative?
 		b.header.Set(clName, strconv.Itoa(cl+dataTagLen))
 	}
 

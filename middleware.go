@@ -119,8 +119,8 @@ func (mw *Middleware) serveBuffered(cfg *PathConfig, pageID uint64, w http.Respo
 
 	// Only plain text response is benchIsResponseAllowed, so detect content type
 	if !isResponseAllowed(buf.Bytes()) {
-		bufResW.FlushHeader(0)
-		if _, err := w.Write(buf.Bytes()); err != nil {
+		bufResW.TriggerRealWrite(0)
+		if _, err := bufResW.Write(buf.Bytes()); err != nil {
 			return http.StatusInternalServerError, err
 		}
 		return code, nil
@@ -185,14 +185,14 @@ func (mw *Middleware) serveBuffered(cfg *PathConfig, pageID uint64, w http.Respo
 	}
 
 	// Calculates the correct Content-Length
-	bufResW.FlushHeader(tags.DataLen())
+	bufResW.TriggerRealWrite(tags.DataLen())
 
 	if _, err := bufRdr.Seek(0, 0); err != nil {
 		return http.StatusInternalServerError, err
 	}
 	// read the 2nd time from the buffer to finally inject the content from the resource backends
 	// into the HTML page
-	if _, _, err := tags.InjectContent(bufRdr, w, 0); err != nil {
+	if _, _, err := tags.InjectContent(bufRdr, bufResW, 0); err != nil {
 		return http.StatusInternalServerError, err
 	}
 
