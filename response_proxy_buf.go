@@ -76,6 +76,11 @@ func (b *bufferedWriter) Header() http.Header {
 }
 
 func (b *bufferedWriter) WriteHeader(code int) {
+	// WriteHeader gets called before TriggerRealWrite
+	if !b.writeReal {
+		b.code = code
+		return
+	}
 	if b.wroteHeader {
 		return
 	}

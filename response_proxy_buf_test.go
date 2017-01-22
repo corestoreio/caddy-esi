@@ -33,6 +33,8 @@ var _ io.ReaderFrom = &bufferedFancyWriter{}
 var _ http.Flusher = &bufferedFlushWriter{}
 
 func TestWrapBuffered(t *testing.T) {
+	t.Parallel()
+
 	wOrg := httptest.NewRecorder()
 	buf := new(bytes.Buffer)
 	wb := responseWrapBuffer(buf, wOrg)
@@ -43,6 +45,15 @@ func TestWrapBuffered(t *testing.T) {
 	assert.Exactly(t, 0, wOrg.Body.Len())
 	assert.Exactly(t, len(data), buf.Len())
 
-	io.Copy(wOrg, buf)
-	assert.Exactly(t, len(data), wOrg.Body.Len())
+	wb.Header().Set("Content-Length", "321")
+
+	wb.TriggerRealWrite(3000)
+	wb.WriteHeader(http.StatusTeapot)
+	if _, err := wb.Write(buf.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Exactly(t, 91, wOrg.Body.Len())
+	assert.Exactly(t, http.StatusTeapot, wOrg.Code, "HTTP Status Code")
+	assert.Exactly(t, `3321`, wOrg.Header().Get("Content-Length"))
 }

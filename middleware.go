@@ -184,10 +184,11 @@ func (mw *Middleware) serveBuffered(cfg *PathConfig, pageID uint64, w http.Respo
 		return http.StatusInternalServerError, err
 	}
 
-	// Calculates the correct Content-Length
+	// Calculates the correct Content-Length and enables now the real writing to the
+	// client.
 	bufResW.TriggerRealWrite(tags.DataLen())
 
-	if _, err := bufRdr.Seek(0, 0); err != nil {
+	if _, err := bufRdr.Seek(0, 0); err != nil { // Reset io.Reader
 		return http.StatusInternalServerError, err
 	}
 	// read the 2nd time from the buffer to finally inject the content from the resource backends
