@@ -238,6 +238,7 @@ func TestMiddleware_ServeHTTP_Parallel(t *testing.T) {
 	tmpLogFile, clean := esitesting.Tempfile(t)
 	defer clean()
 	t.Log(tmpLogFile)
+
 	hpu.ServeHTTPNewRequest(func() *http.Request {
 		return httptest.NewRequest("GET", "/page02.html", nil)
 	}, mwTestHandler(t, `esi {
@@ -311,4 +312,44 @@ func TestMiddleware_ServeHTTP_Redis(t *testing.T) {
 <p>Rustafarian02</p>`,
 		nil,
 	))
+}
+
+func TestMiddleware_HandleHeaderCommands(t *testing.T) {
+	t.Parallel()
+
+	const myMsg = `mwTest01: Another random micro service message`
+	defer backend.RegisterResourceHandler("mwtest01", backend.MockRequestContent(myMsg)).DeferredDeregister()
+
+	tmpLogFile, clean := esitesting.Tempfile(t)
+	defer clean()
+	//t.Log(tmpLogFile)
+
+	stack := mwTestHandler(t, `esi /page01 {
+			on_error "my unimportant global error message"
+			cmd_header_name X-Esi-CMD
+			log_file `+tmpLogFile+`
+			log_level debug
+		}`)
+
+	for i := 1; i <= 3; i++ {
+		req := httptest.NewRequest("GET", "/page01.html", nil)
+		if i == 3 {
+			req.Header.Set("X-Esi-Cmd", "purge")
+		}
+		rec := httptest.NewRecorder()
+		code, err := stack.ServeHTTP(rec, req)
+		if code != http.StatusOK {
+			t.Errorf("HTTP Code Have %d, Want %d", code, http.StatusOK)
+		}
+		if err != nil {
+			t.Fatalf("%+v", err)
+		}
+	}
+
+	logContent, err := ioutil.ReadFile(tmpLogFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Contains(t, string(logContent), `caddyesi.PathConfig.purgeESICache path_scope: "/page01"`)
+	assert.Exactly(t, 2, strings.Count(string(logContent), `caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse error: "<nil>"`))
 }

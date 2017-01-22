@@ -66,7 +66,7 @@ func PluginSetup(c *caddy.Controller) error {
 	c.OnRestart(func() error {
 		// really necessary? investigate later
 		for _, pc := range pcs {
-			pc.reInit()
+			pc.purgeESICache()
 		}
 		return errors.Wrap(backend.CloseAllResourceHandler(), "[caddyesi] OnRestart")
 	})
@@ -212,6 +212,11 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 			return errors.NewNotValidf("[caddyesi] allowed_methods: %s", c.ArgErr())
 		}
 		pc.AllowedMethods = helpers.CommaListToSlice(strings.ToUpper(c.Val()))
+	case "cmd_header_name":
+		if !c.NextArg() {
+			return errors.NewNotValidf("[caddyesi] cmd_header_name: %s", c.ArgErr())
+		}
+		pc.CmdHeaderName = http.CanonicalHeaderKey(c.Val())
 	case "on_error":
 		if !c.NextArg() {
 			return errors.NewNotValidf("[caddyesi] allowed_methods: %s", c.ArgErr())

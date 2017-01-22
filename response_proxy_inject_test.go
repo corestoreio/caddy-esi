@@ -42,6 +42,8 @@ var _ http.Pusher = (*responseMock)(nil)
 var _ io.ReaderFrom = (*responseMock)(nil)
 var _ http.Flusher = (*responseMock)(nil)
 
+var _ io.Reader = (*simpleReader)(nil)
+
 type responseMock struct {
 	http.ResponseWriter
 }
@@ -147,8 +149,8 @@ func TestResponseWrapInjector(t *testing.T) {
 
 		rec := httptest.NewRecorder()
 		rwi := responseWrapInjector(dtChan, rec)
-		html1 := []byte(`<HtMl><bOdY> <esi:include src=""/>`)
-		html2 := []byte(` <p>Text and much more content.</p></body></html>`)
+		html1 := []byte(`<HtMl><bOdY> <esi:include src=""/>|`)
+		html2 := []byte(`<data>Text and much more content.</data></body></html>`)
 		if _, err := rwi.Write(html1); err != nil {
 			t.Fatal(err)
 		}
@@ -156,7 +158,7 @@ func TestResponseWrapInjector(t *testing.T) {
 			t.Fatal(err)
 		}
 		// This test will fail once InjectContent has been bug fixed.
-		assert.Exactly(t, "<HtMl><bOdY> <Hello><world status=\"sinking\"></world></Hello> <p>Text and <Hello><world status=\"sinking\"></world></Hello>></body></html>",
+		assert.Exactly(t, "<HtMl><bOdY> <Hello><world status=\"sinking\"></world></Hello>|<data>Text an<Hello><world status=\"sinking\"></world></Hello>/data></body></html>",
 			rec.Body.String())
 	})
 }

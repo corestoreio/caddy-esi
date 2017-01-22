@@ -40,6 +40,7 @@ https://cyrillschumacher.local:2718 {
         [max_body_size 500kib|5MB|10GB|2EB|etc]
         [page_id_source [host,path,ip, etc]]
         [allowed_methods [GET,POST,etc]]
+        [cmd_header_name [X-What-Ever]]
         [cache redis://localhost:6379/0]
         [cache redis://localhost:6380/0]
         [cache memcache://localhost:11211/2]
@@ -71,10 +72,16 @@ valid URI. Reserved keys are:
 | `cache` | disabled | No | Defines a cache service which stores the retrieved data from a backend resource but only when the ttl (within an ESI tag) has been set. Can only occur multiple times! |
 | `page_id_source` | `host`, `path` | No | Special directive on how to identify a request to the same page. The following settings can be used to calculate the hash value. Available settings: `remoteaddr`, `realip`, `scheme`, `host`, `path`, `rawpath`, `rawquery` and `url`. Special feature to access cookies and headers: Prefix with `cookie-` or `header-` to access the appropriate value. Attention: The more granular you define the higher possibility occurs that your RAM will be filled up (will be fixed ...). |
 | `allowed_methods` | `GET` | No | Any method listed here triggers the ESI middleware |
+| `cmd_header_name` | Disabled | No | Specify here a header name to enable certain commands for e.g. purging the internal ESI tag cache |
 | `log_file` | disabled | No | Put in here either a file name or the wordings `stderr` or `stdout` to write to those file descriptors. |
 | `log_level` | disabled | No | Available key words `debug` the most verbose and `info`, less verbose. |
 | `log_format` | n/a | No | Not yet supported. Ideas? |
 
+`cmd_header_name` current supported values are:
+
+- `purge` use the value `purge` with your defined `cmd_header_name` to purge the
+ESI tag cache. `X-Esi-Cmd: purge`
+- tbd
 
 ## Supported ESI Tags and their attributes
 
@@ -112,6 +119,28 @@ cannot assume that there are any line feeds or other delimiters in the stream
 and the code must assume that the stream is of any arbitrary length. The
 solution cannot meaningfully buffer to the end of the stream and then process
 the replacement.
+
+### TL;DR ESI tag options
+
+Quick overview which options are available for two different kinds of ESI tags.
+
+1. Querying an HTTP backend
+
+```
+<esi:include src="https://micro1.service/esi/foo" src="https://microN.service/esi/foo" 
+    timeout="time.Duration" ttl="time.Duration" 
+    onerror="text or path to file" maxbodysize="bytes"
+    forwardheaders="all or specific comma separated list of header names"
+    returnheaders="all or specific comma separated list of header names"
+    coalesce="true|false"
+/>
+```
+
+2. Querying a NOSQL database or service
+
+```
+<esi:include src="alias name" key="key name" onerror="text or path to file" timeout="time.Duration" />
+```
 
 
 ### Basic tag

@@ -16,7 +16,6 @@ package caddyesi
 
 import (
 	"bufio"
-	"bytes"
 	"io"
 	"net"
 	"net/http"
@@ -82,7 +81,13 @@ func (b *injectingWriter) WriteHeader(code int) {
 	b.rw.WriteHeader(code)
 }
 
-// Write does not write to the client instead it writes in the underlying buffer.
+// Write scans p for occurrences of ESI tags and injects the ESI tag content
+// into the http.ResponseWriter. Write will write more data than the returned
+// int states. The returned int is len(p). The reason for that incorrect
+// behaviour can be looked up bytes.Buffer.WriteTo where it will panic once the
+// writer returns more data written than the data contains. Some other Caddy
+// middleware uses Buffer.WriteTo ... if you know a better solutions to return
+// the correct value, let me know.
 func (b *injectingWriter) Write(p []byte) (int, error) {
 	const (
 		notTested uint8 = iota
@@ -92,7 +97,7 @@ func (b *injectingWriter) Write(p []byte) (int, error) {
 
 	if b.responseAllowed == notTested {
 		// Only plain text response is benchIsResponseAllowed, so detect content type.
-		// Hopefully p is longer than 512 bytes ;-)
+		// Hopefully data is longer than 512 bytes ;-)
 		b.responseAllowed = yes
 		if !isResponseAllowed(p) {
 			b.responseAllowed = no
@@ -103,12 +108,37 @@ func (b *injectingWriter) Write(p []byte) (int, error) {
 		return b.rw.Write(p)
 	}
 
-	// might be buggy in InjectContent on multiple calls to Write(). Fix is to a position counter to the InjectContent.
-	// The position is pos+=len(p)
-	buf := bytes.NewBuffer(p) // todo simplify and use our own type
-	_, nw, err := b.tags.InjectContent(buf, b.rw, b.lastWritePos)
+	// might be buggy in InjectContent on multiple calls to Write(). Fix is to a
+	// position counter to the InjectContent. The position is pos+=len(data)
+	_, _, err := b.tags.InjectContent(newSimpleReader(p), b.rw, b.lastWritePos)
+	// The write of InjectContent is invisible as we write more data as
+	// sometimes the bytes.Buffer.WriteTo checks
 	b.lastWritePos += len(p)
-	return nw, err
+	return len(p), err
+}
+
+func newSimpleReader(p []byte) *simpleReader {
+	// can be in a sync.pool
+	return &simpleReader{
+		data: p,
+	}
+}
+
+type simpleReader struct {
+	off  int
+	data []byte
+}
+
+func (sr *simpleReader) Read(p []byte) (n int, err error) {
+	if sr.off >= len(sr.data) {
+		if len(p) == 0 {
+			return
+		}
+		return 0, io.EOF
+	}
+	n = copy(p, sr.data[sr.off:])
+	sr.off += n
+	return
 }
 
 type injectingFancyWriter struct {

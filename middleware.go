@@ -46,9 +46,6 @@ type Middleware struct {
 
 // ServeHTTP implements the http.Handler interface.
 func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
-	// maybe use a hashing function to check if content changes ... or another
-	// endpoint to clear the internal cache ESI tags ?
-
 	cfg := mw.PathConfigs.ConfigForPath(r)
 	if cfg == nil {
 		return mw.Next.ServeHTTP(w, r) // exit early
@@ -60,6 +57,10 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 			)
 		}
 		return mw.Next.ServeHTTP(w, r) // go on ...
+	}
+	if err := handleHeaderCommands(cfg, r); err != nil {
+		// clears the ESI tags
+		return http.StatusInternalServerError, err
 	}
 
 	pageID, esiEntities := cfg.ESITagsByRequest(r)
@@ -196,4 +197,18 @@ func (mw *Middleware) serveBuffered(cfg *PathConfig, pageID uint64, w http.Respo
 	}
 
 	return code, err
+}
+
+// handleHeaderCommands allows to execute certain commands to influence the
+// behaviour of the ESI tag middleware.
+func handleHeaderCommands(pc *PathConfig, r *http.Request) error {
+	if pc.CmdHeaderName == "" {
+		return nil
+	}
+	switch r.Header.Get(pc.CmdHeaderName) {
+	case `purge`:
+		pc.purgeESICache()
+	}
+
+	return nil
 }

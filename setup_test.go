@@ -176,6 +176,31 @@ func TestPluginSetup(t *testing.T) {
 		nil,
 	))
 
+	t.Run("config with cmd_header_name", runner(
+		`esi {
+			cmd_header_name X-Esi-CMD
+		}`,
+		PathConfigs{
+			&PathConfig{
+				Scope:         "/",
+				Timeout:       DefaultTimeOut,
+				CmdHeaderName: `X-Esi-Cmd`,
+			},
+		},
+		0,   // cache length
+		nil, // kv services []string
+		nil,
+	))
+	t.Run("config with cmd_header_name but value not provided", runner(
+		`esi {
+			cmd_header_name
+		}`,
+		nil,
+		0,   // cache length
+		nil, // kv services []string
+		errors.IsNotValid,
+	))
+
 	t.Run("config with page_id_source", runner(
 		`esi {
 			page_id_source "pAth,host , IP, header-X-GitHub-Request-Id, header-Server, cookie-__Host-user_session_same_site"

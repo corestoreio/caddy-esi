@@ -74,6 +74,10 @@ type PathConfig struct {
 	// zero, caching globally disabled until an ESI tag or this configuration
 	// value contains the TTL attribute.
 	TTL time.Duration
+	// CmdHeaderName if set allows to execute certain maintenance functions to
+	// e.g. purge the cache. For security reasons an empty string means, feature
+	// has been disabled.
+	CmdHeaderName string
 
 	// PageIDSource defines a slice of possible parameters which gets extracted
 	// from the http.Request object. All these parameters will be used to
@@ -268,10 +272,13 @@ func (pc *PathConfig) String() string {
 	return fmt.Sprintf("TODO(CyS) Nicer debug: %#v\n", pc)
 }
 
-func (pc *PathConfig) reInit() {
+func (pc *PathConfig) purgeESICache() {
 	pc.esiMU.Lock()
-	defer pc.esiMU.Unlock()
 	pc.esiCache = make(map[uint64]esitag.Entities)
+	pc.esiMU.Unlock()
+	if pc.Log.IsDebug() {
+		pc.Log.Debug("caddyesi.PathConfig.purgeESICache", log.String("path_scope", pc.Scope))
+	}
 }
 
 // isResponseAllowed uses https://golang.org/pkg/net/http/#DetectContentType
