@@ -15,11 +15,10 @@
 package main
 
 import (
-	"fmt"
-	"net/http/httputil"
 	"os"
 	"runtime"
 
+	"github.com/fatih/color"
 	"github.com/vdobler/ht/cookiejar"
 	"github.com/vdobler/ht/ht"
 )
@@ -48,16 +47,18 @@ func main() {
 		if test.Status > ht.Pass {
 			exitStatus = 35 // line number ;-)
 
-			reqData, err := httputil.DumpRequest(test.Request.Request, true)
-			if err != nil {
-				panic(err)
-			}
-			fmt.Fprintf(os.Stdout, "Request:\n%s\n", reqData)
-			resData, err := httputil.DumpResponse(test.Response.Response, false)
-			if err != nil {
-				panic(err)
-			}
-			fmt.Fprintf(os.Stdout, "Response:\n%s\nError: %s\n\n", resData, test.Response.BodyErr)
+			color.Red("Failed %s", test.Name)
+
+			//reqData, err := httputil.DumpRequest(test.Request.Request, true)
+			//if err != nil {
+			//	panic(err)
+			//}
+			//fmt.Fprintf(os.Stdout, "Request:\n%s\n", reqData)
+			//resData, err := httputil.DumpResponse(test.Response.Response, false)
+			//if err != nil {
+			//	panic(err)
+			//}
+			//fmt.Fprintf(os.Stdout, "Response:\n%s\nError: %s\n\n", resData, test.Response.BodyErr)
 		}
 	}
 

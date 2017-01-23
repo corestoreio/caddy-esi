@@ -16,8 +16,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
-	"time"
 
 	"github.com/vdobler/ht/ht"
 )
@@ -30,42 +28,15 @@ func init() {
 	RegisterTest(page01(), page01(), page01())
 }
 
-var page01Counter int
+var tc01 int // tc = test counter
 
 func page01() (t *ht.Test) {
-	page01Counter++
+	tc01++
 	t = &ht.Test{
-		Name:        fmt.Sprintf("Page MS Cart Tiny Iteration %d", page01Counter),
+		Name:        fmt.Sprintf("Page MS Cart Tiny Iteration %d", tc01),
 		Description: `Request loads ms_cart_tiny.html from a micro service and embeds the checkout cart into its HTML`,
-		Request: ht.Request{
-			Method: "GET",
-			URL:    caddyAddress + "page_cart_tiny.html",
-			Header: http.Header{
-				"Accept":          []string{"text/html"},
-				"Accept-Encoding": []string{"gzip, deflate, br"},
-			},
-			Timeout: 1 * time.Second,
-		},
-		Checks: ht.CheckList{
-			ht.StatusCode{Expect: 200},
-			&ht.Header{
-				Header: "Etag",
-				Condition: ht.Condition{
-					Min: 14, Max: 18}},
-			&ht.Header{
-				Header: "Accept-Ranges",
-				Condition: ht.Condition{
-					Equals: `bytes`}},
-			&ht.Header{
-				Header: "Last-Modified",
-				Condition: ht.Condition{
-					Min: 29, Max: 29}},
-			&ht.None{
-				Of: ht.CheckList{
-					&ht.HTMLContains{
-						Selector: `html`,
-						Text:     []string{"<esi:"},
-					}}},
+		Request:     makeRequestGET("page_cart_tiny.html"),
+		Checks: makeChecklist200(
 			&ht.Body{
 				Contains: "demo-store.shop/autumn-pullie.html",
 				Count:    2,
@@ -74,7 +45,7 @@ func page01() (t *ht.Test) {
 				Contains: ` class="page01CartLoaded"`,
 				Count:    1,
 			},
-		},
+		),
 	}
 	return
 }

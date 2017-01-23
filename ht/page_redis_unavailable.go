@@ -16,8 +16,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
-	"time"
 
 	"github.com/vdobler/ht/ht"
 )
@@ -26,42 +24,15 @@ func init() {
 	RegisterTest(pageRedisNoServer(), pageRedisNoServer())
 }
 
-var pageRedisNoServerCounter int
+var tc04 int // tc = test counter
 
 func pageRedisNoServer() (t *ht.Test) {
-	pageRedisNoServerCounter++
+	tc04++
 	t = &ht.Test{
-		Name:        fmt.Sprintf("Page Redis no server %d", pageRedisNoServerCounter),
+		Name:        fmt.Sprintf("Page Redis unavailable %d", tc04),
 		Description: `Request to redis server fails because the server URI was misspelled and lazy loaded`,
-		Request: ht.Request{
-			Method: "GET",
-			URL:    caddyAddress + "page_redis_no_server.html",
-			Header: http.Header{
-				"Accept":          []string{"text/html"},
-				"Accept-Encoding": []string{"gzip, deflate, br"},
-			},
-			Timeout: 1 * time.Second,
-		},
-		Checks: ht.CheckList{
-			ht.StatusCode{Expect: 200},
-			&ht.Header{
-				Header: "Etag",
-				Condition: ht.Condition{
-					Min: 14, Max: 18}},
-			&ht.Header{
-				Header: "Accept-Ranges",
-				Condition: ht.Condition{
-					Equals: `bytes`}},
-			&ht.Header{
-				Header: "Last-Modified",
-				Condition: ht.Condition{
-					Min: 29, Max: 29}},
-			&ht.None{
-				Of: ht.CheckList{
-					&ht.HTMLContains{
-						Selector: `html`,
-						Text:     []string{"<esi:"},
-					}}},
+		Request:     makeRequestGET("page_redis_unavailable.html"),
+		Checks: makeChecklist200(
 			&ht.Body{
 				Contains: "<td>Redis on google cloud platform one not found</td>",
 				Count:    1,
@@ -81,7 +52,7 @@ func pageRedisNoServer() (t *ht.Test) {
 				Contains: ` class="redisfailure01"`,
 				Count:    3,
 			},
-		},
+		),
 	}
 	return
 }

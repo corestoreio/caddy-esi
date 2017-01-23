@@ -16,8 +16,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
-	"time"
 
 	"github.com/vdobler/ht/ht"
 )
@@ -26,42 +24,15 @@ func init() {
 	RegisterTest(pageRedis(), pageRedis())
 }
 
-var pageRedisCounter int
+var tc03 int // tc = test counter
 
 func pageRedis() (t *ht.Test) {
-	pageRedisCounter++
+	tc03++
 	t = &ht.Test{
-		Name:        fmt.Sprintf("Page Redis success %d", pageRedisCounter),
+		Name:        fmt.Sprintf("Page Redis success %d", tc03),
 		Description: `Request loads two keys from a redis server`,
-		Request: ht.Request{
-			Method: "GET",
-			URL:    caddyAddress + "page_redis.html",
-			Header: http.Header{
-				"Accept":          []string{"text/html"},
-				"Accept-Encoding": []string{"gzip, deflate, br"},
-			},
-			Timeout: 1 * time.Second,
-		},
-		Checks: ht.CheckList{
-			ht.StatusCode{Expect: 200},
-			&ht.Header{
-				Header: "Etag",
-				Condition: ht.Condition{
-					Min: 14, Max: 18}},
-			&ht.Header{
-				Header: "Accept-Ranges",
-				Condition: ht.Condition{
-					Equals: `bytes`}},
-			&ht.Header{
-				Header: "Last-Modified",
-				Condition: ht.Condition{
-					Min: 29, Max: 29}},
-			&ht.None{
-				Of: ht.CheckList{
-					&ht.HTMLContains{
-						Selector: `html`,
-						Text:     []string{"<esi:"},
-					}}},
+		Request:     makeRequestGET("page_redis.html"),
+		Checks: makeChecklist200(
 			&ht.Body{
 				Contains: "Catalog Product 001", // see integration.sh
 				Count:    1,
@@ -78,7 +49,7 @@ func pageRedis() (t *ht.Test) {
 				Contains: ` class="redisSuccess"`,
 				Count:    3,
 			},
-		},
+		),
 	}
 	return
 }
