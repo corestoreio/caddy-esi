@@ -123,7 +123,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend(out *jwriter.Wri
 		if in.ExternalReq == nil {
 			out.RawString("null")
 		} else {
-			easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out, *in.ExternalReq)
+			easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out, in.ExternalReq)
 		}
 	}
 	if in.URL != "" {
@@ -480,7 +480,7 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in *jlexer.Lexe
 		in.Consumed()
 	}
 }
-func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Writer, in http.Request) {
+func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Writer, in *http.Request) {
 	out.RawByte('{')
 	first := true
 	_ = first
