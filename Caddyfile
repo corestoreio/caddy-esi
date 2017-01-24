@@ -6,8 +6,8 @@ http://127.0.0.1:2017 {
     browse
     ext    .html
     log    ./cdy_test_2017_access.log
-    #errors ./cdy_test_2017_errors.log
-    errors visible
+    errors ./cdy_test_2017_errors.log
+    #errors visible
 
     esi {
         cmd_header_name X-Esi-Cmd
