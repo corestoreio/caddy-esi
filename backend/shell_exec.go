@@ -37,7 +37,7 @@ func NewFetchShellExec() *fetchShellExec {
 	return &fetchShellExec{}
 }
 
-// FetchShellExec executes a local program and returns the content or an error.
+// DoRequest executes a local program and returns the content or an error.
 // Header is always nil.
 //
 // To trigger shell exec the src attribute in an ESI tag must start with sh://.
@@ -66,6 +66,7 @@ func (fs *fetchShellExec) DoRequest(args *ResourceArgs) (http.Header, []byte, er
 		cmdName = cmdName[:firstWS]
 	}
 
+	// TODO(CyS) benchmark if the goroutine is really worth to rely on non-blocking execution.
 	var retContent []byte
 	var retErr error
 	done := make(chan struct{})
@@ -90,6 +91,11 @@ func (fs *fetchShellExec) DoRequest(args *ResourceArgs) (http.Header, []byte, er
 		cmd.Stdout = stdOut
 		cmd.Stdin = stdIn
 
+		defer func() {
+			if cmd.Process != nil {
+				cmd.Process.Release()
+			}
+		}()
 		jData, err := args.MarshalJSON()
 		if err != nil {
 			retErr = errors.Wrapf(err, "[esibackend] FetchShellExec MarshalJSON URL %q", args.URL)
@@ -98,7 +104,6 @@ func (fs *fetchShellExec) DoRequest(args *ResourceArgs) (http.Header, []byte, er
 		_, _ = stdIn.Write(jData)
 
 		if err := cmd.Run(); err != nil {
-			cmd.Process.Release()
 			retErr = errors.Wrapf(err, "[esibackend] FetchShellExec cmd.Run URL %q", args.URL)
 			return
 		}
