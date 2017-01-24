@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en-US" xmlns:esi="http://www.w3.org/2001/XMLSchema">
+<head>
+    <title>Caddy ESI Tag Shell</title>
+</head>
+<body>
+
+    <h1> Caddy ESI Tag Shell</h1>
+
+    <table border="1">
+        <tr>
+            <th>Name</th>
+            <th>Output</th>
+        </tr>
+        <tr>
+            <td class="shellSuccess">Should load text</td>
+            <td><esi:include src="sh://./testdata/www_stdOut.sh" timeout="50ms"/></td>
+        </tr>
+        <tr>
+            <td class="shellSuccess">Should load error because typo in shell name</td>
+            <td><esi:include src="sh://./testdata/xxx.sh" timeout="10ms"/></td>
+        </tr>
+    </table>
+
+</body>
+</html>

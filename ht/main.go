@@ -15,6 +15,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"runtime"
 
@@ -49,16 +50,10 @@ func main() {
 
 			color.Red("Failed %s", test.Name)
 
-			//reqData, err := httputil.DumpRequest(test.Request.Request, true)
-			//if err != nil {
-			//	panic(err)
-			//}
-			//fmt.Fprintf(os.Stdout, "Request:\n%s\n", reqData)
-			//resData, err := httputil.DumpResponse(test.Response.Response, false)
-			//if err != nil {
-			//	panic(err)
-			//}
-			//fmt.Fprintf(os.Stdout, "Response:\n%s\nError: %s\n\n", resData, test.Response.BodyErr)
+			if test.Response.BodyErr != nil {
+				color.Yellow(fmt.Sprintf("Response Body Error: %s\n", test.Response.BodyErr))
+			}
+			color.Yellow("Response Body: %q\n", test.Response.BodyStr)
 		}
 	}
 
