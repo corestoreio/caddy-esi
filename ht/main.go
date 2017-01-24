@@ -16,8 +16,10 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/vdobler/ht/cookiejar"
@@ -27,10 +29,26 @@ import (
 const caddyAddress = `http://127.0.0.1:2017/`
 
 func main() {
+	// <Background noise>
+	go func() {
+		for c := time.Tick(1 * time.Millisecond); ; <-c {
+			t := pageRedis()
+			if err := t.Run(); err != nil {
+				panic(err)
+			}
+		}
+	}()
+	// </Background noise>
+
 	jar, err := cookiejar.New(&cookiejar.Options{})
 	if err != nil {
 		panic(err)
 	}
+
+	for _, t := range testCollection {
+		t.Execution.PreSleep = time.Duration(rand.Intn(20)) * time.Millisecond
+	}
+
 	c := ht.Collection{
 		Tests: testCollection,
 	}
