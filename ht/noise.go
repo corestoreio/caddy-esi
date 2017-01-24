@@ -16,35 +16,47 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/vdobler/ht/ht"
 )
 
+var noisyCounter chan int
+
 func init() {
-	RegisterTest(headerCmd())
+	noisyCounter = make(chan int) // must be blocking
+	// generator for incremented integers to be race free
+	go func() {
+		var i int
+		for {
+			noisyCounter <- i
+			i++
+		}
+	}()
+
+	// <Background noise>
+	go func() {
+		for c := time.Tick(1 * time.Millisecond); ; <-c {
+			go func() {
+				// each test needs ~2ms
+				t := noisyRequests()
+				if err := t.Run(); err != nil {
+					panic(fmt.Sprintf("Test %q\nError: %s", t.Name, err))
+				}
+			}()
+		}
+	}()
+	// </Background noise>
 }
 
-func headerCmd() (t *ht.Test) {
-
-	req := makeRequestGET("page_cart_tiny.html")
-	req.Header.Set("X-Esi-Cmd", "purge")
-
+func noisyRequests() (t *ht.Test) {
+	reqID := <-noisyCounter
 	t = &ht.Test{
-		Name:        fmt.Sprint("Header Command Purge 1"),
-		Description: `Sends a special header to purge the ESI tag cache`,
-		Request:     req,
+		Name:    fmt.Sprintf("Noisy Request %d", reqID),
+		Request: makeRequestGET(fmt.Sprintf("ms_cart_tiny.html?id=%d", reqID)),
 		Checks: makeChecklist200(
-			&ht.Header{
-				Header: `X-Esi-Cmd`,
-				Condition: ht.Condition{
-					// Whenever we change the number of tests and the cached
-					// entries grows more we must change here the number of
-					// items in the cache before purging it.
-					Equals: `purge-ok-6`,
-				},
-			},
 			&ht.Body{
-				Contains: "demo-store.shop/autumn-pullie.html",
+				Contains: "price-excluding-tax", // see integration.sh
 				Count:    2,
 			},
 		),

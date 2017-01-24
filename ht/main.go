@@ -12,6 +12,8 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+// Package main adds http testing via integration tests using package
+// github.com/vdobler/ht.
 package main
 
 import (
@@ -29,16 +31,7 @@ import (
 const caddyAddress = `http://127.0.0.1:2017/`
 
 func main() {
-	// <Background noise>
-	go func() {
-		for c := time.Tick(1 * time.Millisecond); ; <-c {
-			t := pageRedis()
-			if err := t.Run(); err != nil {
-				panic(err)
-			}
-		}
-	}()
-	// </Background noise>
+	// FYI: file noise.go adds lots of background requests
 
 	jar, err := cookiejar.New(&cookiejar.Options{})
 	if err != nil {
