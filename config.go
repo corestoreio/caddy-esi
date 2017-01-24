@@ -91,12 +91,12 @@ type PathConfig struct {
 	// LogFile where to write the log output? Either any file name or stderr or
 	// stdout. If empty logging disabled.
 	LogFile string
+
+	esiMU sync.RWMutex
 	// LogLevel can have the values info, debug, fatal. If empty logging disabled.
 	LogLevel string
 	// Log gets set up during setup
 	Log log.Logger
-
-	esiMU sync.RWMutex
 	// esiCache identifies all parsed ESI tags in a page for specific path
 	// prefix. uint64 represents the hash for the current request calculated by
 	// pageID function. Long term "bug": Maybe we need here another algorithm
@@ -272,13 +272,15 @@ func (pc *PathConfig) String() string {
 	return fmt.Sprintf("TODO(CyS) Nicer debug: %#v\n", pc)
 }
 
-func (pc *PathConfig) purgeESICache() {
+func (pc *PathConfig) purgeESICache() (itemsInMap int) {
 	pc.esiMU.Lock()
+	itemsInMap = len(pc.esiCache)
 	pc.esiCache = make(map[uint64]esitag.Entities)
 	pc.esiMU.Unlock()
 	if pc.Log.IsDebug() {
 		pc.Log.Debug("caddyesi.PathConfig.purgeESICache", log.String("path_scope", pc.Scope))
 	}
+	return
 }
 
 // isResponseAllowed uses https://golang.org/pkg/net/http/#DetectContentType

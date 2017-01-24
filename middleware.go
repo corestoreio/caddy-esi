@@ -16,6 +16,7 @@ package caddyesi
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -58,7 +59,7 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 		}
 		return mw.Next.ServeHTTP(w, r) // go on ...
 	}
-	if err := handleHeaderCommands(cfg, r); err != nil {
+	if err := handleHeaderCommands(cfg, w, r); err != nil {
 		// clears the ESI tags
 		return http.StatusInternalServerError, err
 	}
@@ -202,13 +203,35 @@ func (mw *Middleware) serveBuffered(cfg *PathConfig, pageID uint64, w http.Respo
 
 // handleHeaderCommands allows to execute certain commands to influence the
 // behaviour of the ESI tag middleware.
-func handleHeaderCommands(pc *PathConfig, r *http.Request) error {
+func handleHeaderCommands(pc *PathConfig, w http.ResponseWriter, r *http.Request) (err error) {
 	if pc.CmdHeaderName == "" {
 		return nil
 	}
+	var logLevel string
+
 	switch r.Header.Get(pc.CmdHeaderName) {
 	case `purge`:
-		pc.purgeESICache()
+		prevItemsInMap := pc.purgeESICache()
+		w.Header().Set(pc.CmdHeaderName, fmt.Sprintf("purge-ok-%d", prevItemsInMap))
+	case `log-debug`:
+		logLevel = "debug"
+	case `log-info`:
+		logLevel = "info"
+	case `log-none`:
+		logLevel = "none"
+	}
+
+	if logLevel != "" {
+		// TODO: check for race conditions
+		pc.esiMU.Lock()
+		prevLevel := pc.LogLevel
+		pc.LogLevel = logLevel
+		err = setupLogger(pc)
+		pc.esiMU.Unlock()
+		if err != nil {
+			return errors.Wrap(err, "[caddyesi] handleHeaderCommands.setupLogger")
+		}
+		w.Header().Set(pc.CmdHeaderName, fmt.Sprintf("log-%s-ok", prevLevel))
 	}
 
 	return nil
