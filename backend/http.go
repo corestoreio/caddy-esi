@@ -51,7 +51,7 @@ var DefaultHTTPTransport = &http.Transport{
 
 // NewFetchHTTP creates a new HTTP/S backend fetcher which lives the whole
 // application running time. Thread safe.
-func NewFetchHTTP(tr http.RoundTripper) *fetchHTTP {
+func NewFetchHTTP(tr http.RoundTripper) ResourceHandler {
 	f := &fetchHTTP{
 		client: &http.Client{
 			Transport: tr,

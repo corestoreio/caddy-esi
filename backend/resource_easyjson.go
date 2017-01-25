@@ -46,7 +46,7 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend(in *jlexer.Lexer
 				if out.ExternalReq == nil {
 					out.ExternalReq = new(http.Request)
 				}
-				easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in, &*out.ExternalReq)
+				easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in, out.ExternalReq)
 			}
 		case "url":
 			out.URL = string(in.String())
@@ -275,7 +275,7 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in *jlexer.Lexe
 				if out.URL == nil {
 					out.URL = new(url.URL)
 				}
-				easyjson1688e6a4DecodeNetUrl(in, &*out.URL)
+				easyjson1688e6a4DecodeNetUrl(in, out.URL)
 			}
 		case "proto":
 			out.Proto = string(in.String())
@@ -427,7 +427,7 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in *jlexer.Lexe
 				if out.MultipartForm == nil {
 					out.MultipartForm = new(multipart.Form)
 				}
-				easyjson1688e6a4DecodeMimeMultipart(in, &*out.MultipartForm)
+				easyjson1688e6a4DecodeMimeMultipart(in, out.MultipartForm)
 			}
 		case "trailer":
 			if in.IsNull() {
@@ -826,7 +826,7 @@ func easyjson1688e6a4DecodeMimeMultipart(in *jlexer.Lexer, out *multipart.Form) 
 								if v33 == nil {
 									v33 = new(multipart.FileHeader)
 								}
-								easyjson1688e6a4DecodeMimeMultipart1(in, &*v33)
+								easyjson1688e6a4DecodeMimeMultipart1(in, v33)
 							}
 							v32 = append(v32, v33)
 							in.WantComma()
@@ -1073,7 +1073,7 @@ func easyjson1688e6a4DecodeNetUrl(in *jlexer.Lexer, out *url.URL) {
 				if out.User == nil {
 					out.User = new(url.Userinfo)
 				}
-				easyjson1688e6a4DecodeNetUrl1(in, &*out.User)
+				easyjson1688e6a4DecodeNetUrl1(in, out.User)
 			}
 		case "host":
 			out.Host = string(in.String())
@@ -1190,17 +1190,16 @@ func easyjson1688e6a4DecodeNetUrl1(in *jlexer.Lexer, out *url.Userinfo) {
 	}
 	in.Delim('{')
 	for !in.IsDelim('}') {
-		key := in.UnsafeString()
+
 		in.WantColon()
 		if in.IsNull() {
 			in.Skip()
 			in.WantComma()
 			continue
 		}
-		switch key {
-		default:
-			in.SkipRecursive()
-		}
+
+		in.SkipRecursive()
+
 		in.WantComma()
 	}
 	in.Delim('}')

@@ -33,7 +33,7 @@ type fetchShellExec struct {
 
 // NewFetchShellExec creates a new command line executor backend fetcher which
 // lives the whole application running time. Thread safe.
-func NewFetchShellExec() *fetchShellExec {
+func NewFetchShellExec() ResourceHandler {
 	return &fetchShellExec{}
 }
 
