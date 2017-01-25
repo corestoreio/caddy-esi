@@ -91,11 +91,6 @@ func (fs *fetchShellExec) DoRequest(args *ResourceArgs) (http.Header, []byte, er
 		cmd.Stdout = stdOut
 		cmd.Stdin = stdIn
 
-		defer func() {
-			if cmd.Process != nil {
-				cmd.Process.Release()
-			}
-		}()
 		jData, err := args.MarshalJSON()
 		if err != nil {
 			retErr = errors.Wrapf(err, "[esibackend] FetchShellExec MarshalJSON URL %q", args.URL)
