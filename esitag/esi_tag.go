@@ -319,11 +319,10 @@ func (et *Entity) poolPutRFA(rfa *backend.ResourceArgs) {
 }
 
 // QueryResources iterates sequentially over the resources and executes requests
-// as defined in the ResourceHandler. If one resource fails it will be
-// marked as timed out and the next resource gets tried. The exponential
-// back-off stops when MaxBackOffs have been reached and then tries again.
-// Returns a Temporary error behaviour when all requests to all resources are
-// failing.
+// as defined in the ResourceHandler. If one resource fails it will be marked as
+// timed out and the next resource gets tried. The exponential back-off stops
+// when MaxBackOffs have been reached and then tries again. Returns a Temporary
+// error behaviour when all requests to all resources have failed.
 func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 	timeStart := monotime.Now()
 
@@ -343,16 +342,28 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 		case backend.CBStateHalfOpen, backend.CBStateClosed:
 			// TODO(CyS) add ReturnHeader
 			_, data, err := r.DoRequest(rfa)
+
 			if err != nil {
+
+				if errors.IsNotFound(err) {
+					if et.Log.IsDebug() {
+						et.Log.Debug("esitag.Entity.QueryResources.ResourceHandler.NotFound",
+							log.Err(err), log.Duration(log.KeyNameDuration, monotime.Since(timeStart)), lFields)
+					}
+					continue // go to next resource in this loop
+				}
+
+				// A real error and we must trigger the circuit breaker
 				mErr = mErr.AppendErrors(errors.Errorf("\nIndex %d URL %q with %s\n", i, r.String(), err))
 				lastFailureTime := r.CBRecordFailure()
-				if et.Log.IsDebug() {
-					et.Log.Debug("esitag.Entity.QueryResources.ResourceHandler.Error",
+				if et.Log.IsInfo() {
+					et.Log.Info("esitag.Entity.QueryResources.ResourceHandler.Error",
 						log.Duration(log.KeyNameDuration, monotime.Since(timeStart)),
 						log.Err(err), log.Uint64("failure_count", r.CBFailures()), log.UnixNanoHuman("last_failure", lastFailureTime), lFields)
 				}
 				continue // go to next resource in this loop
 			}
+
 			if state == backend.CBStateHalfOpen {
 				r.CBReset()
 				if et.Log.IsDebug() {
@@ -436,7 +447,11 @@ func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 		e := e
 		g.Go(func() error {
 			data, err := e.QueryResources(r)
+			// A temporary error describes that we have problems reaching the
+			// backend resource and that the circuit breaker has been triggered
+			// or maybe even stopped querying.
 			isTempErr := errors.IsTemporary(err)
+
 			if err != nil && !isTempErr {
 				// err should have in most cases temporary error behaviour.
 				// but here URL template rendering went wrong.
