@@ -15,11 +15,44 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/vdobler/ht/ht"
 )
+
+var (
+	testCollection []*ht.Test
+	afterTests     []*ht.Test
+)
+
+// RegisterTest adds a set of tests to the collection
+func RegisterTest(tests ...*ht.Test) {
+	testCollection = append(testCollection, tests...)
+}
+
+// RegisterAfterTest register a test to run after the main concurrent test loop.
+func RegisterAfterTest(tests ...*ht.Test) {
+	afterTests = append(afterTests, tests...)
+}
+
+func handleTestResult(test *ht.Test) (exitStatus int) {
+	if err := test.PrintReport(os.Stdout); err != nil {
+		panic(err)
+	}
+	if test.Status > ht.Pass {
+		exitStatus = 1
+		color.Red("Failed %s", test.Name)
+		if test.Response.BodyErr != nil {
+			color.Yellow(fmt.Sprintf("Response Body Error: %s\n", test.Response.BodyErr))
+		}
+		color.Yellow("Response Body: %q\n", test.Response.BodyStr)
+	}
+	return
+}
 
 func makeRequestGET(path string) (r ht.Request) {
 	r = ht.Request{

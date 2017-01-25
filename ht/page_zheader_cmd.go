@@ -21,7 +21,7 @@ import (
 )
 
 func init() {
-	RegisterTest(headerCmd())
+	RegisterAfterTest(headerCmd())
 }
 
 func headerCmd() (t *ht.Test) {

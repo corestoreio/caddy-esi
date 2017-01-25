@@ -17,13 +17,11 @@
 package main
 
 import (
-	"fmt"
 	"math/rand"
 	"os"
 	"runtime"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/vdobler/ht/cookiejar"
 	"github.com/vdobler/ht/ht"
 )
@@ -47,24 +45,18 @@ func main() {
 	}
 
 	var exitStatus int
-	if err := c.ExecuteConcurrent(runtime.NumCPU(), jar); err != nil {
-		exitStatus = 26 // line number ;-)
-		println("ExecuteConcurrent:", err.Error())
-	}
+	_ = c.ExecuteConcurrent(runtime.NumCPU(), jar)
 
 	for _, test := range c.Tests {
-		if err := test.PrintReport(os.Stdout); err != nil {
-			panic(err)
+		if es := handleTestResult(test); es > 0 {
+			exitStatus = 57
 		}
-		if test.Status > ht.Pass {
-			exitStatus = 35 // line number ;-)
+	}
 
-			color.Red("Failed %s", test.Name)
-
-			if test.Response.BodyErr != nil {
-				color.Yellow(fmt.Sprintf("Response Body Error: %s\n", test.Response.BodyErr))
-			}
-			color.Yellow("Response Body: %q\n", test.Response.BodyStr)
+	for _, test := range afterTests {
+		_ = test.Run()
+		if es := handleTestResult(test); es > 0 {
+			exitStatus = 64
 		}
 	}
 
@@ -72,10 +64,3 @@ func main() {
 	// will fail the build.
 	os.Exit(exitStatus)
 }
-
-// RegisterTest adds a set of tests to the collection
-func RegisterTest(tests ...*ht.Test) {
-	testCollection = append(testCollection, tests...)
-}
-
-var testCollection []*ht.Test
