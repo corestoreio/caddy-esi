@@ -152,7 +152,7 @@ func (er *esiRedis) doRequest(args *backend.ResourceArgs) (_ http.Header, _ []by
 
 	value, err := redis.Bytes(conn.Do("GET", key))
 	if err == redis.ErrNil {
-		return nil, nil, nil
+		return nil, nil, errors.NewNotFoundf("[esikv] URL %q: Key %q not found", er.url, args.Key)
 	}
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "[esikv] Redis.Get %q => %q", er.url, args.Key)
@@ -197,7 +197,7 @@ func (er *esiRedis) doRequestCancel(args *backend.ResourceArgs) (_ http.Header, 
 
 		value, err := redis.Bytes(conn.Do("GET", key))
 		if err == redis.ErrNil {
-			content <- []byte{}
+			retErr <- errors.NewNotFoundf("[esikv] URL %q: Key %q not found", er.url, args.Key)
 			return
 		}
 		if err != nil {

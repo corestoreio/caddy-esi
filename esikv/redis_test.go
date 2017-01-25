@@ -175,7 +175,7 @@ func TestNewRedis(t *testing.T) {
 		assert.Empty(t, string(content), "Content should be empty")
 	})
 
-	t.Run("Fetch Key OK but value not set, should return all nil", func(t *testing.T) {
+	t.Run("Fetch Key NotFound (no-cancel)", func(t *testing.T) {
 		t.Parallel()
 
 		_, be, closer := getMrBee(t)
@@ -187,7 +187,24 @@ func TestNewRedis(t *testing.T) {
 			Timeout:     time.Second,
 			MaxBodySize: 100,
 		})
-		require.NoError(t, err, "%+v", err)
+		require.True(t, errors.IsNotFound(err), "%+v", err)
+		assert.Nil(t, hdr, "Header return must be nil")
+		assert.Empty(t, content, "Content must be empty")
+	})
+
+	t.Run("Fetch Key NotFound (cancel)", func(t *testing.T) {
+		t.Parallel()
+
+		_, be, closer := getMrBee(t, "?cancellable=1")
+		defer closer()
+
+		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
+			ExternalReq: httptest.NewRequest("GET", "/", nil),
+			Key:         "product_price_4711",
+			Timeout:     time.Second,
+			MaxBodySize: 100,
+		})
+		require.True(t, errors.IsNotFound(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Empty(t, content, "Content must be empty")
 	})
