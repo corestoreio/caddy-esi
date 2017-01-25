@@ -25,54 +25,57 @@ import (
 	"github.com/alicebob/miniredis"
 )
 
-// 50000	     34904 ns/op	     941 B/op	      32 allocs/op <-- with deadline ctx
-// 50000	     30739 ns/op	     492 B/op	      23 allocs/op <-- without deadline
-// 50000	     28794 ns/op	    1026 B/op	      33 allocs/op <-- with deadline and goroutine
-// 50000	     25071 ns/op	     529 B/op	      25 allocs/op
 func BenchmarkNewRedis_Parallel(b *testing.B) {
-	mr := miniredis.NewMiniRedis()
-	if err := mr.Start(); err != nil {
-		b.Fatal(err)
-	}
-	defer mr.Close()
 
-	var wantValue = []byte("123,45 € Way too long")
-	if err := mr.Set("product_price_4711", string(wantValue)); err != nil {
-		b.Fatal(err)
-	}
+	runner := func(uriQueryString string) func(*testing.B) {
+		return func(b *testing.B) {
+			mr := miniredis.NewMiniRedis()
+			if err := mr.Start(); err != nil {
+				b.Fatal(err)
+			}
+			defer mr.Close()
 
-	be, err := esikv.NewResourceHandler(fmt.Sprintf("redis://%s", mr.Addr()))
-	if err != nil {
-		b.Fatalf("%+v", err)
-	}
-	defer be.Close()
+			var wantValue = []byte("123,45 € Way too long")
+			if err := mr.Set("product_price_4711", string(wantValue)); err != nil {
+				b.Fatal(err)
+			}
 
-	rfa := &backend.ResourceArgs{
-		ExternalReq: httptest.NewRequest("GET", "/", nil),
-		Key:         "product_price_4711",
-		Timeout:     time.Second,
-		MaxBodySize: 10,
-	}
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			hdr, content, err := be.DoRequest(rfa)
+			be, err := esikv.NewResourceHandler(fmt.Sprintf("redis://%s%s", mr.Addr(), uriQueryString))
 			if err != nil {
 				b.Fatalf("%+v", err)
 			}
-			if hdr != nil {
-				b.Fatal("header should be nil")
-			}
-			if have, want := len(content), 10; have != want {
-				b.Errorf("Have: %q Want: %q", content, wantValue)
-			}
-		}
-	})
+			defer be.Close()
 
-	//require.NoError(t, err, "%+v", err)
-	//assert.Nil(t, hdr, "Header return must be nil")
-	//assert.Exactly(t, "123,45 €", string(content))
+			rfa := &backend.ResourceArgs{
+				ExternalReq: httptest.NewRequest("GET", "/", nil),
+				Key:         "product_price_4711",
+				Timeout:     time.Second,
+				MaxBodySize: 10,
+			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			b.RunParallel(func(pb *testing.PB) {
+				for pb.Next() {
+					hdr, content, err := be.DoRequest(rfa)
+					if err != nil {
+						b.Fatalf("%+v", err)
+					}
+					if hdr != nil {
+						b.Fatal("header should be nil")
+					}
+					if have, want := len(content), 10; have != want {
+						b.Errorf("Have: %q Want: %q", content, wantValue)
+					}
+				}
+			})
+
+			//require.NoError(t, err, "%+v", err)
+			//assert.Nil(t, hdr, "Header return must be nil")
+			//assert.Exactly(t, "123,45 €", string(content))
+		}
+	}
+	b.Run("Cancellable", runner("?cancellable=1"))
+	b.Run("Non__Cancel", runner("?cancellable=0"))
 
 }
