@@ -144,7 +144,9 @@ type ResourceArgs struct {
 // lived state.
 type ResourceHandler interface {
 	// DoRequest fires the request to the resource and it may return a header
-	// and content or an error. All three return values can be nil. Any returned
+	// and content or an error. All three return values can be nil. An error can
+	// have the behaviour of NotFound which calls the next resource in the
+	// sequence and does not trigger the circuit breaker. Any other returned
 	// error will trigger the increment of the circuit breaker. See the variable
 	// CBMaxFailures for the maximum amount of allowed failures until the
 	// circuit breaker opens.
