@@ -49,13 +49,13 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend(in *jlexer.Lexer
 				easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in, out.ExternalReq)
 			}
 		case "url":
-			out.URL = string(in.String())
+			out.URL = in.String()
 		case "timeout":
 			out.Timeout = time.Duration(in.Int64())
 		case "max_body_size":
-			out.MaxBodySize = uint64(in.Uint64())
+			out.MaxBodySize = in.Uint64()
 		case "key":
-			out.Key = string(in.String())
+			out.Key = in.String()
 		case "ttl":
 			out.TTL = time.Duration(in.Int64())
 		case "forward_headers":
@@ -71,14 +71,14 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend(in *jlexer.Lexer
 				}
 				for !in.IsDelim(']') {
 					var v1 string
-					v1 = string(in.String())
+					v1 = in.String()
 					out.ForwardHeaders = append(out.ForwardHeaders, v1)
 					in.WantComma()
 				}
 				in.Delim(']')
 			}
 		case "forward_headers_all":
-			out.ForwardHeadersAll = bool(in.Bool())
+			out.ForwardHeadersAll = in.Bool()
 		case "return_headers":
 			if in.IsNull() {
 				in.Skip()
@@ -92,14 +92,14 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend(in *jlexer.Lexer
 				}
 				for !in.IsDelim(']') {
 					var v2 string
-					v2 = string(in.String())
+					v2 = in.String()
 					out.ReturnHeaders = append(out.ReturnHeaders, v2)
 					in.WantComma()
 				}
 				in.Delim(']')
 			}
 		case "return_headers_all":
-			out.ReturnHeadersAll = bool(in.Bool())
+			out.ReturnHeadersAll = in.Bool()
 		default:
 			in.SkipRecursive()
 		}
@@ -132,7 +132,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend(out *jwriter.Wri
 		}
 		first = false
 		out.RawString("\"url\":")
-		out.String(string(in.URL))
+		out.String(in.URL)
 	}
 	if in.Timeout != 0 {
 		if !first {
@@ -148,7 +148,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend(out *jwriter.Wri
 		}
 		first = false
 		out.RawString("\"max_body_size\":")
-		out.Uint64(uint64(in.MaxBodySize))
+		out.Uint64(in.MaxBodySize)
 	}
 	if in.Key != "" {
 		if !first {
@@ -156,7 +156,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend(out *jwriter.Wri
 		}
 		first = false
 		out.RawString("\"key\":")
-		out.String(string(in.Key))
+		out.String(in.Key)
 	}
 	if in.TTL != 0 {
 		if !first {
@@ -180,7 +180,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend(out *jwriter.Wri
 				if v3 > 0 {
 					out.RawByte(',')
 				}
-				out.String(string(v4))
+				out.String(v4)
 			}
 			out.RawByte(']')
 		}
@@ -191,7 +191,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend(out *jwriter.Wri
 		}
 		first = false
 		out.RawString("\"forward_headers_all\":")
-		out.Bool(bool(in.ForwardHeadersAll))
+		out.Bool(in.ForwardHeadersAll)
 	}
 	if len(in.ReturnHeaders) != 0 {
 		if !first {
@@ -207,7 +207,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend(out *jwriter.Wri
 				if v5 > 0 {
 					out.RawByte(',')
 				}
-				out.String(string(v6))
+				out.String(v6)
 			}
 			out.RawByte(']')
 		}
@@ -218,7 +218,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend(out *jwriter.Wri
 		}
 		//first = false
 		out.RawString("\"return_headers_all\":")
-		out.Bool(bool(in.ReturnHeadersAll))
+		out.Bool(in.ReturnHeadersAll)
 	}
 	out.RawByte('}')
 }
@@ -266,7 +266,7 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in *jlexer.Lexe
 		}
 		switch key {
 		case "method":
-			out.Method = string(in.String())
+			out.Method = in.String()
 		case "url":
 			if in.IsNull() {
 				in.Skip()
@@ -278,11 +278,11 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in *jlexer.Lexe
 				easyjson1688e6a4DecodeNetUrl(in, out.URL)
 			}
 		case "proto":
-			out.Proto = string(in.String())
+			out.Proto = in.String()
 		case "proto_major":
-			out.ProtoMajor = int(in.Int())
+			out.ProtoMajor = in.Int()
 		case "proto_minor":
-			out.ProtoMinor = int(in.Int())
+			out.ProtoMinor = in.Int()
 		case "header":
 			if in.IsNull() {
 				in.Skip()
@@ -294,7 +294,7 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in *jlexer.Lexe
 					out.Header = nil
 				}
 				for !in.IsDelim('}') {
-					key := string(in.String())
+					key := in.String()
 					in.WantColon()
 					var v7 []string
 					if in.IsNull() {
@@ -309,7 +309,7 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in *jlexer.Lexe
 						}
 						for !in.IsDelim(']') {
 							var v8 string
-							v8 = string(in.String())
+							v8 = in.String()
 							v7 = append(v7, v8)
 							in.WantComma()
 						}
@@ -321,7 +321,7 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in *jlexer.Lexe
 				in.Delim('}')
 			}
 		case "content_length":
-			out.ContentLength = int64(in.Int64())
+			out.ContentLength = in.Int64()
 		case "transfer_encoding":
 			if in.IsNull() {
 				in.Skip()
@@ -335,16 +335,16 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in *jlexer.Lexe
 				}
 				for !in.IsDelim(']') {
 					var v9 string
-					v9 = string(in.String())
+					v9 = in.String()
 					out.TransferEncoding = append(out.TransferEncoding, v9)
 					in.WantComma()
 				}
 				in.Delim(']')
 			}
 		case "close":
-			out.Close = bool(in.Bool())
+			out.Close = in.Bool()
 		case "host":
-			out.Host = string(in.String())
+			out.Host = in.String()
 		case "form":
 			if in.IsNull() {
 				in.Skip()
@@ -356,7 +356,7 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in *jlexer.Lexe
 					out.Form = nil
 				}
 				for !in.IsDelim('}') {
-					key := string(in.String())
+					key := in.String()
 					in.WantColon()
 					var v10 []string
 					if in.IsNull() {
@@ -371,7 +371,7 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in *jlexer.Lexe
 						}
 						for !in.IsDelim(']') {
 							var v11 string
-							v11 = string(in.String())
+							v11 = in.String()
 							v10 = append(v10, v11)
 							in.WantComma()
 						}
@@ -393,7 +393,7 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in *jlexer.Lexe
 					out.PostForm = nil
 				}
 				for !in.IsDelim('}') {
-					key := string(in.String())
+					key := in.String()
 					in.WantColon()
 					var v12 []string
 					if in.IsNull() {
@@ -408,7 +408,7 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in *jlexer.Lexe
 						}
 						for !in.IsDelim(']') {
 							var v13 string
-							v13 = string(in.String())
+							v13 = in.String()
 							v12 = append(v12, v13)
 							in.WantComma()
 						}
@@ -440,7 +440,7 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in *jlexer.Lexe
 					out.Trailer = nil
 				}
 				for !in.IsDelim('}') {
-					key := string(in.String())
+					key := in.String()
 					in.WantColon()
 					var v14 []string
 					if in.IsNull() {
@@ -455,7 +455,7 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in *jlexer.Lexe
 						}
 						for !in.IsDelim(']') {
 							var v15 string
-							v15 = string(in.String())
+							v15 = in.String()
 							v14 = append(v14, v15)
 							in.WantComma()
 						}
@@ -467,9 +467,9 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in *jlexer.Lexe
 				in.Delim('}')
 			}
 		case "remote_addr":
-			out.RemoteAddr = string(in.String())
+			out.RemoteAddr = in.String()
 		case "request_uri":
-			out.RequestURI = string(in.String())
+			out.RequestURI = in.String()
 		default:
 			in.SkipRecursive()
 		}
@@ -490,7 +490,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 		}
 		first = false
 		out.RawString("\"method\":")
-		out.String(string(in.Method))
+		out.String(in.Method)
 	}
 	if in.URL != nil {
 		if !first {
@@ -510,7 +510,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 		}
 		first = false
 		out.RawString("\"proto\":")
-		out.String(string(in.Proto))
+		out.String(in.Proto)
 	}
 	if in.ProtoMajor != 0 {
 		if !first {
@@ -518,7 +518,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 		}
 		first = false
 		out.RawString("\"proto_major\":")
-		out.Int(int(in.ProtoMajor))
+		out.Int(in.ProtoMajor)
 	}
 	if in.ProtoMinor != 0 {
 		if !first {
@@ -526,7 +526,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 		}
 		first = false
 		out.RawString("\"proto_minor\":")
-		out.Int(int(in.ProtoMinor))
+		out.Int(in.ProtoMinor)
 	}
 	if len(in.Header) != 0 {
 		if !first {
@@ -544,7 +544,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 					out.RawByte(',')
 				}
 				v16First = false
-				out.String(string(v16Name))
+				out.String(v16Name)
 				out.RawByte(':')
 				if v16Value == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
 					out.RawString("null")
@@ -554,7 +554,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 						if v17 > 0 {
 							out.RawByte(',')
 						}
-						out.String(string(v18))
+						out.String(v18)
 					}
 					out.RawByte(']')
 				}
@@ -568,7 +568,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 		}
 		first = false
 		out.RawString("\"content_length\":")
-		out.Int64(int64(in.ContentLength))
+		out.Int64(in.ContentLength)
 	}
 	if len(in.TransferEncoding) != 0 {
 		if !first {
@@ -584,7 +584,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 				if v19 > 0 {
 					out.RawByte(',')
 				}
-				out.String(string(v20))
+				out.String(v20)
 			}
 			out.RawByte(']')
 		}
@@ -595,7 +595,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 		}
 		first = false
 		out.RawString("\"close\":")
-		out.Bool(bool(in.Close))
+		out.Bool(in.Close)
 	}
 	if in.Host != "" {
 		if !first {
@@ -603,7 +603,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 		}
 		first = false
 		out.RawString("\"host\":")
-		out.String(string(in.Host))
+		out.String(in.Host)
 	}
 	if len(in.Form) != 0 {
 		if !first {
@@ -621,7 +621,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 					out.RawByte(',')
 				}
 				v21First = false
-				out.String(string(v21Name))
+				out.String(v21Name)
 				out.RawByte(':')
 				if v21Value == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
 					out.RawString("null")
@@ -631,7 +631,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 						if v22 > 0 {
 							out.RawByte(',')
 						}
-						out.String(string(v23))
+						out.String(v23)
 					}
 					out.RawByte(']')
 				}
@@ -655,7 +655,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 					out.RawByte(',')
 				}
 				v24First = false
-				out.String(string(v24Name))
+				out.String(v24Name)
 				out.RawByte(':')
 				if v24Value == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
 					out.RawString("null")
@@ -665,7 +665,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 						if v25 > 0 {
 							out.RawByte(',')
 						}
-						out.String(string(v26))
+						out.String(v26)
 					}
 					out.RawByte(']')
 				}
@@ -701,7 +701,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 					out.RawByte(',')
 				}
 				v27First = false
-				out.String(string(v27Name))
+				out.String(v27Name)
 				out.RawByte(':')
 				if v27Value == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
 					out.RawString("null")
@@ -711,7 +711,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 						if v28 > 0 {
 							out.RawByte(',')
 						}
-						out.String(string(v29))
+						out.String(v29)
 					}
 					out.RawByte(']')
 				}
@@ -725,7 +725,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 		}
 		first = false
 		out.RawString("\"remote_addr\":")
-		out.String(string(in.RemoteAddr))
+		out.String(in.RemoteAddr)
 	}
 	if in.RequestURI != "" {
 		if !first {
@@ -733,7 +733,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 		}
 		//first = false
 		out.RawString("\"request_uri\":")
-		out.String(string(in.RequestURI))
+		out.String(in.RequestURI)
 	}
 	out.RawByte('}')
 }
@@ -767,7 +767,7 @@ func easyjson1688e6a4DecodeMimeMultipart(in *jlexer.Lexer, out *multipart.Form) 
 					out.Value = nil
 				}
 				for !in.IsDelim('}') {
-					key := string(in.String())
+					key := in.String()
 					in.WantColon()
 					var v30 []string
 					if in.IsNull() {
@@ -782,7 +782,7 @@ func easyjson1688e6a4DecodeMimeMultipart(in *jlexer.Lexer, out *multipart.Form) 
 						}
 						for !in.IsDelim(']') {
 							var v31 string
-							v31 = string(in.String())
+							v31 = in.String()
 							v30 = append(v30, v31)
 							in.WantComma()
 						}
@@ -804,7 +804,7 @@ func easyjson1688e6a4DecodeMimeMultipart(in *jlexer.Lexer, out *multipart.Form) 
 					out.File = nil
 				}
 				for !in.IsDelim('}') {
-					key := string(in.String())
+					key := in.String()
 					in.WantColon()
 					var v32 []*multipart.FileHeader
 					if in.IsNull() {
@@ -868,7 +868,7 @@ func easyjson1688e6a4EncodeMimeMultipart(out *jwriter.Writer, in multipart.Form)
 					out.RawByte(',')
 				}
 				v34First = false
-				out.String(string(v34Name))
+				out.String(v34Name)
 				out.RawByte(':')
 				if v34Value == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
 					out.RawString("null")
@@ -878,7 +878,7 @@ func easyjson1688e6a4EncodeMimeMultipart(out *jwriter.Writer, in multipart.Form)
 						if v35 > 0 {
 							out.RawByte(',')
 						}
-						out.String(string(v36))
+						out.String(v36)
 					}
 					out.RawByte(']')
 				}
@@ -902,7 +902,7 @@ func easyjson1688e6a4EncodeMimeMultipart(out *jwriter.Writer, in multipart.Form)
 					out.RawByte(',')
 				}
 				v37First = false
-				out.String(string(v37Name))
+				out.String(v37Name)
 				out.RawByte(':')
 				if v37Value == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
 					out.RawString("null")
@@ -946,7 +946,7 @@ func easyjson1688e6a4DecodeMimeMultipart1(in *jlexer.Lexer, out *multipart.FileH
 		}
 		switch key {
 		case "filename":
-			out.Filename = string(in.String())
+			out.Filename = in.String()
 		case "header":
 			if in.IsNull() {
 				in.Skip()
@@ -958,7 +958,7 @@ func easyjson1688e6a4DecodeMimeMultipart1(in *jlexer.Lexer, out *multipart.FileH
 					out.Header = nil
 				}
 				for !in.IsDelim('}') {
-					key := string(in.String())
+					key := in.String()
 					in.WantColon()
 					var v40 []string
 					if in.IsNull() {
@@ -973,7 +973,7 @@ func easyjson1688e6a4DecodeMimeMultipart1(in *jlexer.Lexer, out *multipart.FileH
 						}
 						for !in.IsDelim(']') {
 							var v41 string
-							v41 = string(in.String())
+							v41 = in.String()
 							v40 = append(v40, v41)
 							in.WantComma()
 						}
@@ -1004,7 +1004,7 @@ func easyjson1688e6a4EncodeMimeMultipart1(out *jwriter.Writer, in multipart.File
 		}
 		first = false
 		out.RawString("\"filename\":")
-		out.String(string(in.Filename))
+		out.String(in.Filename)
 	}
 	if len(in.Header) != 0 {
 		if !first {
@@ -1022,7 +1022,7 @@ func easyjson1688e6a4EncodeMimeMultipart1(out *jwriter.Writer, in multipart.File
 					out.RawByte(',')
 				}
 				v42First = false
-				out.String(string(v42Name))
+				out.String(v42Name)
 				out.RawByte(':')
 				if v42Value == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
 					out.RawString("null")
@@ -1032,7 +1032,7 @@ func easyjson1688e6a4EncodeMimeMultipart1(out *jwriter.Writer, in multipart.File
 						if v43 > 0 {
 							out.RawByte(',')
 						}
-						out.String(string(v44))
+						out.String(v44)
 					}
 					out.RawByte(']')
 				}
@@ -1062,9 +1062,9 @@ func easyjson1688e6a4DecodeNetUrl(in *jlexer.Lexer, out *url.URL) {
 		}
 		switch key {
 		case "scheme":
-			out.Scheme = string(in.String())
+			out.Scheme = in.String()
 		case "opaque":
-			out.Opaque = string(in.String())
+			out.Opaque = in.String()
 		case "user":
 			if in.IsNull() {
 				in.Skip()
@@ -1076,17 +1076,17 @@ func easyjson1688e6a4DecodeNetUrl(in *jlexer.Lexer, out *url.URL) {
 				easyjson1688e6a4DecodeNetUrl1(in, out.User)
 			}
 		case "host":
-			out.Host = string(in.String())
+			out.Host = in.String()
 		case "path":
-			out.Path = string(in.String())
+			out.Path = in.String()
 		case "raw_path":
-			out.RawPath = string(in.String())
+			out.RawPath = in.String()
 		case "force_query":
-			out.ForceQuery = bool(in.Bool())
+			out.ForceQuery = in.Bool()
 		case "raw_query":
-			out.RawQuery = string(in.String())
+			out.RawQuery = in.String()
 		case "fragment":
-			out.Fragment = string(in.String())
+			out.Fragment = in.String()
 		default:
 			in.SkipRecursive()
 		}
@@ -1107,7 +1107,7 @@ func easyjson1688e6a4EncodeNetUrl(out *jwriter.Writer, in url.URL) {
 		}
 		first = false
 		out.RawString("\"scheme\":")
-		out.String(string(in.Scheme))
+		out.String(in.Scheme)
 	}
 	if in.Opaque != "" {
 		if !first {
@@ -1115,7 +1115,7 @@ func easyjson1688e6a4EncodeNetUrl(out *jwriter.Writer, in url.URL) {
 		}
 		first = false
 		out.RawString("\"opaque\":")
-		out.String(string(in.Opaque))
+		out.String(in.Opaque)
 	}
 	if in.User != nil {
 		if !first {
@@ -1135,7 +1135,7 @@ func easyjson1688e6a4EncodeNetUrl(out *jwriter.Writer, in url.URL) {
 		}
 		first = false
 		out.RawString("\"host\":")
-		out.String(string(in.Host))
+		out.String(in.Host)
 	}
 	if in.Path != "" {
 		if !first {
@@ -1143,7 +1143,7 @@ func easyjson1688e6a4EncodeNetUrl(out *jwriter.Writer, in url.URL) {
 		}
 		first = false
 		out.RawString("\"path\":")
-		out.String(string(in.Path))
+		out.String(in.Path)
 	}
 	if in.RawPath != "" {
 		if !first {
@@ -1151,7 +1151,7 @@ func easyjson1688e6a4EncodeNetUrl(out *jwriter.Writer, in url.URL) {
 		}
 		first = false
 		out.RawString("\"raw_path\":")
-		out.String(string(in.RawPath))
+		out.String(in.RawPath)
 	}
 	if in.ForceQuery {
 		if !first {
@@ -1159,7 +1159,7 @@ func easyjson1688e6a4EncodeNetUrl(out *jwriter.Writer, in url.URL) {
 		}
 		first = false
 		out.RawString("\"force_query\":")
-		out.Bool(bool(in.ForceQuery))
+		out.Bool(in.ForceQuery)
 	}
 	if in.RawQuery != "" {
 		if !first {
@@ -1167,7 +1167,7 @@ func easyjson1688e6a4EncodeNetUrl(out *jwriter.Writer, in url.URL) {
 		}
 		first = false
 		out.RawString("\"raw_query\":")
-		out.String(string(in.RawQuery))
+		out.String(in.RawQuery)
 	}
 	if in.Fragment != "" {
 		if !first {
@@ -1175,7 +1175,7 @@ func easyjson1688e6a4EncodeNetUrl(out *jwriter.Writer, in url.URL) {
 		}
 		//first = false
 		out.RawString("\"fragment\":")
-		out.String(string(in.Fragment))
+		out.String(in.Fragment)
 	}
 	out.RawByte('}')
 }

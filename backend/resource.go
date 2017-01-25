@@ -480,7 +480,7 @@ var CBMaxFailures uint64 = 12
 // CBThresholdCalc calculates the threshold how long the CB should wait until to set the HalfOpen state.
 // Default implementation returns an exponentially calculated duration
 var CBThresholdCalc = func(failures uint64) time.Duration {
-	return time.Duration((1 << failures) * time.Second)
+	return (1 << failures) * time.Second
 }
 
 // CBFailures number of failures. Thread safe.
