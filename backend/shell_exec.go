@@ -28,11 +28,10 @@ func init() {
 	RegisterResourceHandler("sh", NewFetchShellExec())
 }
 
-type fetchShellExec struct {
-}
+type fetchShellExec struct{}
 
 // NewFetchShellExec creates a new command line executor backend fetcher which
-// lives the whole application running time. Thread safe.
+// lives the whole application running time. Thread safe. Slow.
 func NewFetchShellExec() ResourceHandler {
 	return &fetchShellExec{}
 }
@@ -66,7 +65,8 @@ func (fs *fetchShellExec) DoRequest(args *ResourceArgs) (http.Header, []byte, er
 		cmdName = cmdName[:firstWS]
 	}
 
-	// TODO(CyS) benchmark if the goroutine is really worth to rely on non-blocking execution.
+	// The overhead of the goroutine and the channel is negligible and worth to
+	// rely on "non-blocking" execution, the channel blocks ;-)
 	var retContent []byte
 	var retErr error
 	done := make(chan struct{})
