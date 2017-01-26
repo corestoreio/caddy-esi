@@ -344,22 +344,49 @@ resource backend:
 - sh://
 - Name of the aliases as defined in the Caddyfile
 - sql:// a SQL query (TODO)
+- rpc:// a remote procedure call with GRPC (TODO)
+
+#### http
 
 `http|s` allows the usual HTTP requests to a resource.
+
+#### sh shell
 
 `sh` starts a shell program or any other executable script. The incoming HTTP
 request plus the current arguments gets transformed into a JSON string and will
 be passed as first argument to the program via stdin. If the program writes to
 stderr CaddyESI recognizes that and triggers it as an usual error. Too many
-errors and the circuit breaker opens. To output towards the HTTP response write
+errors and the circuit breaker opens. To output towards the HTTP response gets written
 to stdout. The src attribute must look like:
 
-```
+```html
 <esi:include src="sh://myGoBinary" />
 <esi:include src="sh:///path/to/my/slow/php/script.php" />
 
 illegal (for now):
 <esi:include src="sh://php /path/to/my/slow/php/script.php" />
+```
+
+*ProTip:* Provide always the full path to the binary or script because the
+*lookup time in the operation systems environment PATH variable will take long.
+*In general shell execution is pretty slow no matter which kind of
+*program/script you call.
+
+#### sql queries TODO
+
+`sql` Creates a prepared statement once the ESI tag has been parsed.
+
+```html
+<esi:include src="sql://SELECT value FROM myTable where key=?; r.Header.Get " />
+```
+
+#### rpc Remote Procedure Calls TODO
+
+`rpc` queries another GRPC endpoint
+
+
+```html
+<esi:include src="rpc://Name" key="cart1" />
 ```
 
 ## Unsupported ESI Tags
