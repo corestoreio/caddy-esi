@@ -1,0 +1,6 @@
+[
+  {
+    "alias": "redis01",
+    "url": "redis://127.0.0.1:6379/?db=0&max_active=10&max_idle=4"
+
+]

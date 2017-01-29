@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<items>
+    <item>
+        <alias>redis01</alias>
+        <url><![CDATA[redis://127.0.0.1:6379/?db=0&max_active=10&max_idle=4]]></url>
+        <!--<query>Unused and hence optional</query>-->
+
+</items>

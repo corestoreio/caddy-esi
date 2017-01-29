@@ -22,7 +22,7 @@ import (
 )
 
 func TestNewResourceHandler_Mock(t *testing.T) {
-	rh, err := NewResourceHandler("mockTimeout://4s")
+	rh, err := NewResourceHandler(NewConfigItem("mockTimeout://4s"))
 	assert.NoError(t, err)
 	_, ok := rh.(resourceMock)
 	assert.True(t, ok, "It should be type resourceMock")

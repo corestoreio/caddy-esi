@@ -40,18 +40,18 @@ func (rm resourceMock) Close() error {
 
 // NewResourceHandler a given URL gets checked which service it should instantiate
 // and connect to. Supported schemes: redis:// for now.
-func NewResourceHandler(url string) (backend.ResourceHandler, error) {
-	idx := strings.Index(url, "://")
+func NewResourceHandler(cfg *ConfigItem) (backend.ResourceHandler, error) {
+	idx := strings.Index(cfg.URL, "://")
 	if idx < 0 {
-		return nil, errors.NewNotValidf("[esikv] Unknown URL: %q. Does not contain ://", url)
+		return nil, errors.NewNotValidf("[esikv] Unknown URL: %q. Does not contain ://", cfg.URL)
 	}
-	scheme := url[:idx]
+	scheme := cfg.URL[:idx]
 
 	switch scheme {
 	case "redis":
-		r, err := NewRedis(url)
+		r, err := NewRedis(cfg)
 		if err != nil {
-			return nil, errors.Wrapf(err, "[esikv] Failed to create new Redis object: %q", url)
+			return nil, errors.Wrapf(err, "[esikv] Failed to create new Redis object: %q", cfg.URL)
 		}
 		return r, nil
 		//case "memcache":
@@ -62,9 +62,9 @@ func NewResourceHandler(url string) (backend.ResourceHandler, error) {
 		return resourceMock{
 			DoRequestFn: func(*backend.ResourceArgs) (_ http.Header, content []byte, err error) {
 				// mockTimeout://duration
-				return nil, nil, errors.NewTimeoutf("[esikv] Timeout after %q", url[idx+3:])
+				return nil, nil, errors.NewTimeoutf("[esikv] Timeout after %q", cfg.URL[idx+3:])
 			},
 		}, nil
 	}
-	return nil, errors.NewNotSupportedf("[esikv] Unknown URL: %q. No driver defined for scheme: %q", url, scheme)
+	return nil, errors.NewNotSupportedf("[esikv] Unknown URL: %q. No driver defined for scheme: %q", cfg.URL, scheme)
 }

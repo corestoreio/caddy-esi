@@ -1,0 +1,20 @@
+[
+  {
+    "alias": "redis01",
+    "url": "redis://127.0.0.1:6379/?db=0&max_active=10&max_idle=4"
+  },
+  {
+    "alias": "grpc01",
+    "url": "grpc://127.0.0.1:53044/?pem=../path/to/root.pem"
+  },
+  {
+    "alias": "mysql01",
+    "url": "user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&tls=skip-verify",
+    "query": "SELECT `value` FROM tableX WHERE key='?'"
+  },
+  {
+    "alias": "mysql02",
+    "query": "SELECT `value` FROM tableY WHERE another_key=?",
+    "url": "mysql01"
+  }
+]

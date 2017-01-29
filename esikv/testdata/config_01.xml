@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<items>
+    <item>
+        <alias>redis01</alias>
+        <url><![CDATA[redis://127.0.0.1:6379/?db=0&max_active=10&max_idle=4]]></url>
+        <!--<query>Unused and hence optional</query>-->
+    </item>
+    <item>
+        <alias>grpc01</alias>
+        <url><![CDATA[grpc://127.0.0.1:53044/?pem=../path/to/root.pem]]></url>
+        <!--<query>Unused and hence optional</query>-->
+    </item>
+    <item>
+        <alias>mysql01</alias>
+        <url><![CDATA[user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&tls=skip-verify]]></url>
+        <query><![CDATA[SELECT `value` FROM tableX WHERE key='?']]></query>
+    </item>
+    <item>
+        <alias>mysql02</alias>
+        <url>mysql01</url><!--Uses the connection of mysql01-->
+        <query><![CDATA[SELECT `value` FROM tableY WHERE another_key=?]]></query>
+    </item>
+</items>

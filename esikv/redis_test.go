@@ -38,19 +38,19 @@ func TestNewRedis(t *testing.T) {
 
 	t.Run("Failed to parse max_active", func(t *testing.T) {
 		t.Parallel()
-		be, err := esikv.NewRedis(fmt.Sprint("redis://localHorst/?max_active=∏"))
+		be, err := esikv.NewRedis(esikv.NewConfigItem("redis://localHorst/?max_active=∏"))
 		assert.Nil(t, be)
 		assert.Error(t, err)
 	})
 	t.Run("Failed to parse max_idle", func(t *testing.T) {
 		t.Parallel()
-		be, err := esikv.NewRedis(fmt.Sprint("redis://localHorst/?max_idle=∏"))
+		be, err := esikv.NewRedis(esikv.NewConfigItem("redis://localHorst/?max_idle=∏"))
 		assert.Nil(t, be)
 		assert.Error(t, err)
 	})
 	t.Run("Failed to parse idle_timeout", func(t *testing.T) {
 		t.Parallel()
-		be, err := esikv.NewRedis(fmt.Sprint("redis://localHorst/?idle_timeout=∏"))
+		be, err := esikv.NewRedis(esikv.NewConfigItem("redis://localHorst/?idle_timeout=∏"))
 		assert.Nil(t, be)
 		assert.Error(t, err)
 	})
@@ -58,7 +58,7 @@ func TestNewRedis(t *testing.T) {
 	t.Run("Ping fail", func(t *testing.T) {
 		t.Parallel()
 
-		be, err := esikv.NewResourceHandler("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379")
+		be, err := esikv.NewResourceHandler(esikv.NewConfigItem("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379"))
 		assert.True(t, errors.IsFatal(err), "%+v", err)
 		assert.Nil(t, be)
 	})
@@ -66,7 +66,7 @@ func TestNewRedis(t *testing.T) {
 	t.Run("Ping does not fail because lazy", func(t *testing.T) {
 		t.Parallel()
 
-		be, err := esikv.NewResourceHandler("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/?lazy=1")
+		be, err := esikv.NewResourceHandler(esikv.NewConfigItem("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/?lazy=1"))
 		if err != nil {
 			t.Fatalf("There should be no error but got: %s", err)
 		}
@@ -92,7 +92,7 @@ func TestNewRedis(t *testing.T) {
 		defer mr.Close()
 		mr.RequireAuth("MyPa55w04d")
 
-		be, err := esikv.NewResourceHandler(fmt.Sprintf("redis://MrMiyagi:%s@%s", "MyPa55w04d", mr.Addr()))
+		be, err := esikv.NewResourceHandler(esikv.NewConfigItem(fmt.Sprintf("redis://MrMiyagi:%s@%s", "MyPa55w04d", mr.Addr())))
 		if be == nil {
 			t.Fatalf("NewResourceHandler to %q returns nil %+v", mr.Addr(), err)
 		}
@@ -125,7 +125,7 @@ func TestNewRedis(t *testing.T) {
 		defer mr.Close()
 		mr.RequireAuth("MyPasw04d")
 
-		be, err := esikv.NewRedis(fmt.Sprintf("redis://MrMiyagi:%s@%s", "MyPa55w04d", mr.Addr()))
+		be, err := esikv.NewRedis(esikv.NewConfigItem(fmt.Sprintf("redis://MrMiyagi:%s@%s", "MyPa55w04d", mr.Addr())))
 		if be != nil {
 			t.Fatalf("NewResourceHandler to %q returns not nil", mr.Addr())
 		}
@@ -138,7 +138,7 @@ func TestNewRedis(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		be, err := esikv.NewResourceHandler(fmt.Sprintf("redis://%s%s", mr.Addr(), strings.Join(params, "&")))
+		be, err := esikv.NewResourceHandler(esikv.NewConfigItem(fmt.Sprintf("redis://%s%s", mr.Addr(), strings.Join(params, "&"))))
 		if be == nil {
 			t.Fatalf("NewResourceHandler to %q returns nil %+v", mr.Addr(), err)
 		}
@@ -292,13 +292,13 @@ func TestNewResourceHandler(t *testing.T) {
 	t.Parallel()
 
 	t.Run("URL Error", func(t *testing.T) {
-		be, err := esikv.NewResourceHandler("redis//localhost")
+		be, err := esikv.NewResourceHandler(esikv.NewConfigItem("redis//localhost"))
 		assert.Nil(t, be)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), `Unknown URL: "redis//localhost". Does not contain ://`)
 	})
 	t.Run("Scheme Error", func(t *testing.T) {
-		be, err := esikv.NewResourceHandler("mysql://localhost")
+		be, err := esikv.NewResourceHandler(esikv.NewConfigItem("mysql://localhost"))
 		assert.Nil(t, be)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), `Unknown URL: "mysql://localhost". No driver defined for scheme: "mysql"`)

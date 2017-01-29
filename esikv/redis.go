@@ -36,28 +36,28 @@ type esiRedis struct {
 }
 
 // NewRedis provides, for now, a basic implementation for simple key fetching.
-func NewRedis(rawURL string) (backend.ResourceHandler, error) {
-	addr, pw, params, err := ParseRedisURL(rawURL)
+func NewRedis(cfg *ConfigItem) (backend.ResourceHandler, error) {
+	addr, pw, params, err := ParseRedisURL(cfg.URL)
 	if err != nil {
-		return nil, errors.Errorf("[esikv] Redis error parsing URL %q => %s", rawURL, err)
+		return nil, errors.Errorf("[esikv] Redis error parsing URL %q => %s", cfg.URL, err)
 	}
 
 	maxActive, err := strconv.Atoi(params.Get("max_active"))
 	if err != nil {
-		return nil, errors.NewNotValidf("[esikv] NewRedis.ParseRedisURL. Parameter max_active not valid in  %q", rawURL)
+		return nil, errors.NewNotValidf("[esikv] NewRedis.ParseRedisURL. Parameter max_active not valid in  %q", cfg.URL)
 	}
 	maxIdle, err := strconv.Atoi(params.Get("max_idle"))
 	if err != nil {
-		return nil, errors.NewNotValidf("[esikv] NewRedis.ParseRedisURL. Parameter max_idle not valid in  %q", rawURL)
+		return nil, errors.NewNotValidf("[esikv] NewRedis.ParseRedisURL. Parameter max_idle not valid in  %q", cfg.URL)
 	}
 	idleTimeout, err := time.ParseDuration(params.Get("idle_timeout"))
 	if err != nil {
-		return nil, errors.NewNotValidf("[esikv] NewRedis.ParseRedisURL. Parameter idle_timeout not valid in  %q", rawURL)
+		return nil, errors.NewNotValidf("[esikv] NewRedis.ParseRedisURL. Parameter idle_timeout not valid in  %q", cfg.URL)
 	}
 
 	r := &esiRedis{
 		isCancellable: params.Get("cancellable") == "1",
-		url:           rawURL,
+		url:           cfg.URL,
 		pool: &redis.Pool{
 			MaxActive:   maxActive,
 			MaxIdle:     maxIdle,

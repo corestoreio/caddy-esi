@@ -40,7 +40,7 @@ func BenchmarkNewRedis_Parallel(b *testing.B) {
 				b.Fatal(err)
 			}
 
-			be, err := esikv.NewResourceHandler(fmt.Sprintf("redis://%s%s", mr.Addr(), uriQueryString))
+			be, err := esikv.NewResourceHandler(esikv.NewConfigItem(fmt.Sprintf("redis://%s%s", mr.Addr(), uriQueryString)))
 			if err != nil {
 				b.Fatalf("%+v", err)
 			}
