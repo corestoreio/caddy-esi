@@ -19,6 +19,7 @@ import (
 	"encoding/xml"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
 
 	"github.com/corestoreio/errors"
 )
@@ -72,34 +73,66 @@ func (ci ConfigItems) urlByAlias(alias string) string {
 // CDATA and comments where in JSON you need to encode the strings properly. For
 // security reasons you must store this fileName in a non-webserver accessible
 // directory.
-func ConfigUnmarshal(fileName string) (itms ConfigItems, _ error) {
+func ConfigUnmarshal(fileName string) (itms ConfigItems, err error) {
+	// for test purposes the fileName can also contain the real content.
+
 	// TODO: as passwords gets stored in plain text in the JSON or XML file we
 	// should create a feature where you pass the path to a PGP private key via
 	// environment variable and then you can decode the file. alternatively
 	// instead of read from a file we can query the data from etcd or consul. If
 	// some wants to implement this feature send a PR.
 
-	data, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		return nil, errors.NewFatalf("[esikv] Failed to read file %q with error: %s", fileName, err)
-	}
+	const (
+		shouldReadFile = iota + 1
+		typeJSON
+		typeXML
+	)
 
+	var data []byte
+	var extType int
 	switch ext := filepath.Ext(fileName); ext {
 	case ".json":
+		extType = setBit(extType, typeJSON)
+		extType = setBit(extType, shouldReadFile)
+	case ".xml":
+		extType = setBit(extType, typeXML)
+		extType = setBit(extType, shouldReadFile)
+	default:
+		switch {
+		case strings.HasPrefix(fileName, "["):
+			extType = setBit(extType, typeJSON)
+		case strings.HasPrefix(fileName, "<?xml"):
+			extType = setBit(extType, typeXML)
+		default:
+			return nil, errors.NewNotSupportedf("[kvconfig] Content-Type %q not supported", fileName)
+		}
+	}
+
+	if hasBit(extType, shouldReadFile) {
+		data, err = ioutil.ReadFile(fileName)
+		if err != nil {
+			return nil, errors.NewFatalf("[esikv] Failed to read file %q with error: %s", fileName, err)
+		}
+	} else {
+		data = []byte(fileName)
+	}
+
+	switch {
+	case hasBit(extType, typeJSON):
 		if err := json.Unmarshal(data, &itms); err != nil {
 			return nil, errors.NewFatalf("[esikv] Failed to parse JSON: %s", err)
 		}
-	case ".xml":
+	case hasBit(extType, typeXML):
 		var xi = &struct {
 			XMLName xml.Name      `xml:"items"`
 			Items   []*ConfigItem `xml:"item" json:"items"`
 		}{}
 		if err := xml.Unmarshal(data, xi); err != nil {
-			return nil, errors.NewFatalf("[esikv] Failed to parse JSON: %s", err)
+			return nil, errors.NewFatalf("[esikv] Failed to parse XML: %s\n%s", err, string(data))
 		}
 		itms = ConfigItems(xi.Items)
 	default:
-		return nil, errors.NewNotSupportedf("[kvconfig] File extension %q not supported for filename %q", ext, fileName)
+		return nil, errors.NewNotSupportedf("[kvconfig] Content-Type %q not supported", fileName)
 	}
 
 	// If the field URL contains the name of an Alias of any other field, then copy
@@ -110,4 +143,12 @@ func ConfigUnmarshal(fileName string) (itms ConfigItems, _ error) {
 		}
 	}
 	return itms, nil
+}
+func setBit(n int, pos uint) int {
+	n |= (1 << pos)
+	return n
+}
+func hasBit(n int, pos uint) bool {
+	val := n & (1 << pos)
+	return (val > 0)
 }

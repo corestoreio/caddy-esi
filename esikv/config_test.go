@@ -31,6 +31,11 @@ func TestConfigUnmarshal(t *testing.T) {
 		assert.Nil(t, items, "Items should be nil")
 	})
 
+	t.Run("File not found", func(t *testing.T) {
+		data, err := esikv.ConfigUnmarshal("./testdata/config_99.xml")
+		assert.True(t, errors.IsFatal(err), "%+v", err)
+		assert.Nil(t, data, "Data should be nil")
+	})
 	t.Run("XML unmarshalling failed", func(t *testing.T) {
 		data, err := esikv.ConfigUnmarshal("./testdata/config_00.xml")
 		assert.True(t, errors.IsFatal(err), "%+v", err)
@@ -39,6 +44,11 @@ func TestConfigUnmarshal(t *testing.T) {
 	t.Run("JSON unmarshalling failed", func(t *testing.T) {
 		data, err := esikv.ConfigUnmarshal("./testdata/config_00.json")
 		assert.True(t, errors.IsFatal(err), "%+v", err)
+		assert.Nil(t, data, "Data should be nil")
+	})
+	t.Run("Unknown content type", func(t *testing.T) {
+		data, err := esikv.ConfigUnmarshal("this is a text file")
+		assert.True(t, errors.IsNotSupported(err), "%+v", err)
 		assert.Nil(t, data, "Data should be nil")
 	})
 
@@ -79,7 +89,58 @@ func TestConfigUnmarshal(t *testing.T) {
 		assert.Exactly(t, xmlI, jsonI, "Both unmarshalled slices are not equal")
 		assert.Exactly(t, want, jsonI, "JSON unmarshalling failed")
 		assert.Exactly(t, want, xmlI)
+	})
 
+	t.Run("Load XML and JSON from string", func(t *testing.T) {
+
+		var want = esikv.ConfigItems{
+			&esikv.ConfigItem{
+				Alias: "redis01",
+				URL:   "redis://127.0.0.1:6379/?db=0&max_active=10&max_idle=4",
+				Query: "",
+			},
+			&esikv.ConfigItem{
+				Alias: "mysql01",
+				URL:   "user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&tls=skip-verify",
+				Query: "SELECT value FROM tableX WHERE key='?'",
+			},
+		}
+
+		xmlI, err := esikv.ConfigUnmarshal(`<?xml version="1.0"?>
+<items>
+    <item>
+        <alias>redis01</alias>
+        <url><![CDATA[redis://127.0.0.1:6379/?db=0&max_active=10&max_idle=4]]></url>
+        <!--<query>Unused and hence optional</query>-->
+    </item>
+    <item>
+        <alias>mysql01</alias>
+        <url><![CDATA[user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&tls=skip-verify]]></url>
+        <query><![CDATA[SELECT value FROM tableX WHERE key='?']]></query>
+    </item>
+</items>
+`)
+		if err != nil {
+			t.Fatalf("%+v", err)
+		}
+		jsonI, err := esikv.ConfigUnmarshal(`[
+  {
+    "alias": "redis01",
+    "url": "redis://127.0.0.1:6379/?db=0&max_active=10&max_idle=4"
+  },
+  {
+    "alias": "mysql01",
+    "url": "user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&tls=skip-verify",
+    "query": "SELECT value FROM tableX WHERE key='?'"
+  }
+]
+`)
+		if err != nil {
+			t.Fatalf("%+v", err)
+		}
+		assert.Exactly(t, xmlI, jsonI, "Both unmarshalled slices are not equal")
+		assert.Exactly(t, want, jsonI, "JSON unmarshalling failed")
+		assert.Exactly(t, want, xmlI)
 	})
 
 }
