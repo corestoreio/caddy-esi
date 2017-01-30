@@ -15,6 +15,7 @@
 package esitesting
 
 import (
+	"io"
 	"io/ioutil"
 	"os"
 )
@@ -36,6 +37,35 @@ func Tempfile(t interface {
 
 	return f.Name(), func() {
 		if err := os.Remove(f.Name()); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// WriteXMLTempFile writes the body into the file and returns the file name and
+// a clean up function. The filename always has the suffix ".xml".
+func WriteXMLTempFile(t interface {
+	Fatal(args ...interface{})
+}, body io.WriterTo) (fileName string, clean func()) {
+	f, err := ioutil.TempFile("", "caddyesi-")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := body.WriteTo(f); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	newName := f.Name() + ".xml"
+	if err := os.Rename(f.Name(), newName); err != nil {
+		t.Fatal(err)
+	}
+
+	return newName, func() {
+		if err := os.Remove(newName); err != nil {
 			t.Fatal(err)
 		}
 	}
