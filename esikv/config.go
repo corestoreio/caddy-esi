@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/xml"
+	"io"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
@@ -58,6 +59,12 @@ func NewConfigItem(url string, aliasQuery ...string) *ConfigItem {
 // helper functions.
 type ConfigItems []*ConfigItem
 
+// WriteTo writes the XML into w and may return an error. It returns always zero
+// bytes written :-(.
+func (ci ConfigItems) WriteTo(w io.Writer) (n int64, err error) {
+	return 0, errors.Wrap(ci.toXML(w), "[esikv] ConfigItems.WriteTo failed")
+}
+
 func (ci ConfigItems) urlByAlias(alias string) string {
 	for _, i := range ci {
 		if i.Alias == alias && alias != "" {
@@ -69,7 +76,7 @@ func (ci ConfigItems) urlByAlias(alias string) string {
 
 // MustToXML transforms the object into a strings and panics on error. Only used
 // in testing.
-func (ci ConfigItems) MustToXML() string {
+func (ci ConfigItems) toXML(w io.Writer) error {
 	var xi = &struct {
 		XMLName xml.Name      `xml:"items"`
 		Items   []*ConfigItem `xml:"item" json:"items"`
@@ -77,9 +84,15 @@ func (ci ConfigItems) MustToXML() string {
 		Items: ci,
 	}
 
+	_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`))
+	return errors.Wrap(xml.NewEncoder(w).Encode(xi), "[esikv] ConfigItems.toXML failed")
+}
+
+// MustToXML transforms the object into a strings and panics on error. Only used
+// in testing.
+func (ci ConfigItems) MustToXML() string {
 	var b bytes.Buffer
-	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
-	if err := xml.NewEncoder(&b).Encode(xi); err != nil {
+	if err := ci.toXML(&b); err != nil {
 		panic(err)
 	}
 	return b.String()

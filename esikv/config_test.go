@@ -15,6 +15,7 @@
 package esikv_test
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/SchumacherFM/caddyesi/esikv"
@@ -169,6 +170,11 @@ func TestConfigUnmarshal(t *testing.T) {
 		const wantXML = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><items><item><alias>redis01</alias><url>redis://127.0.0.1:6379/?db=0&amp;max_active=10&amp;max_idle=4</url></item><item><alias>grpc01</alias><url>grpc://127.0.0.1:53044/?pem=../path/to/root.pem</url></item><item><alias>mysql01</alias><url>user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&amp;tls=skip-verify</url><query>SELECT `value` FROM tableX WHERE key=&#39;?&#39;</query></item><item><alias>mysql02</alias><url>user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&amp;tls=skip-verify</url><query>SELECT `value` FROM tableY WHERE another_key&lt;&gt;?</query></item></items>"
 		haveXML := items.MustToXML()
 		assert.Exactly(t, wantXML, haveXML)
+
+		var buf bytes.Buffer
+		written, err := items.WriteTo(&buf)
+		assert.Exactly(t, int64(0), written)
+		assert.NoError(t, err, "%+v", err)
 
 		items2, err := esikv.ConfigUnmarshal(haveXML)
 		if err != nil {
