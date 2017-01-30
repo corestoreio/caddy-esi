@@ -143,4 +143,37 @@ func TestConfigUnmarshal(t *testing.T) {
 		assert.Exactly(t, want, xmlI)
 	})
 
+	t.Run("ConfigItems to XML String", func(t *testing.T) {
+		items := esikv.ConfigItems{
+			&esikv.ConfigItem{
+				Alias: "redis01",
+				URL:   "redis://127.0.0.1:6379/?db=0&max_active=10&max_idle=4",
+			},
+			&esikv.ConfigItem{
+				Alias: "grpc01",
+				URL:   "grpc://127.0.0.1:53044/?pem=../path/to/root.pem",
+			},
+			&esikv.ConfigItem{
+				Alias: "mysql01",
+				URL:   "user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&tls=skip-verify",
+				Query: "SELECT `value` FROM tableX WHERE key='?'",
+			},
+			&esikv.ConfigItem{
+				Alias: "mysql02",
+				// the alias mysql-1 got resolved to the correct URL data
+				URL:   "user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&tls=skip-verify",
+				Query: "SELECT `value` FROM tableY WHERE another_key<>?",
+			},
+		}
+
+		const wantXML = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><items><item><alias>redis01</alias><url>redis://127.0.0.1:6379/?db=0&amp;max_active=10&amp;max_idle=4</url></item><item><alias>grpc01</alias><url>grpc://127.0.0.1:53044/?pem=../path/to/root.pem</url></item><item><alias>mysql01</alias><url>user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&amp;tls=skip-verify</url><query>SELECT `value` FROM tableX WHERE key=&#39;?&#39;</query></item><item><alias>mysql02</alias><url>user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&amp;tls=skip-verify</url><query>SELECT `value` FROM tableY WHERE another_key&lt;&gt;?</query></item></items>"
+		haveXML := items.MustToXML()
+		assert.Exactly(t, wantXML, haveXML)
+
+		items2, err := esikv.ConfigUnmarshal(haveXML)
+		if err != nil {
+			t.Fatalf("%+v", err)
+		}
+		assert.Exactly(t, items, items2, "Encoded items should be equal to decoded items2")
+	})
 }

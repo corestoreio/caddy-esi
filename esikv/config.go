@@ -15,6 +15,7 @@
 package esikv
 
 import (
+	"bytes"
 	"encoding/json"
 	"encoding/xml"
 	"io/ioutil"
@@ -35,7 +36,7 @@ type ConfigItem struct {
 	URL string `xml:"url" json:"url"`
 	// Query contains mostly a SQL query which runs as a prepared statement so you
 	// must use the question mark or any other placeholder.
-	Query string `xml:"query" json:"query"`
+	Query string `xml:"query,omitempty" json:"query"`
 }
 
 // NewConfigItem creates a new configuration
@@ -64,6 +65,24 @@ func (ci ConfigItems) urlByAlias(alias string) string {
 		}
 	}
 	return ""
+}
+
+// MustToXML transforms the object into a strings and panics on error. Only used
+// in testing.
+func (ci ConfigItems) MustToXML() string {
+	var xi = &struct {
+		XMLName xml.Name      `xml:"items"`
+		Items   []*ConfigItem `xml:"item" json:"items"`
+	}{
+		Items: ci,
+	}
+
+	var b bytes.Buffer
+	b.WriteString(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`)
+	if err := xml.NewEncoder(&b).Encode(xi); err != nil {
+		panic(err)
+	}
+	return b.String()
 }
 
 // ConfigUnmarshal runs during Caddy setup and reads the extended resource
