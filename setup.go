@@ -234,21 +234,26 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 			return errors.NewNotValidf("[caddyesi] log_level: %s", c.ArgErr())
 		}
 		pc.LogLevel = strings.ToLower(c.Val())
-
-	default:
-		//catch all
+	case "resources":
 		if !c.NextArg() {
-			return errors.NewNotValidf("[caddyesi] any key: %s", c.ArgErr())
+			return errors.NewNotValidf("[caddyesi] resources: %s", c.ArgErr())
 		}
-		if key == "" || c.Val() == "" {
-			return nil // continue
-		}
-
-		f, err := esikv.NewResourceHandler(c.Val())
+		// c.Val() contains the file name or raw-content ;-)
+		items, err := esikv.ConfigUnmarshal(c.Val())
 		if err != nil {
-			return errors.Wrapf(err, "[caddyesi] KeyValue Service init failed for Key %q and Value %q", key, c.Val())
+			return errors.Wrapf(err, "[caddyesi] Failed to unmarshal resource config %q", c.Val())
 		}
-		backend.RegisterResourceHandler(key, f)
+		for _, item := range items {
+			f, err := esikv.NewResourceHandler(item)
+			if err != nil {
+				// may disclose passwords which are stored in the URL
+				return errors.Wrapf(err, "[caddyesi] esikv Service init failed for URL %q in file %q", item.URL, c.Val())
+			}
+			backend.RegisterResourceHandler(item.Alias, f)
+		}
+	default:
+		c.NextArg()
+		return errors.NewNotSupportedf("[caddyesi] Key %q with value %q not supported", key, c.Val())
 	}
 
 	return nil

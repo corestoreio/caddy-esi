@@ -25,6 +25,7 @@ import (
 
 	"github.com/SchumacherFM/caddyesi"
 	"github.com/SchumacherFM/caddyesi/backend"
+	"github.com/SchumacherFM/caddyesi/esikv"
 	"github.com/SchumacherFM/caddyesi/esitesting"
 	"github.com/alicebob/miniredis"
 	"github.com/corestoreio/errors"
@@ -277,9 +278,14 @@ func TestMiddleware_ServeHTTP_Redis(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	esiCfg, clean := esitesting.WriteXMLTempFile(t, esikv.ConfigItems{
+		esikv.NewConfigItem(`redis://`+mr.Addr()+`/0`, "miniRedis"),
+	})
+	defer clean()
 	t.Run("Query in page04.html successfully", mwTestRunner(
 		`esi {
-			miniRedis redis://`+mr.Addr()+`/0
+			resources `+esiCfg+`
+			# miniRedis redis://`+mr.Addr()+`/0
 			# log_file +tmpLogFile+
 			# log_level debug
 		}`,
@@ -296,10 +302,14 @@ func TestMiddleware_ServeHTTP_Redis(t *testing.T) {
 	//tmpLogFile, _ := esitesting.Tempfile(t)
 	//t.Log(tmpLogFile)
 	// defer clean()
+	esiCfg, clean = esitesting.WriteXMLTempFile(t, esikv.ConfigItems{
+		esikv.NewConfigItem(`redis://`+mr.Addr()+`/0`, "miniRedis"),
+		esikv.NewConfigItem(`mockTimeout://50s`, "miniRedisTimeout"),
+	})
+	defer clean()
 	t.Run("Query in page05.html but timeout in server 2 and fall back to server 1", mwTestRunner(
 		`esi {
-			miniRedis redis://`+mr.Addr()+`/0 # server 1
-			miniRedisTimeout mockTimeout://50s # server 2
+			   resources `+esiCfg+`
 			  #log_file  +tmpLogFile+
 			  #log_level debug
 		}`,

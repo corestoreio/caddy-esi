@@ -48,11 +48,7 @@ https://cyrillschumacher.local:2718 {
         [on_error (filename|"any text")]
         [log_file (filename|stdout|stderr)]
         [log_level (fatal|info|debug)]
-
-        # optional: next 3 are used for ESI includes
-        redisAWS1 redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/0
-        redisLocal1 redis://localhost:6381/3
-        memcacheLocal2 memcache://localhost:11211/1
+        [resources path/to/url_configrations.(xml|json)]
     }
 }
 ```
@@ -76,12 +72,70 @@ valid URI. Reserved keys are:
 | `log_file` | disabled | No | Put in here either a file name or the wordings `stderr` or `stdout` to write to those file descriptors. |
 | `log_level` | disabled | No | Available key words `debug` the most verbose and `info`, less verbose. |
 | `log_format` | n/a | No | Not yet supported. Ideas? |
+| `resources` | n/a | No | Additional configuration file in XML or JSON to refer to more backend resource services. |
 
 `cmd_header_name` current supported values are:
 
 - `purge` use the value `purge` with your defined `cmd_header_name` to purge the
 ESI tag cache. `X-Esi-Cmd: purge`
 - tbd
+
+`resources` defines the path to a configuration file for more backend resource
+services. An example on how the XML or JSON must be coded:
+
+```xml
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<items>
+    <item>
+        <alias>redis01</alias>
+        <url><![CDATA[redis://127.0.0.1:6379/?db=0&max_active=10&max_idle=4]]></url>
+        <!--<query>Unused and hence optional</query>-->
+    </item>
+    <item>
+        <alias>grpc01</alias>
+        <url><![CDATA[grpc://127.0.0.1:53044/?pem=../path/to/root.pem]]></url>
+        <!--<query>Unused and hence optional</query>-->
+    </item>
+    <item>
+        <alias>mysql01</alias>
+        <url><![CDATA[mysql://user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&tls=skip-verify]]></url>
+        <query><![CDATA[SELECT `value` FROM tableX WHERE key='?']]></query> <!--Creates a long-lived prepared statement-->
+    </item>
+    <item>
+        <alias>mysql02</alias>
+        <url>mysql01</url><!--Uses the connection of mysql01-->
+        <query><![CDATA[SELECT `value` FROM tableY WHERE another_key=?]]></query> <!--Creates a long-lived prepared statement-->
+    </item>
+</items>
+```
+
+```json
+[
+  {
+    "alias": "redis01",
+    "url": "redis://127.0.0.1:6379/?db=0&max_active=10&max_idle=4"
+  },
+  {
+    "alias": "grpc01",
+    "url": "grpc://127.0.0.1:53044/?pem=../path/to/root.pem"
+  },
+  {
+    "alias": "mysql01",
+    "url": "mysql://user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&tls=skip-verify",
+    "query": "SELECT `value` FROM tableX WHERE key='?'"
+  },
+  {
+    "alias": "mysql02",
+    "url": "mysql01",
+    "query": "SELECT `value` FROM tableY WHERE another_key=?"
+  }
+]
+```
+
+Please be aware that this file must be stored securely on the hard drive and
+that the owner of the Caddy process can read it.
+
+The further usage of configuration gets explained in the ESI tag documentation.
 
 ## Supported ESI Tags and their attributes
 
@@ -105,20 +159,16 @@ Implemented:
 - [x] Dynamic sources
 - [ ] Conditional tag loading
 - [x] Redis access
+- [ ] Memcache access
+- [ ] MySQL access
+- [ ] PGSQL access
+- [ ] GRPC access
+- [x] Shell scripts/programs access (stderr|out|in) communication
 - [x] Handle compressed content from backends (Go http.Client)
-- [ ] Coalesce multiple requests into one backend request
 - [x] Query HTTP/S backend servers
-- [x] Query and execute shell scripts/programs (stderr|out|in) communication
+- [ ] Coalesce multiple requests into one backend request
 
-Implementation ideas:
-
-ESI Tags within a pages must get replaced with a stream replacement algorithm.
-Take a stream of bytes and look for the bytes “<esi:include...>” and when they
-are found, replace them with the fetched content from the backend. The code
-cannot assume that there are any line feeds or other delimiters in the stream
-and the code must assume that the stream is of any arbitrary length. The
-solution cannot meaningfully buffer to the end of the stream and then process
-the replacement.
+TODO: Database or GRPC access in package `esikv` must be enabled via Go build tag.
 
 ### TL;DR ESI tag options
 
@@ -139,7 +189,8 @@ Quick overview which options are available for two different kinds of ESI tags.
 2. Querying a NOSQL database or service
 
 ```
-<esi:include src="alias name" key="key name" onerror="text or path to file" timeout="time.Duration" />
+<esi:include src="alias_name1" src="alias_nameN" key="key name" 
+    onerror="text or path to file" timeout="time.Duration" />
 ```
 
 
@@ -315,15 +366,16 @@ can be used for comparison. TODO: rethink this to optimize condition execution.
     condition="{{ if .Req.Host eq 'customer.micro.service' }}true{{end}}"/>
 ```
 
-### Redis access
+### NoSQL access
 
-The ESI processor can access Redis resources which are specified in the Caddy
-configuration. The `src` attribute must contain the valid alias name as defined
-in configuration file. The ESI tag must contain a `key` attribute which accesses
-the value in Redis. This value will be rendered unmodified into the HTML page
-output. If multiple `src` tags are defined the next `src` gets used once the key
-cannot be found in the previous source or the `timeout` applies. Return and
-forward headers are not supported.
+The ESI processor can access NoSQL resources which are specified in the Caddy
+resources configuration file. The `src` attribute must contain the valid alias
+name as defined in resources file. The ESI tag must contain a `key` attribute
+which accesses the value in the NoSQL server. The returned value will be
+rendered unmodified into the HTML page output. You are responsible for secure
+escaping of your data. If multiple `src` tags are defined the next `src` gets
+used once the key cannot be found in the previous source or the `timeout`
+applies. Return and forward headers are not supported.
 
 If the `key` attribute contains 2x curly brackets, the Go `text/template` logic
 gets created.
@@ -336,15 +388,16 @@ gets created.
 
 ### Registered schemes or aliases in the src attribute
 
-The `src` attribute can contain the following prefixes to fetch content from a
-resource backend:
+The `src` attribute can contain or refer to the following prefixes or aliases
+(defined in the resource configuration file) to fetch content from a resource
+backend:
 
 - http://
 - https://
 - sh://
 - Name of the aliases as defined in the Caddyfile
 - sql:// a SQL query (TODO)
-- rpc:// a remote procedure call with GRPC (TODO)
+- grpc:// a remote procedure call with GRPC (TODO)
 
 #### http
 
@@ -360,10 +413,10 @@ errors and the circuit breaker opens. To output towards the HTTP response gets w
 to stdout. The src attribute must look like:
 
 ```html
-<esi:include src="sh://myGoBinary" />
+<esi:include src="sh:///path/to/myGoBinary" />
 <esi:include src="sh:///path/to/my/slow/php/script.php" />
+<esi:include src="sh:///path/to/my/slow/php/script.php --arg1 --arg2=x --argN=y" />
 
-illegal (for now):
 <esi:include src="sh://php /path/to/my/slow/php/script.php" />
 ```
 
@@ -374,19 +427,19 @@ illegal (for now):
 
 #### sql queries TODO
 
-`sql` Creates a prepared statement once the ESI tag has been parsed.
+`sql` Uses a prepared statement once the ESI tag has been parsed.
 
 ```html
-<esi:include src="sql://SELECT value FROM myTable where key=?; r.Header.Get " />
+<esi:include src="alias_name; r.Header.Get " />
 ```
 
-#### rpc Remote Procedure Calls TODO
+#### grpc Remote Procedure Calls TODO
 
-`rpc` queries another GRPC endpoint
-
+`grpc` queries another GRPC endpoint. A struct of arguments gets encoded and
+passed over the wire.
 
 ```html
-<esi:include src="rpc://Name" key="cart1" />
+<esi:include src="alias_name" key="cart1" />
 ```
 
 ## Unsupported ESI Tags

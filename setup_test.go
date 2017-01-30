@@ -23,6 +23,7 @@ import (
 
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esicache"
+	"github.com/SchumacherFM/caddyesi/esikv"
 	"github.com/SchumacherFM/caddyesi/esitesting"
 	"github.com/alicebob/miniredis"
 	"github.com/corestoreio/errors"
@@ -142,11 +143,15 @@ func TestPluginSetup(t *testing.T) {
 		nil,
 	))
 
-	t.Run("With timeout, ttl and KVService", runner(
+	esiCfg, clean := esitesting.WriteXMLTempFile(t, esikv.ConfigItems{
+		esikv.NewConfigItem(`redis://`+mr.Addr()+`/0`, "backend"),
+	})
+	defer clean()
+	t.Run("With timeout, ttl and resources", runner(
 		`esi {
 			timeout 5ms
 			ttl 10ms
-			backend redis://`+mr.Addr()+`/0
+			resources `+esiCfg+`
 		}`,
 		PathConfigs{
 			&PathConfig{
@@ -219,7 +224,7 @@ func TestPluginSetup(t *testing.T) {
 
 	t.Run("config with page_id_source but errors", runner(
 		`esi {
-			page_id_source "path,host , ip
+			page_id_source
 		}`,
 		nil,
 		0,   // cache length
@@ -237,11 +242,15 @@ func TestPluginSetup(t *testing.T) {
 		errors.IsNotValid,
 	))
 
+	esiCfg, clean = esitesting.WriteXMLTempFile(t, esikv.ConfigItems{
+		esikv.NewConfigItem(`redis//`+mr.Addr()+`/0`, "backend"), // missing colon
+	})
+	defer clean()
 	t.Run("Invalid KVService URL", runner(
 		`esi {
 			timeout 5ms
 			ttl 10ms
-			backend redis//`+mr.Addr()+`/0
+			resources `+esiCfg+`
 		}`,
 		nil,
 		0,   // cache length
@@ -249,12 +258,16 @@ func TestPluginSetup(t *testing.T) {
 		errors.IsNotValid,
 	))
 
+	esiCfg, clean = esitesting.WriteXMLTempFile(t, esikv.ConfigItems{
+		esikv.NewConfigItem(`redis://`+mr.Addr()+`/0`, "backend"),
+		esikv.NewConfigItem(`redis://`+mr.Addr()+`/1`, "backend"),
+	})
+	defer clean()
 	t.Run("Overwrite duplicate key in KVServices", runner(
 		`esi {
 			timeout 5ms
 			ttl 10ms
-			backend redis://`+mr.Addr()+`/0
-			backend redis://`+mr.Addr()+`/1
+			resources `+esiCfg+` 
 		}`,
 		PathConfigs{
 			&PathConfig{
@@ -268,12 +281,16 @@ func TestPluginSetup(t *testing.T) {
 		nil,
 	))
 
+	esiCfg, clean = esitesting.WriteXMLTempFile(t, esikv.ConfigItems{
+		esikv.NewConfigItem(`redis://`+mr.Addr()+`/0`, "redis1"),
+		esikv.NewConfigItem(`redis://`+mr.Addr()+`/1`, "redis2"),
+	})
+	defer clean()
 	t.Run("Create two KVServices", runner(
 		`esi {
 			timeout 5ms
 			ttl 10ms
-			redis1 redis://`+mr.Addr()+`/0
-			redis2 redis://`+mr.Addr()+`/1
+			resources `+esiCfg+`
 		}`,
 		PathConfigs{
 			&PathConfig{
@@ -307,23 +324,28 @@ func TestPluginSetup(t *testing.T) {
 		nil,
 	))
 
+	esiCfg1, clean := esitesting.WriteXMLTempFile(t, esikv.ConfigItems{
+		esikv.NewConfigItem(`redis://`+mr.Addr()+`/2`, "redisAWS1"),
+		esikv.NewConfigItem(`redis://`+mr.Addr()+`/3`, "redisLocal1"),
+		esikv.NewConfigItem(`redis://`+mr.Addr()+`/1`, "redisLocal2"),
+	})
+	defer clean()
+	esiCfg2, clean := esitesting.WriteXMLTempFile(t, esikv.ConfigItems{
+		esikv.NewConfigItem(`redis://`+mr.Addr()+`/3`, "redisLocal3"),
+	})
+	defer clean()
 	t.Run("2x esi directives with different KVServices", runner(
 		`esi /catalog/product {
 		   timeout 122ms
 		   ttl 123ms
 		   log_file stderr
 		   log_level debug
-
-		   redisAWS1 redis://`+mr.Addr()+`/2
-		   redisLocal1 redis://`+mr.Addr()+`/3
-		   redisLocal2 redis://`+mr.Addr()+`/1
-
+		   resources `+esiCfg1+`
 		}
 		esi /checkout/cart {
 		   timeout 131ms
 		   ttl 132ms
-
-		   redisLocal3 redis://`+mr.Addr()+`/3
+			resources `+esiCfg2+`
 		}`,
 		PathConfigs{
 			&PathConfig{
