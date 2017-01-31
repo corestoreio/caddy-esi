@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -o pipefail
+set -e
 
 sed -i.bak '/This is where other plugins get plugged in (imported)/a\
 _ "github.com/SchumacherFM/caddyesi"\'$'\n' $GOPATH/src/github.com/mholt/caddy/caddy/caddymain/run.go
