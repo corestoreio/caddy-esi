@@ -27,10 +27,11 @@ import (
 	"github.com/SchumacherFM/caddyesi/helpers"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
-	"github.com/corestoreio/log/logw"
+	"github.com/corestoreio/log/zapw"
 	"github.com/dustin/go-humanize"
 	"github.com/mholt/caddy"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
+	"github.com/uber-go/zap"
 )
 
 func init() {
@@ -122,14 +123,15 @@ var osStdOut io.Writer = os.Stdout
 
 func setupLogger(pc *PathConfig) error {
 	pc.Log = log.BlackHole{}
-	lvl := 0
+
+	var lvl zap.Level
 	switch pc.LogLevel {
 	case "debug":
-		lvl = logw.LevelDebug
+		lvl = zap.DebugLevel
 	case "info":
-		lvl = logw.LevelInfo
+		lvl = zap.InfoLevel
 	case "fatal":
-		lvl = logw.LevelFatal
+		lvl = zap.FatalLevel
 	}
 	if lvl == 0 {
 		// logging disabled
@@ -154,8 +156,17 @@ func setupLogger(pc *PathConfig) error {
 		}
 	}
 
-	// TODO(CyS) the output format of the logger isn't very machine parsing friendly
-	pc.Log = logw.NewLog(logw.WithWriter(w), logw.WithLevel(lvl))
+	pc.Log = zapw.Wrap{
+		Level: lvl,
+		Zap: zap.New(
+			zap.NewJSONEncoder(zap.TimeFormatter(func(t time.Time) zap.Field {
+				return zap.String("ts", t.Format(time.RFC3339Nano))
+			})),
+			zap.Output(zap.AddSync(w)),
+			lvl,
+		),
+	}
+
 	return nil
 }
 
