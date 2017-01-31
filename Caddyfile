@@ -13,9 +13,7 @@ http://127.0.0.1:2017 {
         cmd_header_name X-Esi-Cmd
         log_file ./cdy_test_2017_debug.log
         log_level debug
-        redisLocalhostDB0 redis://127.0.0.1:6379/?db=0&max_active=10&max_idle=4
-        redisLocalhostDB1 redis://127.0.0.1:6379/?db=1&max_active=10&max_idle=4
-        redisGCPNoHost1 redis://127.0.0.1:6699/?db=2&lazy=1
+        resources ./CaddyfileResources.xml
     }
 }
 
