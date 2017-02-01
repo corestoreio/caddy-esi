@@ -454,6 +454,16 @@ supported. You should switch to a server side scripting language ;-).
 replaced by a different package with a different syntax.
 2. That's it for now.
 
+# Building
+
+Use build tags to enable the different resource handlers. Supported tags are:
+
+- all: enables all handlers
+- redis: compiles redis handlers
+- .... ?
+
+See `.travis.yml` and `integration.sh` for examples.
+
 # Contribute
 
 Send me a pull request or open an issue if you encounter a bug or something can

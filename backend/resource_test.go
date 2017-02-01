@@ -36,6 +36,20 @@ var _ easyjson.Marshaler = (*backend.ResourceArgs)(nil)
 var _ easyjson.Unmarshaler = (*backend.ResourceArgs)(nil)
 var _ log.Marshaler = (*backend.ResourceArgs)(nil)
 
+func TestNewResourceHandler_Mock(t *testing.T) {
+	t.Parallel()
+
+	rh, err := backend.NewResourceHandler(backend.NewConfigItem("mockTimeout://4s"))
+	assert.NoError(t, err)
+	_, ok := rh.(backend.ResourceMock)
+	assert.True(t, ok, "It should be type ResourceMock")
+
+	n1, n2, err := rh.DoRequest(nil)
+	assert.Nil(t, n1)
+	assert.Nil(t, n2)
+	assert.True(t, errors.IsTimeout(err), "Error should have behaviour timeout: %+v", err)
+}
+
 func TestNewResource(t *testing.T) {
 	t.Run("URL", func(t *testing.T) {
 		r, err := backend.NewResource(0, "http://cart.service")

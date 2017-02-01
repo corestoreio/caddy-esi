@@ -15,7 +15,6 @@
 package backend
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -31,7 +30,7 @@ import (
 	"github.com/dustin/go-humanize"
 )
 
-// DefaultTimeOut to a backend resource
+// DefaultTimeOut defines the default timeout to a backend resource.
 const DefaultTimeOut = 20 * time.Second
 
 // TemplateIdentifier if some strings contain these characters then a
@@ -66,59 +65,6 @@ func ParseTemplate(name, text string) (TemplateExecer, error) {
 	return template.New(name).Parse(text)
 }
 
-var rrfRegister = &struct {
-	sync.RWMutex
-	fetchers map[string]ResourceHandler
-}{
-	fetchers: make(map[string]ResourceHandler),
-}
-
-// RegisterResourceHandler scheme can be a protocol before the :// but also an alias
-// to register a key-value service. This function returns a closure which lets
-// you deregister the scheme/alias once a test has finished. Use the defer word.
-// Scheme/alias will be transformed into an all lowercase string.
-func RegisterResourceHandler(scheme string, f ResourceHandler) struct{ DeferredDeregister func() } {
-	scheme = strings.ToLower(scheme)
-	rrfRegister.Lock()
-	defer rrfRegister.Unlock()
-	rrfRegister.fetchers[scheme] = f
-	return struct {
-		DeferredDeregister func()
-	}{
-		DeferredDeregister: func() { DeregisterResourceHandler(scheme) },
-	}
-}
-
-// DeregisterResourceHandler removes a previously registered scheme/alias.
-func DeregisterResourceHandler(scheme string) {
-	scheme = strings.ToLower(scheme)
-	rrfRegister.Lock()
-	defer rrfRegister.Unlock()
-	delete(rrfRegister.fetchers, scheme)
-}
-
-// LookupResourceHandler uses the scheme/alias to retrieve the backend request function.
-func LookupResourceHandler(scheme string) (rf ResourceHandler, ok bool) {
-	scheme = strings.ToLower(scheme)
-	rrfRegister.RLock()
-	defer rrfRegister.RUnlock()
-	rf, ok = rrfRegister.fetchers[scheme]
-	return
-}
-
-// CloseAllResourceHandler does what the function name says returns the first
-// occurred error.
-func CloseAllResourceHandler() error {
-	rrfRegister.Lock()
-	defer rrfRegister.Unlock()
-	for scheme, rh := range rrfRegister.fetchers {
-		if err := rh.Close(); err != nil {
-			return errors.Wrapf(err, "[esibackend] Failed to close %q", scheme)
-		}
-	}
-	return nil
-}
-
 // ResourceArgs arguments to ResourceHandler.DoRequest. Might get extended.
 // For now this structure and using it as an argument works quite well.
 // Maybe refactor.
@@ -137,23 +83,6 @@ type ResourceArgs struct {
 	ForwardHeadersAll bool           // optional
 	ReturnHeaders     []string       // optional, already treated with http.CanonicalHeaderKey
 	ReturnHeadersAll  bool           // optional
-}
-
-// ResourceHandler gets implemented by any client which is able to speak to any
-// remote backend. A handler gets registered in a global map and has a long
-// lived state.
-type ResourceHandler interface {
-	// DoRequest fires the request to the resource and it may return a header
-	// and content or an error. All three return values can be nil. An error can
-	// have the behaviour of NotFound which calls the next resource in the
-	// sequence and does not trigger the circuit breaker. Any other returned
-	// error will trigger the increment of the circuit breaker. See the variable
-	// CBMaxFailures for the maximum amount of allowed failures until the
-	// circuit breaker opens.
-	DoRequest(*ResourceArgs) (header http.Header, content []byte, err error)
-	// Closes closes the resource when Caddy restarts or reloads. If supported
-	// by the resource.
-	Close() error
 }
 
 // Validate checks if required arguments have been set
@@ -315,65 +244,120 @@ func (a *ResourceArgs) MarshalLog(kv log.KeyValuer) error {
 	return nil
 }
 
-const mockRequestMsg = "%s %q Timeout %s MaxBody %s"
-
-type resourceMock struct {
-	DoRequestFn func(args *ResourceArgs) (http.Header, []byte, error)
-	CloseFn     func() error
+var rhRegistry = &struct {
+	sync.RWMutex
+	handlers map[string]ResourceHandler
+}{
+	handlers: make(map[string]ResourceHandler),
 }
 
-func (rm resourceMock) DoRequest(a *ResourceArgs) (http.Header, []byte, error) {
-	return rm.DoRequestFn(a)
-}
-
-func (rm resourceMock) Close() error {
-	if rm.CloseFn == nil {
-		return nil
-	}
-	return rm.CloseFn()
-}
-
-// MockRequestContent for testing purposes only.
-func MockRequestContent(content string) ResourceHandler {
-	return resourceMock{
-		DoRequestFn: func(args *ResourceArgs) (http.Header, []byte, error) {
-			if args.URL == "" && args.Key == "" {
-				panic(fmt.Sprintf("[esibackend] URL and Key cannot be empty: %#v\n", args))
-			}
-			return nil, []byte(fmt.Sprintf(mockRequestMsg, content, args.URL, args.Timeout, args.MaxBodySizeHumanized())), nil
-		},
+// RegisterResourceHandler scheme can be a protocol before the :// but also an
+// alias to register a key-value service. This function returns a closure which
+// lets you deregister the scheme/alias once a test has finished. Use the defer
+// word. Scheme/alias will be transformed into an all lowercase string.
+func RegisterResourceHandler(scheme string, f ResourceHandler) struct{ DeferredDeregister func() } {
+	scheme = strings.ToLower(scheme)
+	rhRegistry.Lock()
+	defer rhRegistry.Unlock()
+	rhRegistry.handlers[scheme] = f
+	return struct {
+		DeferredDeregister func()
+	}{
+		DeferredDeregister: func() { DeregisterResourceHandler(scheme) },
 	}
 }
 
-// MockRequestContentCB for testing purposes only. Call back gets executed
-// before the function returns.
-func MockRequestContentCB(content string, callback func() error) ResourceHandler {
-	return resourceMock{
-		DoRequestFn: func(args *ResourceArgs) (http.Header, []byte, error) {
-			if err := callback(); err != nil {
-				return nil, nil, errors.Wrapf(err, "MockRequestContentCB with URL %q", args.URL)
-			}
-			return nil, []byte(fmt.Sprintf(mockRequestMsg, content, args.URL, args.Timeout, args.MaxBodySizeHumanized())), nil
-		},
-	}
+// DeregisterResourceHandler removes a previously registered scheme/alias.
+func DeregisterResourceHandler(scheme string) {
+	scheme = strings.ToLower(scheme)
+	rhRegistry.Lock()
+	defer rhRegistry.Unlock()
+	delete(rhRegistry.handlers, scheme)
 }
 
-// MockRequestError for testing purposes only.
-func MockRequestError(err error) ResourceHandler {
-	return resourceMock{
-		DoRequestFn: func(_ *ResourceArgs) (http.Header, []byte, error) {
-			return nil, nil, err
-		},
-	}
+// LookupResourceHandler uses the scheme/alias to retrieve the backend request
+// function.
+func LookupResourceHandler(scheme string) (rf ResourceHandler, ok bool) {
+	scheme = strings.ToLower(scheme)
+	rhRegistry.RLock()
+	defer rhRegistry.RUnlock()
+	rf, ok = rhRegistry.handlers[scheme]
+	return
 }
 
-// MockRequestPanic just panics
-func MockRequestPanic(msg interface{}) ResourceHandler {
-	return resourceMock{
-		DoRequestFn: func(_ *ResourceArgs) (http.Header, []byte, error) {
-			panic(msg)
-		},
+// CloseAllResourceHandler does what the function name says returns the first
+// occurred error.
+func CloseAllResourceHandler() error {
+	rhRegistry.Lock()
+	defer rhRegistry.Unlock()
+	for scheme, rh := range rhRegistry.handlers {
+		if err := rh.Close(); err != nil {
+			return errors.Wrapf(err, "[esibackend] Failed to close %q", scheme)
+		}
 	}
+	return nil
+}
+
+// ResourceHandlerFactoryFunc creates a new handler or an error.
+type ResourceHandlerFactoryFunc func(cfg *ConfigItem) (ResourceHandler, error)
+
+var factoryResourceHandlers = &struct {
+	sync.RWMutex
+	factories map[string]ResourceHandlerFactoryFunc
+}{
+	factories: make(map[string]ResourceHandlerFactoryFunc),
+}
+
+// RegisterResourceHandlerFactory registers a new factory function to create a
+// new ResourceHandler. Useful when you have entries in the
+// resources_config.xml|json file.
+func RegisterResourceHandlerFactory(alias string, f ResourceHandlerFactoryFunc) {
+	factoryResourceHandlers.Lock()
+	factoryResourceHandlers.factories[alias] = f
+	factoryResourceHandlers.Unlock()
+}
+
+func newResourceHandlerFromFactory(alias string, cfg *ConfigItem) (ResourceHandler, error) {
+	factoryResourceHandlers.RLock()
+	defer factoryResourceHandlers.RUnlock()
+	if f, ok := factoryResourceHandlers.factories[alias]; ok && alias != "" {
+		return f(cfg)
+	}
+	return nil, errors.NewNotSupportedf("[backend] Alias %q not supported in factory registry", alias)
+}
+
+// ResourceHandler gets implemented by any client which is able to speak to any
+// remote backend. A handler gets registered in a global map and has a long
+// lived state.
+type ResourceHandler interface {
+	// DoRequest fires the request to the resource and it may return a header
+	// and content or an error. All three return values can be nil. An error can
+	// have the behaviour of NotFound which calls the next resource in the
+	// sequence and does not trigger the circuit breaker. Any other returned
+	// error will trigger the increment of the circuit breaker. See the variable
+	// CBMaxFailures for the maximum amount of allowed failures until the
+	// circuit breaker opens.
+	DoRequest(*ResourceArgs) (header http.Header, content []byte, err error)
+	// Closes closes the resource when Caddy restarts or reloads. If supported
+	// by the resource.
+	Close() error
+}
+
+// NewResourceHandler a given URL gets checked which service it should
+// instantiate and connect to. A handler must be previously registered via
+// function RegisterResourceHandlerFactory.
+func NewResourceHandler(cfg *ConfigItem) (ResourceHandler, error) {
+	idx := strings.Index(cfg.URL, "://")
+	if idx < 0 {
+		return nil, errors.NewNotValidf("[backend] Unknown URL: %q. Does not contain ://", cfg.URL)
+	}
+	scheme := cfg.URL[:idx]
+
+	rh, err := newResourceHandlerFromFactory(scheme, cfg)
+	if err != nil {
+		return nil, errors.Wrapf(err, "[backend] Failed to create new ResourceHandler object: %q", cfg.URL)
+	}
+	return rh, nil
 }
 
 // Resource specifies the location to a 3rd party remote system within an ESI

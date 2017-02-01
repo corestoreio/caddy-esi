@@ -12,23 +12,5 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-package esikv
-
-import (
-	"testing"
-
-	"github.com/corestoreio/errors"
-	"github.com/stretchr/testify/assert"
-)
-
-func TestNewResourceHandler_Mock(t *testing.T) {
-	rh, err := NewResourceHandler(NewConfigItem("mockTimeout://4s"))
-	assert.NoError(t, err)
-	_, ok := rh.(resourceMock)
-	assert.True(t, ok, "It should be type resourceMock")
-
-	n1, n2, err := rh.DoRequest(nil)
-	assert.Nil(t, n1)
-	assert.Nil(t, n2)
-	assert.True(t, errors.IsTimeout(err), "Error should have behaviour timeout: %+v", err)
-}
+// Package backend provides integrations for 3rd party resources.
+package backend

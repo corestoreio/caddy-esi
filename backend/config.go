@@ -12,7 +12,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-package esikv
+package backend
 
 import (
 	"bytes"
@@ -62,7 +62,7 @@ type ConfigItems []*ConfigItem
 // WriteTo writes the XML into w and may return an error. It returns always zero
 // bytes written :-(.
 func (ci ConfigItems) WriteTo(w io.Writer) (n int64, err error) {
-	return 0, errors.Wrap(ci.toXML(w), "[esikv] ConfigItems.WriteTo failed")
+	return 0, errors.Wrap(ci.toXML(w), "[backend] ConfigItems.WriteTo failed")
 }
 
 func (ci ConfigItems) urlByAlias(alias string) string {
@@ -85,7 +85,7 @@ func (ci ConfigItems) toXML(w io.Writer) error {
 	}
 
 	_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`))
-	return errors.Wrap(xml.NewEncoder(w).Encode(xi), "[esikv] ConfigItems.toXML failed")
+	return errors.Wrap(xml.NewEncoder(w).Encode(xi), "[backend] ConfigItems.toXML failed")
 }
 
 // MustToXML transforms the object into a strings and panics on error. Only used
@@ -143,7 +143,7 @@ func ConfigUnmarshal(fileName string) (itms ConfigItems, err error) {
 	if hasBit(extType, shouldReadFile) {
 		data, err = ioutil.ReadFile(fileName)
 		if err != nil {
-			return nil, errors.NewFatalf("[esikv] Failed to read file %q with error: %s", fileName, err)
+			return nil, errors.NewFatalf("[backend] Failed to read file %q with error: %s", fileName, err)
 		}
 	} else {
 		data = []byte(fileName)
@@ -152,7 +152,7 @@ func ConfigUnmarshal(fileName string) (itms ConfigItems, err error) {
 	switch {
 	case hasBit(extType, typeJSON):
 		if err := json.Unmarshal(data, &itms); err != nil {
-			return nil, errors.NewFatalf("[esikv] Failed to parse JSON: %s", err)
+			return nil, errors.NewFatalf("[backend] Failed to parse JSON: %s", err)
 		}
 	case hasBit(extType, typeXML):
 		var xi = &struct {
@@ -160,7 +160,7 @@ func ConfigUnmarshal(fileName string) (itms ConfigItems, err error) {
 			Items   []*ConfigItem `xml:"item" json:"items"`
 		}{}
 		if err := xml.Unmarshal(data, xi); err != nil {
-			return nil, errors.NewFatalf("[esikv] Failed to parse XML: %s\n%s", err, string(data))
+			return nil, errors.NewFatalf("[backend] Failed to parse XML: %s\n%s", err, string(data))
 		}
 		itms = ConfigItems(xi.Items)
 	default:

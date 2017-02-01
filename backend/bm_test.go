@@ -15,6 +15,7 @@
 package backend_test
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -24,7 +25,63 @@ import (
 
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esitesting"
+	"github.com/alicebob/miniredis"
 )
+
+func BenchmarkNewRedis_Parallel(b *testing.B) {
+
+	runner := func(uriQueryString string) func(*testing.B) {
+		return func(b *testing.B) {
+			mr := miniredis.NewMiniRedis()
+			if err := mr.Start(); err != nil {
+				b.Fatal(err)
+			}
+			defer mr.Close()
+
+			var wantValue = []byte("123,45 € Way too long")
+			if err := mr.Set("product_price_4711", string(wantValue)); err != nil {
+				b.Fatal(err)
+			}
+
+			be, err := backend.NewResourceHandler(backend.NewConfigItem(fmt.Sprintf("redis://%s%s", mr.Addr(), uriQueryString)))
+			if err != nil {
+				b.Fatalf("%+v", err)
+			}
+			defer be.Close()
+
+			rfa := &backend.ResourceArgs{
+				ExternalReq: httptest.NewRequest("GET", "/", nil),
+				Key:         "product_price_4711",
+				Timeout:     time.Second,
+				MaxBodySize: 10,
+			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			b.RunParallel(func(pb *testing.PB) {
+				for pb.Next() {
+					hdr, content, err := be.DoRequest(rfa)
+					if err != nil {
+						b.Fatalf("%+v", err)
+					}
+					if hdr != nil {
+						b.Fatal("header should be nil")
+					}
+					if have, want := len(content), 10; have != want {
+						b.Errorf("Have: %q Want: %q", content, wantValue)
+					}
+				}
+			})
+
+			//require.NoError(t, err, "%+v", err)
+			//assert.Nil(t, hdr, "Header return must be nil")
+			//assert.Exactly(t, "123,45 €", string(content))
+		}
+	}
+	b.Run("Cancellable", runner("?cancellable=1"))
+	b.Run("Non__Cancel", runner("?cancellable=0"))
+
+}
 
 var benchmarkResourceArgs_PrepareForwardHeaders []string
 

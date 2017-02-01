@@ -12,13 +12,13 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-package esikv_test
+package backend_test
 
 import (
 	"bytes"
 	"testing"
 
-	"github.com/SchumacherFM/caddyesi/esikv"
+	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/corestoreio/errors"
 	"github.com/stretchr/testify/assert"
 )
@@ -27,51 +27,51 @@ func TestConfigUnmarshal(t *testing.T) {
 	t.Parallel()
 
 	t.Run("File extension not supported", func(t *testing.T) {
-		items, err := esikv.ConfigUnmarshal("./testdata/config_01.txt")
+		items, err := backend.ConfigUnmarshal("./testdata/config_01.txt")
 		assert.True(t, errors.IsNotSupported(err))
 		assert.Nil(t, items, "Items should be nil")
 	})
 
 	t.Run("File not found", func(t *testing.T) {
-		data, err := esikv.ConfigUnmarshal("./testdata/config_99.xml")
+		data, err := backend.ConfigUnmarshal("./testdata/config_99.xml")
 		assert.True(t, errors.IsFatal(err), "%+v", err)
 		assert.Nil(t, data, "Data should be nil")
 	})
 	t.Run("XML unmarshalling failed", func(t *testing.T) {
-		data, err := esikv.ConfigUnmarshal("./testdata/config_00.xml")
+		data, err := backend.ConfigUnmarshal("./testdata/config_00.xml")
 		assert.True(t, errors.IsFatal(err), "%+v", err)
 		assert.Nil(t, data, "Data should be nil")
 	})
 	t.Run("JSON unmarshalling failed", func(t *testing.T) {
-		data, err := esikv.ConfigUnmarshal("./testdata/config_00.json")
+		data, err := backend.ConfigUnmarshal("./testdata/config_00.json")
 		assert.True(t, errors.IsFatal(err), "%+v", err)
 		assert.Nil(t, data, "Data should be nil")
 	})
 	t.Run("Unknown content type", func(t *testing.T) {
-		data, err := esikv.ConfigUnmarshal("this is a text file")
+		data, err := backend.ConfigUnmarshal("this is a text file")
 		assert.True(t, errors.IsNotSupported(err), "%+v", err)
 		assert.Nil(t, data, "Data should be nil")
 	})
 
 	t.Run("Load XML and JSON which must be equal", func(t *testing.T) {
 
-		var want = esikv.ConfigItems{
-			&esikv.ConfigItem{
+		var want = backend.ConfigItems{
+			&backend.ConfigItem{
 				Alias: "redis01",
 				URL:   "redis://127.0.0.1:6379/?db=0&max_active=10&max_idle=4",
 				Query: "",
 			},
-			&esikv.ConfigItem{
+			&backend.ConfigItem{
 				Alias: "grpc01",
 				URL:   "grpc://127.0.0.1:53044/?pem=../path/to/root.pem",
 				Query: "",
 			},
-			&esikv.ConfigItem{
+			&backend.ConfigItem{
 				Alias: "mysql01",
 				URL:   "user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&tls=skip-verify",
 				Query: "SELECT `value` FROM tableX WHERE key='?'",
 			},
-			&esikv.ConfigItem{
+			&backend.ConfigItem{
 				Alias: "mysql02",
 				// the alias mysql-1 got resolved to the correct URL data
 				URL:   "user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&tls=skip-verify",
@@ -79,11 +79,11 @@ func TestConfigUnmarshal(t *testing.T) {
 			},
 		}
 
-		xmlI, err := esikv.ConfigUnmarshal("./testdata/config_01.xml")
+		xmlI, err := backend.ConfigUnmarshal("./testdata/config_01.xml")
 		if err != nil {
 			t.Fatalf("%+v", err)
 		}
-		jsonI, err := esikv.ConfigUnmarshal("./testdata/config_01.json")
+		jsonI, err := backend.ConfigUnmarshal("./testdata/config_01.json")
 		if err != nil {
 			t.Fatalf("%+v", err)
 		}
@@ -94,20 +94,20 @@ func TestConfigUnmarshal(t *testing.T) {
 
 	t.Run("Load XML and JSON from string", func(t *testing.T) {
 
-		var want = esikv.ConfigItems{
-			&esikv.ConfigItem{
+		var want = backend.ConfigItems{
+			&backend.ConfigItem{
 				Alias: "redis01",
 				URL:   "redis://127.0.0.1:6379/?db=0&max_active=10&max_idle=4",
 				Query: "",
 			},
-			&esikv.ConfigItem{
+			&backend.ConfigItem{
 				Alias: "mysql01",
 				URL:   "user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&tls=skip-verify",
 				Query: "SELECT value FROM tableX WHERE key='?'",
 			},
 		}
 
-		xmlI, err := esikv.ConfigUnmarshal(`<?xml version="1.0"?>
+		xmlI, err := backend.ConfigUnmarshal(`<?xml version="1.0"?>
 <items>
     <item>
         <alias>redis01</alias>
@@ -124,7 +124,7 @@ func TestConfigUnmarshal(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%+v", err)
 		}
-		jsonI, err := esikv.ConfigUnmarshal(`[
+		jsonI, err := backend.ConfigUnmarshal(`[
   {
     "alias": "redis01",
     "url": "redis://127.0.0.1:6379/?db=0&max_active=10&max_idle=4"
@@ -145,21 +145,21 @@ func TestConfigUnmarshal(t *testing.T) {
 	})
 
 	t.Run("ConfigItems to XML String", func(t *testing.T) {
-		items := esikv.ConfigItems{
-			&esikv.ConfigItem{
+		items := backend.ConfigItems{
+			&backend.ConfigItem{
 				Alias: "redis01",
 				URL:   "redis://127.0.0.1:6379/?db=0&max_active=10&max_idle=4",
 			},
-			&esikv.ConfigItem{
+			&backend.ConfigItem{
 				Alias: "grpc01",
 				URL:   "grpc://127.0.0.1:53044/?pem=../path/to/root.pem",
 			},
-			&esikv.ConfigItem{
+			&backend.ConfigItem{
 				Alias: "mysql01",
 				URL:   "user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&tls=skip-verify",
 				Query: "SELECT `value` FROM tableX WHERE key='?'",
 			},
-			&esikv.ConfigItem{
+			&backend.ConfigItem{
 				Alias: "mysql02",
 				// the alias mysql-1 got resolved to the correct URL data
 				URL:   "user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&tls=skip-verify",
@@ -176,7 +176,7 @@ func TestConfigUnmarshal(t *testing.T) {
 		assert.Exactly(t, int64(0), written)
 		assert.NoError(t, err, "%+v", err)
 
-		items2, err := esikv.ConfigUnmarshal(haveXML)
+		items2, err := backend.ConfigUnmarshal(haveXML)
 		if err != nil {
 			t.Fatalf("%+v", err)
 		}
