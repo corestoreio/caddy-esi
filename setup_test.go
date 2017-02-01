@@ -455,16 +455,16 @@ func TestSetupLogger(t *testing.T) {
 	t.Run("Debug Stderr", runner(pc, nil))
 	assert.True(t, pc.Log.IsDebug())
 	pc.Log.Debug("DebugStdErr", log.String("debug01", "stderr01"))
-	assert.Contains(t, buf.String(), `DebugStdErr debug01: "stderr01"`)
+	assert.Contains(t, buf.String(), `"msg":"DebugStdErr","debug01":"stderr01"`)
 
 	pc = &PathConfig{
 		LogLevel: "info",
 		LogFile:  "stdout",
 	}
 	t.Run("Info Stdout", runner(pc, nil))
-	assert.True(t, pc.Log.IsInfo())
+	assert.True(t, pc.Log.IsInfo(), "Loglevel should be info")
 	pc.Log.Info("InfoStdOut", log.String("info01", "stdout01"))
-	assert.Contains(t, buf.String(), `InfoStdOut info01: "stdout01"`)
+	assert.Contains(t, buf.String(), `InfoStdOut","info01":"stdout01"`)
 
 	pc = &PathConfig{
 		LogLevel: "",
@@ -510,6 +510,6 @@ func TestSetupLogger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Contains(t, string(tmpFileContent), `InfoWriteToTempFile info03: 2412`)
-	assert.Contains(t, string(tmpFileContent), `DebugWriteToTempFile debugo04: 2512`)
+	assert.Contains(t, string(tmpFileContent), `"msg":"InfoWriteToTempFile","info03":2412`)
+	assert.Contains(t, string(tmpFileContent), `"msg":"DebugWriteToTempFile","debugo04":2512`)
 }

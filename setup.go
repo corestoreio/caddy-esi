@@ -124,7 +124,7 @@ var osStdOut io.Writer = os.Stdout
 func setupLogger(pc *PathConfig) error {
 	pc.Log = log.BlackHole{}
 
-	var lvl zap.Level
+	var lvl zap.Level = -5000
 	switch pc.LogLevel {
 	case "debug":
 		lvl = zap.DebugLevel
@@ -133,7 +133,8 @@ func setupLogger(pc *PathConfig) error {
 	case "fatal":
 		lvl = zap.FatalLevel
 	}
-	if lvl == 0 {
+
+	if lvl == -5000 {
 		// logging disabled
 		return nil
 	}

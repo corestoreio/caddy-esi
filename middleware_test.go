@@ -169,8 +169,8 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Contains(t, string(logContent), `error: "`+errMsg+`"`)
-		assert.Contains(t, string(logContent), `url: "mwTest01://micro.service/esi/foo"`)
+		assert.Exactly(t, 2, strings.Count(string(logContent), `"error":"`+errMsg+`"`), "Should contain 2 occurrences")
+		assert.Exactly(t, 2, strings.Count(string(logContent), `"resource_url":"mwTest01://micro.service/esi/foo"`), "Should contain 2 occurrences")
 	}
 
 	t.Run("Replace a single ESI Tag in page01.html but error in backend triggers default on_error message", mwTestRunner(
@@ -258,7 +258,7 @@ func TestMiddleware_ServeHTTP_Parallel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Exactly(t, 1, strings.Count(string(logContent), `caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse error: "<nil>"`), `caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse error: "<nil>" MUST only occur once!!!`)
+	assert.Exactly(t, 1, strings.Count(string(logContent), `caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse","error":"<nil>"`), `caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse error: "<nil>" MUST only occur once!!!`)
 	assert.Exactly(t, 600, strings.Count(string(logContent), `esitag.Entity.QueryResources.ResourceHandler.CBStateClosed`), `esitag.Entity.QueryResources.ResourceHandler.CBStateClosed`)
 }
 
@@ -360,6 +360,6 @@ func TestMiddleware_HandleHeaderCommands(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Contains(t, string(logContent), `caddyesi.PathConfig.purgeESICache path_scope: "/page01"`)
-	assert.Exactly(t, 2, strings.Count(string(logContent), `caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse error: "<nil>"`))
+	assert.Contains(t, string(logContent), `caddyesi.PathConfig.purgeESICache","path_scope":"/page01"`)
+	assert.Exactly(t, 2, strings.Count(string(logContent), `caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse","error":"<nil>"`))
 }
