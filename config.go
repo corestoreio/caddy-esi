@@ -26,7 +26,7 @@ import (
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/esitag"
-	"github.com/SchumacherFM/caddyesi/helpers"
+	"github.com/SchumacherFM/caddyesi/helper"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
@@ -243,7 +243,7 @@ func pageID(source []string, r *http.Request) (_ uint64, ok bool) {
 		case "remoteaddr":
 			_, _ = buf.WriteString(r.RemoteAddr)
 		case "realip":
-			_, _ = buf.Write(helpers.RealIP(r))
+			_, _ = buf.Write(helper.RealIP(r))
 		case "scheme":
 			_, _ = buf.WriteString(r.URL.Scheme)
 		case "host":

@@ -23,9 +23,7 @@ import (
 
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esicache"
-	"github.com/SchumacherFM/caddyesi/esikv"
 	"github.com/SchumacherFM/caddyesi/esitesting"
-	"github.com/alicebob/miniredis"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	"github.com/mholt/caddy"
@@ -33,66 +31,60 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func testPluginSetup(config string, wantPC PathConfigs, cacheCount int, requestFuncs []string, wantErrBhf errors.BehaviourFunc) func(*testing.T) {
+	return func(t *testing.T) {
+		defer esicache.MainRegistry.Clear()
+
+		c := caddy.NewTestController("http", config)
+
+		if err := PluginSetup(c); wantErrBhf != nil {
+			assert.True(t, wantErrBhf(err), "(%s):\n%+v", t.Name(), err)
+			return
+		} else if err != nil {
+			t.Fatalf("Expected no errors, got: %+v", err)
+		}
+
+		mids := httpserver.GetConfig(c).Middleware()
+		if len(mids) != 1 {
+			t.Fatalf("Expected one middleware, got %d instead", len(mids))
+		}
+		handler := mids[0](httpserver.EmptyNext)
+		myHandler, ok := handler.(*Middleware)
+		if !ok {
+			t.Fatalf("Expected handler to be type ESI, got: %#v", handler)
+		}
+
+		assert.Exactly(t, len(wantPC), len(myHandler.PathConfigs))
+		for j, wantC := range wantPC {
+			haveC := myHandler.PathConfigs[j]
+
+			assert.Exactly(t, wantC.Scope, haveC.Scope, "Scope (Path) %s", t.Name())
+			assert.Exactly(t, wantC.Timeout, haveC.Timeout, "Timeout %s", t.Name())
+			assert.Exactly(t, wantC.TTL, haveC.TTL, "TTL %s", t.Name())
+			assert.Exactly(t, wantC.PageIDSource, haveC.PageIDSource, "PageIDSource %s", t.Name())
+			assert.Exactly(t, wantC.AllowedMethods, haveC.AllowedMethods, "AllowedMethods %s", t.Name())
+			assert.Exactly(t, wantC.LogFile, haveC.LogFile, "LogFile %s", t.Name())
+			assert.Exactly(t, wantC.LogLevel, haveC.LogLevel, "LogLevel %s", t.Name())
+			if len(wantC.OnError) > 0 {
+				assert.Exactly(t, string(wantC.OnError), string(haveC.OnError), "OnError %s", t.Name())
+			}
+
+			assert.Exactly(t, cacheCount, esicache.MainRegistry.Len(haveC.Scope), "Mismatch esicache.MainRegistry.Len")
+		}
+
+		for _, kvName := range requestFuncs {
+			rf, ok := backend.LookupResourceHandler(kvName)
+			assert.True(t, ok, "Should have been registered %q", kvName)
+			assert.NotNil(t, rf, "Should have a non-nil func %q", kvName)
+		}
+
+	}
+}
+
 func TestPluginSetup(t *testing.T) {
 	t.Parallel()
 
-	mr := miniredis.NewMiniRedis()
-	if err := mr.Start(); err != nil {
-		t.Fatal(err)
-	}
-	defer mr.Close()
-
-	runner := func(config string, wantPC PathConfigs, cacheCount int, requestFuncs []string, wantErrBhf errors.BehaviourFunc) func(*testing.T) {
-		return func(t *testing.T) {
-			defer esicache.MainRegistry.Clear()
-
-			c := caddy.NewTestController("http", config)
-
-			if err := PluginSetup(c); wantErrBhf != nil {
-				assert.True(t, wantErrBhf(err), "%+v", err)
-				return
-			} else if err != nil {
-				t.Fatalf("Expected no errors, got: %+v", err)
-			}
-
-			mids := httpserver.GetConfig(c).Middleware()
-			if len(mids) != 1 {
-				t.Fatalf("Expected one middleware, got %d instead", len(mids))
-			}
-			handler := mids[0](httpserver.EmptyNext)
-			myHandler, ok := handler.(*Middleware)
-			if !ok {
-				t.Fatalf("Expected handler to be type ESI, got: %#v", handler)
-			}
-
-			assert.Exactly(t, len(wantPC), len(myHandler.PathConfigs))
-			for j, wantC := range wantPC {
-				haveC := myHandler.PathConfigs[j]
-
-				assert.Exactly(t, wantC.Scope, haveC.Scope, "Scope (Path) %s", t.Name())
-				assert.Exactly(t, wantC.Timeout, haveC.Timeout, "Timeout %s", t.Name())
-				assert.Exactly(t, wantC.TTL, haveC.TTL, "TTL %s", t.Name())
-				assert.Exactly(t, wantC.PageIDSource, haveC.PageIDSource, "PageIDSource %s", t.Name())
-				assert.Exactly(t, wantC.AllowedMethods, haveC.AllowedMethods, "AllowedMethods %s", t.Name())
-				assert.Exactly(t, wantC.LogFile, haveC.LogFile, "LogFile %s", t.Name())
-				assert.Exactly(t, wantC.LogLevel, haveC.LogLevel, "LogLevel %s", t.Name())
-				if len(wantC.OnError) > 0 {
-					assert.Exactly(t, string(wantC.OnError), string(haveC.OnError), "OnError %s", t.Name())
-				}
-
-				assert.Exactly(t, cacheCount, esicache.MainRegistry.Len(haveC.Scope), "Mismatch esicache.MainRegistry.Len")
-			}
-
-			for _, kvName := range requestFuncs {
-				rf, ok := backend.LookupResourceHandler(kvName)
-				assert.True(t, ok, "Should have been registered %q", kvName)
-				assert.NotNil(t, rf, "Should have a non-nil func %q", kvName)
-			}
-
-		}
-	}
-
-	t.Run("Default Config", runner(
+	t.Run("Default Config", testPluginSetup(
 		`esi`,
 		PathConfigs{
 			&PathConfig{
@@ -106,66 +98,7 @@ func TestPluginSetup(t *testing.T) {
 		nil,
 	))
 
-	t.Run("With timeout, ttl and 1x Cacher", runner(
-		`esi {
-			timeout 5ms
-			ttl 10ms
-			cache redis://`+mr.Addr()+`/0
-		}`,
-		PathConfigs{
-			&PathConfig{
-				Scope:   "/",
-				Timeout: time.Millisecond * 5,
-				TTL:     time.Millisecond * 10,
-			},
-		},
-		1,   // cache length
-		nil, // kv services []string
-		nil,
-	))
-
-	t.Run("With timeout, ttl and 2x Cacher", runner(
-		`esi {
-			timeout 5ms
-			ttl 10ms
-			cache redis://`+mr.Addr()+`/0
-			cache redis://`+mr.Addr()+`/1
-		}`,
-		PathConfigs{
-			&PathConfig{
-				Scope:   "/",
-				Timeout: time.Millisecond * 5,
-				TTL:     time.Millisecond * 10,
-			},
-		},
-		2,   // cache length
-		nil, // kv services []string
-		nil,
-	))
-
-	esiCfg, clean := esitesting.WriteXMLTempFile(t, esikv.ConfigItems{
-		esikv.NewConfigItem(`redis://`+mr.Addr()+`/0`, "backend"),
-	})
-	defer clean()
-	t.Run("With timeout, ttl and resources", runner(
-		`esi {
-			timeout 5ms
-			ttl 10ms
-			resources `+esiCfg+`
-		}`,
-		PathConfigs{
-			&PathConfig{
-				Scope:   "/",
-				Timeout: time.Millisecond * 5,
-				TTL:     time.Millisecond * 10,
-			},
-		},
-		0,                   // cache length
-		[]string{"backend"}, // kv services []string
-		nil,
-	))
-
-	t.Run("config with allowed_methods", runner(
+	t.Run("config with allowed_methods", testPluginSetup(
 		`esi {
 			allowed_methods "GET,pUT , POsT"
 		}`,
@@ -181,7 +114,7 @@ func TestPluginSetup(t *testing.T) {
 		nil,
 	))
 
-	t.Run("config with cmd_header_name", runner(
+	t.Run("config with cmd_header_name", testPluginSetup(
 		`esi {
 			cmd_header_name X-Esi-CMD
 		}`,
@@ -196,7 +129,7 @@ func TestPluginSetup(t *testing.T) {
 		nil, // kv services []string
 		nil,
 	))
-	t.Run("config with cmd_header_name but value not provided", runner(
+	t.Run("config with cmd_header_name but value not provided", testPluginSetup(
 		`esi {
 			cmd_header_name
 		}`,
@@ -206,7 +139,7 @@ func TestPluginSetup(t *testing.T) {
 		errors.IsNotValid,
 	))
 
-	t.Run("config with page_id_source", runner(
+	t.Run("config with page_id_source", testPluginSetup(
 		`esi {
 			page_id_source "pAth,host , IP, header-X-GitHub-Request-Id, header-Server, cookie-__Host-user_session_same_site"
 		}`,
@@ -222,7 +155,7 @@ func TestPluginSetup(t *testing.T) {
 		nil,
 	))
 
-	t.Run("config with page_id_source but errors", runner(
+	t.Run("config with page_id_source but errors", testPluginSetup(
 		`esi {
 			page_id_source
 		}`,
@@ -232,7 +165,7 @@ func TestPluginSetup(t *testing.T) {
 		errors.IsNotValid,
 	))
 
-	t.Run("Parse timeout fails", runner(
+	t.Run("Parse timeout fails", testPluginSetup(
 		`esi {
 			timeout Dms
 		}`,
@@ -242,69 +175,7 @@ func TestPluginSetup(t *testing.T) {
 		errors.IsNotValid,
 	))
 
-	esiCfg, clean = esitesting.WriteXMLTempFile(t, esikv.ConfigItems{
-		esikv.NewConfigItem(`redis//`+mr.Addr()+`/0`, "backend"), // missing colon
-	})
-	defer clean()
-	t.Run("Invalid KVService URL", runner(
-		`esi {
-			timeout 5ms
-			ttl 10ms
-			resources `+esiCfg+`
-		}`,
-		nil,
-		0,   // cache length
-		nil, // kv services []string
-		errors.IsNotValid,
-	))
-
-	esiCfg, clean = esitesting.WriteXMLTempFile(t, esikv.ConfigItems{
-		esikv.NewConfigItem(`redis://`+mr.Addr()+`/0`, "backend"),
-		esikv.NewConfigItem(`redis://`+mr.Addr()+`/1`, "backend"),
-	})
-	defer clean()
-	t.Run("Overwrite duplicate key in KVServices", runner(
-		`esi {
-			timeout 5ms
-			ttl 10ms
-			resources `+esiCfg+` 
-		}`,
-		PathConfigs{
-			&PathConfig{
-				Scope:   "/",
-				Timeout: time.Millisecond * 5,
-				TTL:     time.Millisecond * 10,
-			},
-		},
-		0,                   // cache length
-		[]string{"backend"}, // kv services []string
-		nil,
-	))
-
-	esiCfg, clean = esitesting.WriteXMLTempFile(t, esikv.ConfigItems{
-		esikv.NewConfigItem(`redis://`+mr.Addr()+`/0`, "redis1"),
-		esikv.NewConfigItem(`redis://`+mr.Addr()+`/1`, "redis2"),
-	})
-	defer clean()
-	t.Run("Create two KVServices", runner(
-		`esi {
-			timeout 5ms
-			ttl 10ms
-			resources `+esiCfg+`
-		}`,
-		PathConfigs{
-			&PathConfig{
-				Scope:   "/",
-				Timeout: time.Millisecond * 5,
-				TTL:     time.Millisecond * 10,
-			},
-		},
-		0, // cache length
-		[]string{"redis1", "redis2"}, // kv services []string
-		nil,
-	))
-
-	t.Run("esi with path to /blog and /guestbook", runner(
+	t.Run("esi with path to /blog and /guestbook", testPluginSetup(
 		`esi /blog
 		esi /guestbook`,
 		PathConfigs{
@@ -324,49 +195,7 @@ func TestPluginSetup(t *testing.T) {
 		nil,
 	))
 
-	esiCfg1, clean := esitesting.WriteXMLTempFile(t, esikv.ConfigItems{
-		esikv.NewConfigItem(`redis://`+mr.Addr()+`/2`, "redisAWS1"),
-		esikv.NewConfigItem(`redis://`+mr.Addr()+`/3`, "redisLocal1"),
-		esikv.NewConfigItem(`redis://`+mr.Addr()+`/1`, "redisLocal2"),
-	})
-	defer clean()
-	esiCfg2, clean := esitesting.WriteXMLTempFile(t, esikv.ConfigItems{
-		esikv.NewConfigItem(`redis://`+mr.Addr()+`/3`, "redisLocal3"),
-	})
-	defer clean()
-	t.Run("2x esi directives with different KVServices", runner(
-		`esi /catalog/product {
-		   timeout 122ms
-		   ttl 123ms
-		   log_file stderr
-		   log_level debug
-		   resources `+esiCfg1+`
-		}
-		esi /checkout/cart {
-		   timeout 131ms
-		   ttl 132ms
-			resources `+esiCfg2+`
-		}`,
-		PathConfigs{
-			&PathConfig{
-				Scope:    "/catalog/product",
-				Timeout:  time.Millisecond * 122,
-				TTL:      time.Millisecond * 123,
-				LogFile:  "stderr",
-				LogLevel: "debug",
-			},
-			&PathConfig{
-				Scope:   "/checkout/cart",
-				Timeout: time.Millisecond * 131,
-				TTL:     time.Millisecond * 132,
-			},
-		},
-		0, // cache length
-		[]string{"redisAWS1", "redisLocal1", "redisLocal2", "redisLocal3"}, // kv services []string
-		nil,
-	))
-
-	t.Run("Log level info and file stderr", runner(
+	t.Run("Log level info and file stderr", testPluginSetup(
 		`esi /catalog/product {
 		   log_file stderr
 		   log_level INFO
@@ -384,7 +213,7 @@ func TestPluginSetup(t *testing.T) {
 		nil,
 	))
 
-	t.Run("OnError String", runner(
+	t.Run("OnError String", testPluginSetup(
 		`esi /catalog/product {
 		   on_error "Resource content unavailable"
 		}`,
@@ -400,7 +229,7 @@ func TestPluginSetup(t *testing.T) {
 		nil,
 	))
 
-	t.Run("OnError File", runner(
+	t.Run("OnError File", testPluginSetup(
 		`esi /catalog/product {
 		   on_error "testdata/on_error.txt"
 		}`,
@@ -416,7 +245,7 @@ func TestPluginSetup(t *testing.T) {
 		nil,
 	))
 
-	t.Run("OnError File not found", runner(
+	t.Run("OnError File not found", testPluginSetup(
 		`esi / {
 		   on_error "testdataXX/on_error.txt"
 		}`,

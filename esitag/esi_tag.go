@@ -27,7 +27,7 @@ import (
 
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/bufpool"
-	"github.com/SchumacherFM/caddyesi/helpers"
+	"github.com/SchumacherFM/caddyesi/helper"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	"github.com/dustin/go-humanize"
@@ -192,7 +192,7 @@ func (et *Entity) ParseRaw() error {
 			if value == "all" {
 				et.ForwardHeadersAll = true
 			} else {
-				et.ForwardHeaders = helpers.CommaListToSlice(value)
+				et.ForwardHeaders = helper.CommaListToSlice(value)
 				for i, v := range et.ForwardHeaders {
 					et.ForwardHeaders[i] = http.CanonicalHeaderKey(v)
 				}
@@ -201,7 +201,7 @@ func (et *Entity) ParseRaw() error {
 			if value == "all" {
 				et.ReturnHeadersAll = true
 			} else {
-				et.ReturnHeaders = helpers.CommaListToSlice(value)
+				et.ReturnHeaders = helper.CommaListToSlice(value)
 				for i, v := range et.ReturnHeaders {
 					et.ReturnHeaders[i] = http.CanonicalHeaderKey(v)
 				}

@@ -23,8 +23,7 @@ import (
 
 	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esicache"
-	"github.com/SchumacherFM/caddyesi/esikv"
-	"github.com/SchumacherFM/caddyesi/helpers"
+	"github.com/SchumacherFM/caddyesi/helper"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	"github.com/corestoreio/log/zapw"
@@ -217,13 +216,13 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 		if !c.NextArg() {
 			return errors.NewNotValidf("[caddyesi] page_id_source: %s", c.ArgErr())
 		}
-		pc.PageIDSource = helpers.CommaListToSlice(c.Val())
+		pc.PageIDSource = helper.CommaListToSlice(c.Val())
 
 	case "allowed_methods":
 		if !c.NextArg() {
 			return errors.NewNotValidf("[caddyesi] allowed_methods: %s", c.ArgErr())
 		}
-		pc.AllowedMethods = helpers.CommaListToSlice(strings.ToUpper(c.Val()))
+		pc.AllowedMethods = helper.CommaListToSlice(strings.ToUpper(c.Val()))
 	case "cmd_header_name":
 		if !c.NextArg() {
 			return errors.NewNotValidf("[caddyesi] cmd_header_name: %s", c.ArgErr())
@@ -251,12 +250,12 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 			return errors.NewNotValidf("[caddyesi] resources: %s", c.ArgErr())
 		}
 		// c.Val() contains the file name or raw-content ;-)
-		items, err := esikv.ConfigUnmarshal(c.Val())
+		items, err := backend.ConfigUnmarshal(c.Val())
 		if err != nil {
 			return errors.Wrapf(err, "[caddyesi] Failed to unmarshal resource config %q", c.Val())
 		}
 		for _, item := range items {
-			f, err := esikv.NewResourceHandler(item)
+			f, err := backend.NewResourceHandler(item)
 			if err != nil {
 				// may disclose passwords which are stored in the URL
 				return errors.Wrapf(err, "[caddyesi] esikv Service init failed for URL %q in file %q", item.URL, c.Val())
