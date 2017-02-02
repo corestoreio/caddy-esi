@@ -1,4 +1,18 @@
-package helpers_test
+// Copyright 2016-2017, Cyrill @ Schumacher.fm and the CaddyESI Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
+package helper_test
 
 import (
 	"net"
@@ -6,7 +20,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/SchumacherFM/caddyesi/helpers"
+	"github.com/SchumacherFM/caddyesi/helper"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -62,7 +76,7 @@ func TestGetRealIP(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		haveIP := helpers.RealIP(test.r)
+		haveIP := helper.RealIP(test.r)
 		assert.Exactly(t, test.wantIP, haveIP, "Index: %d Want %s Have %s", i, test.wantIP, haveIP)
 	}
 }
