@@ -297,7 +297,7 @@ func TestNewResourceHandler(t *testing.T) {
 		be, err := backend.NewResourceHandler(backend.NewConfigItem("redis//localhost"))
 		assert.Nil(t, be)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), `Unknown URL: "redis//localhost". Does not contain ://`)
+		assert.Contains(t, err.Error(), `Unknown scheme in URL: "redis//localhost". Does not contain ://`)
 	})
 	t.Run("Scheme Error", func(t *testing.T) {
 		be, err := backend.NewResourceHandler(backend.NewConfigItem("mysql://localhost"))

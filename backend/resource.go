@@ -349,7 +349,7 @@ type ResourceHandler interface {
 func NewResourceHandler(cfg *ConfigItem) (ResourceHandler, error) {
 	idx := strings.Index(cfg.URL, "://")
 	if idx < 0 {
-		return nil, errors.NewNotValidf("[backend] Unknown URL: %q. Does not contain ://", cfg.URL)
+		return nil, errors.NewNotValidf("[backend] Unknown scheme in URL: %q. Does not contain ://", cfg.URL)
 	}
 	scheme := cfg.URL[:idx]
 
