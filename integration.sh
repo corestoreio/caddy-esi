@@ -14,7 +14,7 @@ redis-cli -n 1 SET "checkout_cart" "You have 10 items in your cart"
 # redis-cli MGET "category_tree" "product_001"
 # redis-cli -n 1 GET "checkout_cart"
 
-go build -tags=all -race -o caddy.bin $GOPATH/src/github.com/mholt/caddy/caddy/main.go
+go build -tags esiall -race -o caddy.bin $GOPATH/src/github.com/mholt/caddy/caddy/main.go
 # go run $GOPATH/src/github.com/mholt/caddy/caddy/main.go -conf ./Caddyfile
 
 ./caddy.bin -conf ./Caddyfile 2>&1 > caddy_stdout.log &

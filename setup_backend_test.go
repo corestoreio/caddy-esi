@@ -12,7 +12,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-// +build all
+// +build esiall
 
 // above build tag triggers inclusion of all backend resource connectors
 
