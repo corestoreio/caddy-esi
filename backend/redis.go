@@ -12,15 +12,13 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-// +build all redis
+// +build esiall esiredis
 
 package backend
 
 import (
 	"context"
-	"net"
 	"net/http"
-	"net/url"
 	"strconv"
 	"time"
 
@@ -42,22 +40,22 @@ type esiRedis struct {
 
 // NewRedis provides, for now, a basic implementation for simple key fetching.
 func NewRedis(cfg *ConfigItem) (ResourceHandler, error) {
-	addr, pw, params, err := ParseRedisURL(cfg.URL)
+	addr, pw, params, err := ParseNoSQLURL(cfg.URL)
 	if err != nil {
 		return nil, errors.Errorf("[backend] Redis error parsing URL %q => %s", cfg.URL, err)
 	}
 
 	maxActive, err := strconv.Atoi(params.Get("max_active"))
 	if err != nil {
-		return nil, errors.NewNotValidf("[backend] NewRedis.ParseRedisURL. Parameter max_active not valid in  %q", cfg.URL)
+		return nil, errors.NewNotValidf("[backend] NewRedis.ParseNoSQLURL. Parameter max_active not valid in  %q", cfg.URL)
 	}
 	maxIdle, err := strconv.Atoi(params.Get("max_idle"))
 	if err != nil {
-		return nil, errors.NewNotValidf("[backend] NewRedis.ParseRedisURL. Parameter max_idle not valid in  %q", cfg.URL)
+		return nil, errors.NewNotValidf("[backend] NewRedis.ParseNoSQLURL. Parameter max_idle not valid in  %q", cfg.URL)
 	}
 	idleTimeout, err := time.ParseDuration(params.Get("idle_timeout"))
 	if err != nil {
-		return nil, errors.NewNotValidf("[backend] NewRedis.ParseRedisURL. Parameter idle_timeout not valid in  %q", cfg.URL)
+		return nil, errors.NewNotValidf("[backend] NewRedis.ParseNoSQLURL. Parameter idle_timeout not valid in  %q", cfg.URL)
 	}
 
 	r := &esiRedis{
@@ -224,69 +222,4 @@ func (er *esiRedis) doRequestCancel(args *ResourceArgs) (_ http.Header, _ []byte
 	case err = <-retErr:
 	}
 	return nil, value, err
-}
-
-// defaultPoolConnectionParameters this var also exists in the test file
-var defaultPoolConnectionParameters = [...]string{
-	"db", "0",
-	"max_active", "10",
-	"max_idle", "400",
-	"idle_timeout", "240s",
-	"cancellable", "0",
-	"lazy", "0", // if 1 disables the ping to redis during caddy startup
-}
-
-// ParseRedisURL parses a given URL using the Redis
-// URI scheme. URLs should follow the draft IANA specification for the
-// scheme (https://www.iana.org/assignments/uri-schemes/prov/redis).
-// For example:
-// 		redis://localhost:6379/?db=3
-// 		redis://:6380/?db=0 => connects to localhost:6380
-// 		redis:// => connects to localhost:6379 with DB 0
-// 		redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/?db=0
-// Available parameters: db, max_active (int, Connections), max_idle (int,
-// Connections), idle_timeout (time.Duration, Connection), cancellable (0,1
-// request towards redis), lazy (0, 1 disables ping during connection setup).
-func ParseRedisURL(raw string) (address, password string, params url.Values, err error) {
-	u, err := url.Parse(raw)
-	if err != nil {
-		return "", "", nil, errors.Errorf("[backend] url.Parse: %s", err)
-	}
-
-	if u.Scheme != "redis" {
-		return "", "", nil, errors.Errorf("[backend] Invalid Redis URL scheme: %q", u.Scheme)
-	}
-
-	// As per the IANA draft spec, the host defaults to localhost and
-	// the port defaults to 6379.
-	host, port, err := net.SplitHostPort(u.Host)
-	if sErr, ok := err.(*net.AddrError); ok && sErr != nil && sErr.Err == "too many colons in address" {
-		return "", "", nil, errors.Errorf("[backend] SplitHostPort: %s", err)
-	}
-	if err != nil {
-		// assume port is missing
-		host = u.Host
-		port = "6379"
-	}
-	if host == "" {
-		host = "localhost"
-	}
-	address = net.JoinHostPort(host, port)
-
-	if u.User != nil {
-		password, _ = u.User.Password()
-	}
-
-	params, err = url.ParseQuery(u.RawQuery)
-	if err != nil {
-		return "", "", nil, errors.NewNotValidf("[backend] ParseRedisURL: Failed to parse %q for parameters in URL %q with error %s", u.RawQuery, raw, err)
-	}
-
-	for i := 0; i < len(defaultPoolConnectionParameters); i = i + 2 {
-		if params.Get(defaultPoolConnectionParameters[i]) == "" {
-			params.Set(defaultPoolConnectionParameters[i], defaultPoolConnectionParameters[i+1])
-		}
-	}
-
-	return
 }

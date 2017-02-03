@@ -12,7 +12,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-// +build esiall esiredis
+// +build esiall esimemcache
 
 package backend_test
 
@@ -28,14 +28,14 @@ import (
 	"time"
 
 	"github.com/SchumacherFM/caddyesi/backend"
-	"github.com/alicebob/miniredis"
+	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/corestoreio/errors"
 	"github.com/mitchellh/go-ps"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var isRedisRunning int // 0 not init; 1 nope; 2 yes
+var isMemCacheRunning int // 0 not init; 1 nope; 2 yes
 
 func init() {
 
@@ -43,18 +43,18 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	isRedisRunning = 1
+	isMemCacheRunning = 1
 	for _, p := range pses {
-		if "redis-server" == p.Executable() {
-			isRedisRunning = 2
+		if "memcached" == p.Executable() {
+			isMemCacheRunning = 2
 			break
 		}
 	}
 
-	if isRedisRunning == 1 {
-		if _, err := exec.LookPath("redis-server"); err != nil {
+	if isMemCacheRunning == 1 {
+		if _, err := exec.LookPath("memcached"); err != nil {
 			if err == exec.ErrNotFound {
-				isRedisRunning = 0 // skip tests and benchmarks
+				isMemCacheRunning = 0 // skip tests and benchmarks
 			} else {
 				panic(err)
 			}
@@ -62,27 +62,31 @@ func init() {
 	}
 }
 
-func TestNewRedis(t *testing.T) {
+func TestNewMemCache(t *testing.T) {
 	t.Parallel()
 
-	if isRedisRunning < 2 {
-		t.Skip("Redis not running or not installed. Skipping...")
+	if isMemCacheRunning < 2 {
+		t.Skip("Memcache not installed or not running. Skipping ...")
 	}
 
-	t.Run("Failed to parse max_active", func(t *testing.T) {
-		t.Parallel()
-		be, err := backend.NewRedis(backend.NewConfigItem("redis://localHorst/?max_active=∏"))
-		assert.Nil(t, be)
-		assert.True(t, errors.IsNotValid(err), "%+v", err)
-		assert.Error(t, err)
-	})
-	t.Run("Failed to parse max_idle", func(t *testing.T) {
-		t.Parallel()
-		be, err := backend.NewRedis(backend.NewConfigItem("redis://localHorst/?max_idle=∏"))
-		assert.Nil(t, be)
-		assert.True(t, errors.IsNotValid(err), "%+v", err)
-		assert.Error(t, err)
-	})
+	var valProductPrice4711 = []byte("123,45 € Way too long")
+
+	mc := memcache.New("localhost:11211")
+	if err := mc.Set(&memcache.Item{
+		Key:   "product_price_4711",
+		Value: valProductPrice4711,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	const wantContent = `<b>Awesome large Gopher plush toy</b>`
+	if err := mc.Set(&memcache.Item{
+		Key:   "product_GopherPlushXXL",
+		Value: []byte(wantContent),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
 	t.Run("Failed to parse idle_timeout", func(t *testing.T) {
 		t.Parallel()
 		be, err := backend.NewRedis(backend.NewConfigItem("redis://localHorst/?idle_timeout=∏"))
@@ -94,7 +98,7 @@ func TestNewRedis(t *testing.T) {
 	t.Run("Ping fail", func(t *testing.T) {
 		t.Parallel()
 
-		be, err := backend.NewResourceHandler(backend.NewConfigItem("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379"))
+		be, err := backend.NewResourceHandler(backend.NewConfigItem("memcache://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:11211"))
 		assert.True(t, errors.IsFatal(err), "%+v", err)
 		assert.Nil(t, be)
 	})
@@ -102,7 +106,7 @@ func TestNewRedis(t *testing.T) {
 	t.Run("Ping does not fail because lazy", func(t *testing.T) {
 		t.Parallel()
 
-		be, err := backend.NewResourceHandler(backend.NewConfigItem("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/?lazy=1"))
+		be, err := backend.NewResourceHandler(backend.NewConfigItem("memcache://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:11211/?lazy=1"))
 		if err != nil {
 			t.Fatalf("There should be no error but got: %s", err)
 		}
@@ -115,29 +119,18 @@ func TestNewRedis(t *testing.T) {
 		})
 		assert.Nil(t, hdr, "header must be nil")
 		assert.Nil(t, content, "content must be nil")
-		assert.Contains(t, err.Error(), `dial tcp: lookup`)
+		assert.Contains(t, err.Error(), `memcache: no servers configured or available`)
 	})
 
-	t.Run("Authentication and Fetch Key OK", func(t *testing.T) {
+	t.Run("Fetch Key OK", func(t *testing.T) {
 		t.Parallel()
 
-		mr := miniredis.NewMiniRedis()
-		if err := mr.Start(); err != nil {
-			t.Fatal(err)
-		}
-		defer mr.Close()
-		mr.RequireAuth("MyPa55w04d")
-
-		be, err := backend.NewResourceHandler(backend.NewConfigItem(fmt.Sprintf("redis://MrMiyagi:%s@%s", "MyPa55w04d", mr.Addr())))
+		be, err := backend.NewResourceHandler(backend.NewConfigItem("memcache://"))
 		if be == nil {
-			t.Fatalf("NewResourceHandler to %q returns nil %+v", mr.Addr(), err)
+			t.Fatalf("NewResourceHandler   returns nil %+v", err)
 		}
 		if err != nil {
-			t.Fatalf("Redis connection %q error: %+v", mr.Addr(), err)
-		}
-
-		if err := mr.Set("product_price_4711", "123,45 € Way too long"); err != nil {
-			t.Fatal(err)
+			t.Fatalf("MemCache connection   error: %+v", err)
 		}
 
 		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
@@ -151,55 +144,29 @@ func TestNewRedis(t *testing.T) {
 		assert.Exactly(t, "123,45 €", string(content))
 	})
 
-	t.Run("Authentication failed", func(t *testing.T) {
-		t.Parallel()
+	// getMrBee mr == MiniMemCache; Bee = Back EEnd ;-)
+	getMrBee := func(t *testing.T, params ...string) (backend.ResourceHandler, func()) {
 
-		mr := miniredis.NewMiniRedis()
-		if err := mr.Start(); err != nil {
-			t.Fatal(err)
-		}
-		defer mr.Close()
-		mr.RequireAuth("MyPasw04d")
-
-		be, err := backend.NewRedis(backend.NewConfigItem(fmt.Sprintf("redis://MrMiyagi:%s@%s", "MyPa55w04d", mr.Addr())))
-		if be != nil {
-			t.Fatalf("NewResourceHandler to %q returns not nil", mr.Addr())
-		}
-		assert.True(t, errors.IsFatal(err), "%+v", err)
-	})
-
-	// getMrBee mr == MiniRedis; Bee = Back EEnd ;-)
-	getMrBee := func(t *testing.T, params ...string) (*miniredis.Miniredis, backend.ResourceHandler, func()) {
-		mr := miniredis.NewMiniRedis()
-		if err := mr.Start(); err != nil {
-			t.Fatal(err)
-		}
-
-		be, err := backend.NewResourceHandler(backend.NewConfigItem(fmt.Sprintf("redis://%s%s", mr.Addr(), strings.Join(params, "&"))))
+		be, err := backend.NewResourceHandler(backend.NewConfigItem(fmt.Sprintf("memcache://%s", strings.Join(params, "&"))))
 		if be == nil {
-			t.Fatalf("NewResourceHandler to %q returns nil %+v", mr.Addr(), err)
+			t.Fatalf("NewResourceHandler returns nil %+v", err)
 		}
 		if err != nil {
-			t.Fatalf("Redis connection %q error: %+v", mr.Addr(), err)
+			t.Fatalf("MemCache connection   error: %+v", err)
 		}
 
-		return mr, be, func() {
-			mr.Close()
+		return be, func() {
 			if err := be.Close(); err != nil {
 				t.Fatal(err)
 			}
 		}
 	}
 
-	t.Run("Cancel Request towards Redis", func(t *testing.T) {
+	t.Run("Cancel Request towards MemCache", func(t *testing.T) {
 		t.Parallel()
 
-		mr, be, closer := getMrBee(t, "?cancellable=1")
+		be, closer := getMrBee(t, "?cancellable=1")
 		defer closer()
-
-		if err := mr.Set("product_price_4711", "123,45 € Way too long"); err != nil {
-			t.Fatal(err)
-		}
 
 		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
@@ -215,12 +182,12 @@ func TestNewRedis(t *testing.T) {
 	t.Run("Fetch Key NotFound (no-cancel)", func(t *testing.T) {
 		t.Parallel()
 
-		_, be, closer := getMrBee(t)
+		be, closer := getMrBee(t)
 		defer closer()
 
 		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Key:         "product_price_4711",
+			Key:         "product_price_4712",
 			Timeout:     time.Second,
 			MaxBodySize: 100,
 		})
@@ -232,12 +199,12 @@ func TestNewRedis(t *testing.T) {
 	t.Run("Fetch Key NotFound (cancel)", func(t *testing.T) {
 		t.Parallel()
 
-		_, be, closer := getMrBee(t, "?cancellable=1")
+		be, closer := getMrBee(t, "?cancellable=1")
 		defer closer()
 
 		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Key:         "product_price_4711",
+			Key:         "product_price_4712",
 			Timeout:     time.Second,
 			MaxBodySize: 100,
 		})
@@ -247,7 +214,7 @@ func TestNewRedis(t *testing.T) {
 	})
 
 	t.Run("Key empty error", func(t *testing.T) {
-		_, be, closer := getMrBee(t)
+		be, closer := getMrBee(t)
 		defer closer()
 
 		hdr, content, err := be.DoRequest(&backend.ResourceArgs{})
@@ -257,7 +224,7 @@ func TestNewRedis(t *testing.T) {
 	})
 
 	t.Run("ExternalReq empty error", func(t *testing.T) {
-		_, be, closer := getMrBee(t)
+		be, closer := getMrBee(t)
 		defer closer()
 
 		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
@@ -269,7 +236,7 @@ func TestNewRedis(t *testing.T) {
 	})
 
 	t.Run("Timeout empty error", func(t *testing.T) {
-		_, be, closer := getMrBee(t)
+		be, closer := getMrBee(t)
 		defer closer()
 
 		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
@@ -282,7 +249,7 @@ func TestNewRedis(t *testing.T) {
 	})
 
 	t.Run("MaxBodySize empty error", func(t *testing.T) {
-		_, be, closer := getMrBee(t)
+		be, closer := getMrBee(t)
 		defer closer()
 
 		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
@@ -295,15 +262,36 @@ func TestNewRedis(t *testing.T) {
 		assert.Nil(t, content, "Content must be nil")
 	})
 
-	t.Run("Key Template", func(t *testing.T) {
-		mr, be, closer := getMrBee(t)
+	t.Run("Key Template (non-cancle)", func(t *testing.T) {
+		be, closer := getMrBee(t)
 		defer closer()
 
 		const key = `product_{{ .Req.Header.Get "X-Product-ID" }}`
-		const wantContent = `<b>Awesome large Gopher plush toy</b>`
-		if err := mr.Set("product_GopherPlushXXL", wantContent); err != nil {
-			t.Fatal(err)
-		}
+
+		tpl, err := template.New("key_tpl").Parse(key)
+		require.NoError(t, err)
+
+		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
+			ExternalReq: func() *http.Request {
+				req := httptest.NewRequest("GET", "/", nil)
+				req.Header.Set("X-Product-ID", "GopherPlushXXL")
+				return req
+			}(),
+			Key:         key,
+			KeyTemplate: tpl,
+			Timeout:     time.Second,
+			MaxBodySize: 100,
+		})
+		require.NoError(t, err, "%+v", err)
+		assert.Nil(t, hdr, "Header return must be nil")
+		assert.Exactly(t, wantContent, string(content), "Content not equal")
+	})
+
+	t.Run("Key Template (cancle)", func(t *testing.T) {
+		be, closer := getMrBee(t, "?cancellable=1")
+		defer closer()
+
+		const key = `product_{{ .Req.Header.Get "X-Product-ID" }}`
 
 		tpl, err := template.New("key_tpl").Parse(key)
 		require.NoError(t, err)
@@ -325,14 +313,14 @@ func TestNewRedis(t *testing.T) {
 	})
 }
 
-func TestRedisNewResourceHandler(t *testing.T) {
+func TestMemCacheNewResourceHandler(t *testing.T) {
 	t.Parallel()
 
 	t.Run("URL Error", func(t *testing.T) {
-		be, err := backend.NewResourceHandler(backend.NewConfigItem("redis//localhost"))
+		be, err := backend.NewResourceHandler(backend.NewConfigItem("memcache//localhost"))
 		assert.Nil(t, be)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), `Unknown scheme in URL: "redis//localhost". Does not contain ://`)
+		assert.Contains(t, err.Error(), `Unknown scheme in URL: "memcache//localhost". Does not contain ://`)
 	})
 	t.Run("Scheme Error", func(t *testing.T) {
 		be, err := backend.NewResourceHandler(backend.NewConfigItem("mysql://localhost"))
