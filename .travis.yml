@@ -16,6 +16,13 @@ matrix:
   #  - go: tip
   fast_finish: true
 
+before_install:
+  - if [ "$TRAVIS_OS_NAME" = osx ]; then brew update; fi
+  - if [ "$TRAVIS_OS_NAME" = osx ]; then brew install memcached; fi
+  - if [ "$TRAVIS_OS_NAME" = osx ]; then /usr/local/opt/memcached/bin/memcached -l 127.0.0.1:11211 -d; fi
+  - if [ "$TRAVIS_OS_NAME" = osx ]; then brew install redis; fi
+  - if [ "$TRAVIS_OS_NAME" = osx ]; then brew services start redis; fi
+
 install:
   - go get -tags esiall -t ./...
   - go get github.com/golang/lint/golint

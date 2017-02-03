@@ -53,7 +53,7 @@ func init() {
 
 	if isMemCacheRunning == 1 {
 		if _, err := exec.LookPath("memcached"); err != nil {
-			if err == exec.ErrNotFound {
+			if strings.Contains(err.Error(), exec.ErrNotFound.Error()) {
 				isMemCacheRunning = 0 // skip tests and benchmarks
 			} else {
 				panic(err)

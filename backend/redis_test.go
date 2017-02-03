@@ -53,7 +53,7 @@ func init() {
 
 	if isRedisRunning == 1 {
 		if _, err := exec.LookPath("redis-server"); err != nil {
-			if err == exec.ErrNotFound {
+			if strings.Contains(err.Error(), exec.ErrNotFound.Error()) {
 				isRedisRunning = 0 // skip tests and benchmarks
 			} else {
 				panic(err)
