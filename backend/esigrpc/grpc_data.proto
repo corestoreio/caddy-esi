@@ -1,0 +1,74 @@
+// Copyright 2016-2017, Cyrill @ Schumacher.fm and the CaddyESI Contributors
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "fm.schumacherfm.caddy.esi";
+option java_outer_classname = "CaddyESIProto";
+
+package esigrpc;
+
+// Interface exported by the server.
+service HeaderBodyService {
+    rpc GetHeaderBody (ResourceArg) returns (HeaderBody) {
+    }
+}
+
+message ResourceArg {
+    message ExternalReq {
+        string method = 1;
+        string url = 2;
+        string proto = 3;
+        int32 proto_major = 4;
+        int32 proto_minor = 5;
+        repeated MapValues header = 6;
+        int64 ContentLength = 7;
+        repeated string transfer_encoding = 8;
+        bool close = 9;
+        string host = 10;
+        repeated MapValues form = 11;
+        repeated MapValues post_form = 12;
+        string remote_addr = 13;
+        string request_uri = 14;
+    }
+
+    ExternalReq external_req = 1; // required
+    string url = 2;
+    int64 timeout = 3;
+    uint64 max_body_size = 34;
+    uint64 ttl = 5;
+    string key = 6; // required
+    string forward_headers = 7;
+    bool forward_headers_all = 8;
+    repeated string return_headers = 9;
+    bool return_headers_all = 10;
+}
+
+// HeaderBody a return value like in the backend package but here the three
+// return arguments are combined into one struct. If error is empty, then no
+// error has happend.
+message HeaderBody {
+    repeated MapValues header = 1;
+    bytes body = 2;
+    string error = 3;
+}
+
+// MapValues is equivalent to map[string][]string used in url.Values and
+// http.Header but for the sake of the protoc compiler we use here a slice which
+// is easier to handle than a new map type.
+message MapValues {
+    string key = 1;
+    string value = 2;
+}
