@@ -28,6 +28,7 @@ import (
 	"github.com/SchumacherFM/mailout/bufpool"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
+	loghttp "github.com/corestoreio/log/http"
 	"github.com/dustin/go-humanize"
 )
 
@@ -140,6 +141,42 @@ var DropHeadersReturn = map[string]bool{
 	"Upgrade":                   true,
 }
 
+// PrepareForm prepares (GET) form values in a balanced slice: i == key and i+1
+// == value. A key can occur multiple times. Errors parsing the form gets logged
+// on Info level.
+func (a *ResourceArgs) PrepareForm() []string {
+	if err := a.ExternalReq.ParseForm(); err != nil {
+		a.Log.Info("backend.ResourceArgs.PrepareForm.ExternalReq.ParseForm",
+			log.Err(err), loghttp.Request("request", a.ExternalReq), log.Marshal("resource_args", a))
+	}
+	ret := make([]string, 0, len(a.ExternalReq.Form))
+
+	for k, vals := range a.ExternalReq.Form {
+		for _, val := range vals {
+			ret = append(ret, k, val)
+		}
+	}
+	return ret
+}
+
+// PreparePostForm prepares (POST,PUT,PATCH) form values in a balanced slice: i
+// == key and i+1 == value. A key can occur multiple times. Errors parsing the
+// form gets logged on Info level.
+func (a *ResourceArgs) PreparePostForm() []string {
+	if err := a.ExternalReq.ParseForm(); err != nil {
+		a.Log.Info("backend.ResourceArgs.PreparePostForm.ExternalReq.ParseForm",
+			log.Err(err), loghttp.Request("request", a.ExternalReq), log.Marshal("resource_args", a))
+	}
+	ret := make([]string, 0, len(a.ExternalReq.PostForm))
+
+	for k, vals := range a.ExternalReq.PostForm {
+		for _, val := range vals {
+			ret = append(ret, k, val)
+		}
+	}
+	return ret
+}
+
 // PrepareForwardHeaders returns all headers which must get forwarded to the
 // backend resource. Returns a non-nil slice when no headers should be
 // forwarded. Slice is balanced: i == key and i+1 == value
@@ -230,7 +267,7 @@ func (a *ResourceArgs) TemplateToURL(te TemplateExecer) (string, error) {
 	return buf.String(), nil
 }
 
-// MarshalLog special crafted log format
+// MarshalLog special crafted log format, does not log the external request
 func (a *ResourceArgs) MarshalLog(kv log.KeyValuer) error {
 	kv.AddString("ra_url", a.URL)
 	kv.AddInt64("ra_timeout", a.Timeout.Nanoseconds())

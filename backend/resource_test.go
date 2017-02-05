@@ -20,6 +20,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"sort"
+	"strings"
 	"testing"
 	"text/template"
 	"time"
@@ -265,6 +266,138 @@ func TestResourceArgs_PrepareForwardHeaders(t *testing.T) {
 			rfa.PrepareForwardHeaders(),
 		)
 	})
+}
+
+func TestResourceArgs_PrepareForm_GET(t *testing.T) {
+
+	rfa := &backend.ResourceArgs{
+		URL:         "http://whatever.anydomain/page.html",
+		ExternalReq: getExternalReqWithExtendedHeaders(),
+		Timeout:     time.Second,
+		MaxBodySize: 15,
+	}
+
+	rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm/search?q=foo&q=bar&both=x&prio=1&orphan=nope&empty=not",
+		nil)
+	rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+
+	have := rfa.PrepareForm()
+	want := []string{"q", "foo", "q", "bar", "both", "x", "prio", "1", "orphan", "nope", "empty", "not"}
+
+	// because url.Values is a map we must sort it first before comparing it.
+	sort.Strings(have)
+	sort.Strings(want)
+	assert.Exactly(t, want, have)
+}
+
+func TestResourceArgs_PrepareForm_GET_POST(t *testing.T) {
+
+	rfa := &backend.ResourceArgs{
+		URL:         "http://whatever.anydomain/page.html",
+		ExternalReq: getExternalReqWithExtendedHeaders(),
+		Timeout:     time.Second,
+		MaxBodySize: 15,
+	}
+
+	rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm/search?q=foo&q=bar&both=x&prio=1&orphan=nope&empty=not",
+		strings.NewReader("z=post&both=y&prio=2&=nokey&orphan;empty=&"))
+	rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+
+	have := rfa.PrepareForm()
+	want := []string{"empty", "", "empty", "not", "z", "post", "both", "y", "both", "x", "prio", "2", "prio", "1", "", "nokey", "q", "foo", "q", "bar", "orphan", "", "orphan", "nope"}
+
+	// because url.Values is a map we must sort it first before comparing it.
+	sort.Strings(have)
+	sort.Strings(want)
+	assert.Exactly(t, want, have)
+}
+
+func TestResourceArgs_PrepareForm_POST(t *testing.T) {
+
+	rfa := &backend.ResourceArgs{
+		URL:         "http://whatever.anydomain/page.html",
+		ExternalReq: getExternalReqWithExtendedHeaders(),
+		Timeout:     time.Second,
+		MaxBodySize: 15,
+	}
+
+	rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm/search",
+		strings.NewReader("z=post&both=y&prio=2&=nokey&orphan;empty=&"))
+	rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+
+	have := rfa.PrepareForm()
+	want := []string{"prio", "2", "", "nokey", "orphan", "", "empty", "", "z", "post", "both", "y"}
+
+	// because url.Values is a map we must sort it first before comparing it.
+	sort.Strings(have)
+	sort.Strings(want)
+	assert.Exactly(t, want, have)
+}
+
+func TestResourceArgs_PreparePostForm_GET(t *testing.T) {
+
+	rfa := &backend.ResourceArgs{
+		URL:         "http://whatever.anydomain/page.html",
+		ExternalReq: getExternalReqWithExtendedHeaders(),
+		Timeout:     time.Second,
+		MaxBodySize: 15,
+	}
+
+	rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm/search?q=foo&q=bar&both=x&prio=1&orphan=nope&empty=not",
+		nil)
+	rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+
+	have := rfa.PreparePostForm()
+	want := []string{}
+
+	// because url.Values is a map we must sort it first before comparing it.
+	sort.Strings(have)
+	sort.Strings(want)
+	assert.Exactly(t, want, have)
+}
+
+func TestResourceArgs_PreparePostForm_GET_POST(t *testing.T) {
+
+	rfa := &backend.ResourceArgs{
+		URL:         "http://whatever.anydomain/page.html",
+		ExternalReq: getExternalReqWithExtendedHeaders(),
+		Timeout:     time.Second,
+		MaxBodySize: 15,
+	}
+
+	rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm/search?q=foo&q=bar&both=x&prio=1&orphan=nope&empty=not",
+		strings.NewReader("z=post&both=y&prio=2&=nokey&orphan;empty=&"))
+	rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+
+	have := rfa.PreparePostForm()
+	want := []string{"orphan", "", "empty", "", "z", "post", "both", "y", "prio", "2", "", "nokey"}
+
+	// because url.Values is a map we must sort it first before comparing it.
+	sort.Strings(have)
+	sort.Strings(want)
+	assert.Exactly(t, want, have)
+}
+
+func TestResourceArgs_PreparePostForm_POST(t *testing.T) {
+
+	rfa := &backend.ResourceArgs{
+		URL:         "http://whatever.anydomain/page.html",
+		ExternalReq: getExternalReqWithExtendedHeaders(),
+		Timeout:     time.Second,
+		MaxBodySize: 15,
+	}
+
+	rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm",
+		strings.NewReader("z=post&both=y&prio=2&=nokey&orphan;empty=&"))
+	rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+
+	have := rfa.PreparePostForm()
+	want := []string{"", "nokey", "orphan", "", "empty", "", "z", "post", "both", "y", "prio", "2"}
+
+	// because url.Values is a map we must sort it first before comparing it.
+	sort.Strings(have)
+	sort.Strings(want)
+	assert.Exactly(t, want, have)
 }
 
 func TestResourceArgs_PrepareReturnHeaders(t *testing.T) {
