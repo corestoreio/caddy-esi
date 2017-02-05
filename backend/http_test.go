@@ -148,9 +148,9 @@ func TestNewFetchHTTP_Serial(t *testing.T) {
 		//	RequestCache: make(map[*http.Request]struct{}),
 		//}).DoRequest(rfa2)
 		//
-		//assert.Nil(t, hdr, "Header")
-		//assert.Empty(t, string(content), "Content must be empty")
-		//assert.EqualError(t, errors.Cause(err), context.DeadlineExceeded.Error())
+		//assert.Nil(tb, hdr, "Header")
+		//assert.Empty(tb, string(content), "Content must be empty")
+		//assert.EqualError(tb, errors.Cause(err), context.DeadlineExceeded.Error())
 
 	})
 }

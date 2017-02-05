@@ -15,15 +15,16 @@
 package backend_test
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"text/template"
 	"time"
 
 	"github.com/SchumacherFM/caddyesi/backend"
-	"github.com/SchumacherFM/caddyesi/esitesting"
 )
 
 var benchmarkResourceArgs_PrepareForwardHeaders []string
@@ -152,44 +153,66 @@ func BenchmarkResourceArgs_MarshalEasyJSON(b *testing.B) {
 	}
 }
 
-// Full in memory bench test without touching the HDD
-// BenchmarkNewFetchHTTP_Parallel-4   	   50000	     29915 ns/op	   65713 B/op	      39 allocs/op
+// BenchmarkNewFetchHTTP_Parallel-4   	   			50000	     29915 ns/op	   65713 B/op	      39 allocs/op in memory
+// BenchmarkNewFetchHTTP_Parallel/Insecure-4        10000	    120814 ns/op	   68779 B/op	      78 allocs/op full network roundtrip
 func BenchmarkNewFetchHTTP_Parallel(b *testing.B) {
+	// This parent benchmark function runs only once as soon as there is another
+	// sub-benchmark.
 
-	// file size ~22KB
-	wantContent, err := ioutil.ReadFile("testdata/cart_example.html")
-	if err != nil {
-		b.Fatal(err)
-	}
+	// Full integration benchmark test which starts a HTTP file server and uses
+	// TCP to query it on the localhost.
+	const backendURL = "http://127.0.0.1:8283/cart_example.html"
+	const lenCartExampleHTML = 21601
 
-	fh := backend.NewFetchHTTP(esitesting.NewHTTPTripBytes(200, wantContent, nil))
+	// grpc_server_main also reads the file from the disk so stay conistent when
+	// running benchmarks.
+	cmd := backend.StartProcess("go", "run", "http_server_main.go")
+	go cmd.Wait()            // waits forever until killed
+	defer cmd.Process.Kill() // kills the go process but not the main startet server
+	defer backend.KillZombieProcess("http_server_main")
 
-	rfa := &backend.ResourceArgs{
-		ExternalReq: getExternalReqWithExtendedHeaders(),
-		URL:         "http://totally-uninteresting.what",
-		Timeout:     time.Second,
-		MaxBodySize: 22001,
-	}
-
-	b.ResetTimer()
-	b.ReportAllocs()
-	b.RunParallel(func(pb *testing.PB) {
-		var content []byte
-		var hdr http.Header
-		var err error
-
-		for pb.Next() {
-			hdr, content, err = fh.DoRequest(rfa)
-			if err != nil {
-				b.Fatalf("%+v", err)
-			}
-			if hdr != nil {
-				b.Fatal("Header should be nil")
-			}
-			if len(content) != len(wantContent) {
-				b.Fatalf("Want %q\nHave %q", wantContent, content)
-			}
+	// Wait until http server has been started
+	for i := 300; ; i = i + 100 {
+		d := time.Duration(i) * time.Millisecond
+		time.Sleep(d)
+		_, err := http.Get(backendURL)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "BenchmarkNewFetchHTTP_Parallel: %s => Sleept %s\n", err, d)
+			continue
 		}
+		break
+	}
+
+	b.Run("Insecure", func(b *testing.B) {
+
+		fh := backend.NewFetchHTTP(backend.DefaultHTTPTransport)
+		rfa := &backend.ResourceArgs{
+			ExternalReq: getExternalReqWithExtendedHeaders(),
+			URL:         backendURL,
+			Timeout:     time.Second,
+			MaxBodySize: 22001,
+		}
+
+		b.ResetTimer()
+		b.ReportAllocs()
+		b.RunParallel(func(pb *testing.PB) {
+			var content []byte
+			var hdr http.Header
+			var err error
+
+			for pb.Next() {
+				hdr, content, err = fh.DoRequest(rfa)
+				if err != nil {
+					b.Fatalf("%+v", err)
+				}
+				if hdr != nil {
+					b.Fatal("Header should be nil")
+				}
+				if len(content) != lenCartExampleHTML {
+					b.Fatalf("Want %d\nHave %d", lenCartExampleHTML, len(content))
+				}
+			}
+		})
 	})
 }
 

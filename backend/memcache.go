@@ -39,7 +39,7 @@ type esiMemCache struct {
 func NewMemCache(cfg *ConfigItem) (ResourceHandler, error) {
 	addr, _, params, err := ParseNoSQLURL(cfg.URL)
 	if err != nil {
-		return nil, errors.Errorf("[backend] NewMemCache error parsing URL %q => %s", cfg.URL, err)
+		return nil, errors.NewNotValidf("[backend] NewMemCache error parsing URL %q => %s", cfg.URL, err)
 	}
 
 	idleTimeout, err := time.ParseDuration(params.Get("idle_timeout"))

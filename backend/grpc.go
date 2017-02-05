@@ -20,42 +20,140 @@ package backend
 
 import (
 	"net/http"
+	"time"
 
+	"github.com/SchumacherFM/caddyesi/backend/esigrpc"
 	"github.com/corestoreio/errors"
+	"github.com/corestoreio/log"
+	"github.com/gavv/monotime"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 func init() {
-	RegisterResourceHandlerFactory("grpc", NewGRPC)
+	RegisterResourceHandlerFactory("grpc", NewGRPCClient)
 }
 
-type esiGRPC struct {
-	isCancellable bool
-	url           string
+type grpcClient struct {
+	url    string
+	con    *grpc.ClientConn
+	client esigrpc.HeaderBodyServiceClient
 }
 
-// NewGRPC creates a new memcache resource handler supporting n-memcache server.
-func NewGRPC(cfg *ConfigItem) (ResourceHandler, error) {
+// NewGRPCClient creates a new gRPC client resource handler supporting one remote
+// server. The following URL parameters are supported: timeout (duration), tls
+// (1 for enabled, then the next parameters must be provided), ca_file (file
+// containing the CA root cert file), server_host_override (server name used to
+// verify the hostname returned by TLS handshake)
+// Examples for cfg.URL:
+//		grpc://micro.service.tld:9876
+//		grpc://micro.service.tld:34567?timeout=20s&tls=1&ca_file=path/to/ca.pem
+func NewGRPCClient(cfg *ConfigItem) (ResourceHandler, error) {
+	addr, _, params, err := ParseNoSQLURL(cfg.URL)
+	if err != nil {
+		return nil, errors.NewNotValidf("[esibackend_grpc] Error parsing URL %q => %s", cfg.URL, err)
+	}
 
-	// TODO init grpc client
+	opts := make([]grpc.DialOption, 0, 4)
 
-	return nil, nil
+	if to := params.Get("timeout"); to != "" {
+		d, err := time.ParseDuration(to)
+		if err != nil {
+			return nil, errors.NewNotValidf("[esibackend_grpc] Cannot parse timeout %q with error %v", to, err)
+		}
+		opts = append(opts, grpc.WithTimeout(d), grpc.WithBlock())
+	}
+	if params.Get("tls") == "1" {
+		var sn string
+		if sho := params.Get("server_host_override"); sho != "" {
+			sn = sho
+		}
+		var creds credentials.TransportCredentials
+		if caFile := params.Get("ca_file"); caFile != "" {
+			var err error
+			creds, err = credentials.NewClientTLSFromFile(caFile, sn)
+			if err != nil {
+				return nil, errors.NewFatalf("[esibackend_grpc] Failed to create TLS credentials %v from file %q", err, caFile)
+			}
+		} else {
+			creds = credentials.NewClientTLSFromCert(nil, sn)
+		}
+		opts = append(opts, grpc.WithTransportCredentials(creds))
+	} else {
+		opts = append(opts, grpc.WithInsecure())
+	}
+
+	conn, err := grpc.Dial(addr, opts...)
+	if err != nil {
+		return nil, errors.NewFatalf("[esibackend_grpc] Failed to dial: %v", err)
+	}
+
+	return &grpcClient{
+		url:    cfg.URL,
+		con:    conn,
+		client: esigrpc.NewHeaderBodyServiceClient(conn),
+	}, nil
 }
 
-// Closes closes the resource when Caddy restarts or reloads. If supported
-// by the resource.
-func (mc *esiGRPC) Close() error {
-	return nil
+// Closes closes the resource when Caddy restarts or reloads.
+func (mc *grpcClient) Close() error {
+	return errors.Wrapf(mc.con.Close(), "[esibackend] GRPC connection close error for URL %q", mc.url)
 }
 
 // DoRequest returns a value from the field Key in the args argument. Header is
 // not supported. Request cancellation through a timeout (when the client
 // request gets cancelled) is supported.
-func (mc *esiGRPC) DoRequest(args *ResourceArgs) (_ http.Header, _ []byte, err error) {
+func (mc *grpcClient) DoRequest(args *ResourceArgs) (http.Header, []byte, error) {
+	timeStart := monotime.Now()
 
-	return nil, nil, nil
+	if err := args.Validate(); err != nil {
+		return nil, nil, errors.Wrap(err, "[esibackend] FetchHTTP.args.Validate")
+	}
+
+	in := &esigrpc.ResourceArg{
+		ExternalReq: &esigrpc.ResourceArg_ExternalReq{
+			Method:           args.ExternalReq.Method,
+			Url:              args.ExternalReq.URL.String(), // needed? maybe remove
+			Proto:            args.ExternalReq.Proto,
+			ProtoMajor:       int32(args.ExternalReq.ProtoMajor),
+			ProtoMinor:       int32(args.ExternalReq.ProtoMinor),
+			Header:           args.PrepareForwardHeaders(),
+			ContentLength:    args.ExternalReq.ContentLength,
+			TransferEncoding: args.ExternalReq.TransferEncoding,
+			Close:            args.ExternalReq.Close,
+			Host:             args.ExternalReq.Host,
+			Form:             args.PrepareForm(),
+			PostForm:         args.PreparePostForm(),
+			RemoteAddr:       args.ExternalReq.RemoteAddr,
+			RequestUri:       args.ExternalReq.RequestURI,
+		},
+		Url:               args.URL,
+		Timeout:           args.Timeout.Nanoseconds(),
+		MaxBodySize:       args.MaxBodySize,
+		Ttl:               args.TTL.Nanoseconds(),
+		Key:               args.Key,
+		ForwardHeaders:    args.ForwardHeaders,
+		ForwardHeadersAll: args.ForwardHeadersAll,
+		ReturnHeaders:     args.ReturnHeaders,
+		ReturnHeadersAll:  args.ReturnHeadersAll,
+	}
+
+	r, err := mc.client.GetHeaderBody(args.ExternalReq.Context(), in)
+	if args.Log.IsDebug() {
+		args.Log.Debug("backend.grpcClient.DoRequest.ResourceArg",
+			log.Err(err), log.Duration(log.KeyNameDuration, monotime.Since(timeStart)),
+			log.Marshal("resource_args", args), log.Object("grpc_resource_args", in),
+			log.String("grpc_return_body", string(r.GetBody())),
+		)
+	}
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "[esibackend] GetHeaderBody")
+	}
+
+	return nil, r.GetBody(), nil
 }
 
-func (mc *esiGRPC) validateArgs(args *ResourceArgs) (err error) {
+func (mc *grpcClient) validateArgs(args *ResourceArgs) (err error) {
 	switch {
 	case args.Key == "":
 		err = errors.NewEmptyf("[esibackend] For ResourceArgs %#v the URL value is empty", args)

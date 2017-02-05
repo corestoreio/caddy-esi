@@ -17,8 +17,12 @@ package backend
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/corestoreio/errors"
+	ps "github.com/mitchellh/go-ps"
 )
 
 func init() {
@@ -93,5 +97,36 @@ func MockRequestPanic(msg interface{}) ResourceHandler {
 		DoRequestFn: func(_ *ResourceArgs) (http.Header, []byte, error) {
 			panic(msg)
 		},
+	}
+}
+
+// StartProcess starts a process and returns a cleanup function which kills the
+// process. Panics on error.
+func StartProcess(name string, arg ...string) *exec.Cmd {
+	cmd := exec.Command(name, arg...)
+	if err := cmd.Start(); err != nil {
+		panic(fmt.Sprintf("skipping test; couldn't find go binary: %v", err))
+	}
+	return cmd
+}
+
+// KillZombieProcess searches a running process by its name and kills it. Writes
+// the success to Stderr. Panics on errors.
+func KillZombieProcess(processName16 string) {
+	pses, err := ps.Processes()
+	if err != nil {
+		panic(err)
+	}
+	for _, p := range pses {
+		if strings.Contains(p.Executable(), processName16) { // max length 16
+			proc, err := os.FindProcess(p.Pid())
+			if err != nil {
+				panic(err)
+			}
+			if err := proc.Kill(); err != nil {
+				panic(err)
+			}
+			fmt.Fprintf(os.Stderr, "Killed previous running process %s with pid %d\n", p.Executable(), p.Pid())
+		}
 	}
 }

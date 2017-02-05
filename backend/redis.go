@@ -42,7 +42,7 @@ type esiRedis struct {
 func NewRedis(cfg *ConfigItem) (ResourceHandler, error) {
 	addr, pw, params, err := ParseNoSQLURL(cfg.URL)
 	if err != nil {
-		return nil, errors.Errorf("[backend] Redis error parsing URL %q => %s", cfg.URL, err)
+		return nil, errors.NewNotValidf("[backend] Redis error parsing URL %q => %s", cfg.URL, err)
 	}
 
 	maxActive, err := strconv.Atoi(params.Get("max_active"))

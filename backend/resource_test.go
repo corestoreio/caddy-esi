@@ -427,7 +427,7 @@ func TestResourceArgs_PrepareReturnHeaders(t *testing.T) {
 		}
 
 		have := rfa.PrepareReturnHeaders(resourceRespWithExtendedHeaders)
-		//t.Logf("%#v", have)
+		//tb.Logf("%#v", have)
 		assert.Exactly(t, want, have)
 	})
 
