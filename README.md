@@ -53,12 +53,10 @@ https://cyrillschumacher.local:2718 {
 }
 ```
 
-Most of the **global optional configuration values** can be overwritten with a different value in a single ESI tag.
+Most of the **global optional configuration values** can be overwritten with a
+different value in a single ESI tag.
 
-`esi` defines the namespace in the Caddy configuration file. All keys in the
-`esi` namespace which are not reserved key words will be treated as a `src` aka.
-resource to load data from. The value of the not reserved keywords must be a
-valid URI. Reserved keys are:
+`esi` defines the namespace in the Caddy configuration file. Reserved keys are:
 
 | Config Name |  Default | Support in ESI tag | Description |
 | ----------- |  ------- | ----------- |  ----------- |
@@ -68,7 +66,7 @@ valid URI. Reserved keys are:
 | `cache` | disabled | No | Defines a cache service which stores the retrieved data from a backend resource but only when the ttl (within an ESI tag) has been set. Can only occur multiple times! |
 | `page_id_source` | `host`, `path` | No | Special directive on how to identify a request to the same page. The following settings can be used to calculate the hash value. Available settings: `remoteaddr`, `realip`, `scheme`, `host`, `path`, `rawpath`, `rawquery` and `url`. Special feature to access cookies and headers: Prefix with `cookie-` or `header-` to access the appropriate value. Attention: The more granular you define the higher possibility occurs that your RAM will be filled up (will be fixed ...). |
 | `allowed_methods` | `GET` | No | Any method listed here triggers the ESI middleware |
-| `cmd_header_name` | Disabled | No | Specify here a header name to enable certain commands for e.g. purging the internal ESI tag cache |
+| `cmd_header_name` | Disabled | No | Specify here a header name to enable certain commands for e.g. purging the internal ESI tag cache, setting log-level |
 | `log_file` | disabled | No | Put in here either a file name or the wordings `stderr` or `stdout` to write to those file descriptors. |
 | `log_level` | disabled | No | Available key words `debug` the most verbose and `info`, less verbose. |
 | `log_format` | n/a | No | Not yet supported. Ideas? |
@@ -78,7 +76,9 @@ valid URI. Reserved keys are:
 
 - `purge` use the value `purge` with your defined `cmd_header_name` to purge the
 ESI tag cache. `X-Esi-Cmd: purge`
-- tbd
+- `log-debug` enables debug logging. Costs heavily performance.
+- `log-info` enables info logging. Logs some errors and other note worthy informations.
+- `log-none` disables logging.
 
 `resources` defines the path to a configuration file for more backend resource
 services. An example on how the XML or JSON must be coded:
@@ -93,7 +93,7 @@ services. An example on how the XML or JSON must be coded:
     </item>
     <item>
         <alias>grpc01</alias>
-        <url><![CDATA[grpc://127.0.0.1:53044/?pem=../path/to/root.pem]]></url>
+        <url><![CDATA[grpc://127.0.0.1:53044/?timeout=60s&tls=1&ca_file=../path/to/root.pem&server_host_override=my.domain.kom]]></url>
         <!--<query>Unused and hence optional</query>-->
     </item>
     <item>
@@ -117,7 +117,7 @@ services. An example on how the XML or JSON must be coded:
   },
   {
     "alias": "grpc01",
-    "url": "grpc://127.0.0.1:53044/?pem=../path/to/root.pem"
+    "url": "grpc://127.0.0.1:53044/?timeout=60s&tls=1&ca_file=../path/to/root.pem&server_host_override=my.domain.kom"
   },
   {
     "alias": "mysql01",
@@ -154,21 +154,23 @@ Implemented:
 - [x] Forward some headers
 - [ ] Return all headers
 - [ ] Return some headers
+- [ ] Forward QUERY STRING and/or POST form data
 - [x] Multiple sources
 - [ ] Multiple sources with `race="true"`
 - [x] Dynamic sources
 - [ ] Conditional tag loading
 - [x] Redis access
-- [ ] Memcache access
+- [x] Memcache access
 - [ ] MySQL access
 - [ ] PGSQL access
-- [ ] GRPC access
+- [x] gRPC access
 - [x] Shell scripts/programs access (stderr|out|in) communication
 - [x] Handle compressed content from backends (Go http.Client)
 - [x] Query HTTP/S backend servers
 - [ ] Coalesce multiple requests into one backend request
 
-TODO: Database or GRPC access in package `esikv` must be enabled via Go build tag.
+Databases, NoSQL or gRPC access in package `backend` must be enabled via Go
+build tags. Please see the source files for the correct build tag.
 
 ### TL;DR ESI tag options
 
@@ -186,7 +188,7 @@ Quick overview which options are available for two different kinds of ESI tags.
 />
 ```
 
-2. Querying a NOSQL database or service
+2. Querying a NOSQL database or gRPC service
 
 ```
 <esi:include src="alias_name1" src="alias_nameN" key="key name" 
@@ -397,7 +399,7 @@ backend:
 - sh://
 - Name of the aliases as defined in the Caddyfile
 - sql:// a SQL query (TODO)
-- grpc:// a remote procedure call with GRPC (TODO)
+- grpc:// a remote procedure call with gRPC
 
 #### http
 
@@ -421,9 +423,9 @@ to stdout. The src attribute must look like:
 ```
 
 *ProTip:* Provide always the full path to the binary or script because the
-*lookup time in the operation systems environment PATH variable will take long.
-*In general shell execution is pretty slow no matter which kind of
-*program/script you call.
+lookup time in the operation systems environment PATH variable will take long.
+In general shell execution is pretty slow no matter which kind of
+program/script you call.
 
 #### sql queries TODO
 
@@ -433,14 +435,19 @@ to stdout. The src attribute must look like:
 <esi:include src="alias_name; r.Header.Get " />
 ```
 
-#### grpc Remote Procedure Calls TODO
+#### grpc Remote Procedure Calls
 
-`grpc` queries another GRPC endpoint. A struct of arguments gets encoded and
+`grpc` queries another gRPC endpoint. A struct of arguments gets encoded and
 passed over the wire.
 
 ```html
 <esi:include src="alias_name" key="cart1" />
 ```
+
+You are responsible for building the gRPC server. The `.proto` file and the
+corresponding Go file have been placed in package `backend/esigrpc`. Your gRPC
+server can run in any programming language you like and is supported by gRPC.
+[https://www.grpc.io](https://www.grpc.io)
 
 ## Unsupported ESI Tags
 
@@ -528,17 +535,66 @@ THE SOFTWARE.
 ```text
 Copyright 2011 Google Inc.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
 
      http://www.apache.org/licenses/LICENSE-2.0
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+```
+
+### github.com/garyburd/redigo
+
+```text
+Copyright 2012 Gary Burd
+
+Licensed under the Apache License, Version 2.0 (the "License"): you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+```
+
+### google.golang.org/grpc
+
+```text
+Copyright 2016, Google Inc.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+    * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+    * Neither the name of Google Inc. nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
 # License
