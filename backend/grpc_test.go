@@ -35,15 +35,24 @@ const (
 )
 
 type grpcLogTestWrap struct {
-	tb testing.TB
+	sync.Mutex // because runs in parallel in a goroutine, otherwise it would be racy.
+	tb         testing.TB
 }
 
-func (lw grpcLogTestWrap) Fatal(args ...interface{})                 { lw.tb.Fatal(args...) }
-func (lw grpcLogTestWrap) Fatalf(format string, args ...interface{}) { lw.tb.Fatalf(format, args...) }
-func (lw grpcLogTestWrap) Fatalln(args ...interface{})               { lw.tb.Fatal(args...) }
-func (lw grpcLogTestWrap) Print(args ...interface{})                 { lw.tb.Log(args...) }
-func (lw grpcLogTestWrap) Printf(format string, args ...interface{}) { lw.tb.Logf(format, args...) }
-func (lw grpcLogTestWrap) Println(args ...interface{})               { lw.tb.Log(args...) }
+func (lw *grpcLogTestWrap) Fatal(args ...interface{}) { lw.Lock(); lw.tb.Fatal(args...); lw.Unlock() }
+func (lw *grpcLogTestWrap) Fatalf(format string, args ...interface{}) {
+	lw.Lock()
+	lw.tb.Fatalf(format, args...)
+	lw.Unlock()
+}
+func (lw *grpcLogTestWrap) Fatalln(args ...interface{}) { lw.Lock(); lw.tb.Fatal(args...); lw.Unlock() }
+func (lw *grpcLogTestWrap) Print(args ...interface{})   { lw.Lock(); lw.tb.Log(args...); lw.Unlock() }
+func (lw *grpcLogTestWrap) Printf(format string, args ...interface{}) {
+	lw.Lock()
+	lw.tb.Logf(format, args...)
+	lw.Unlock()
+}
+func (lw *grpcLogTestWrap) Println(args ...interface{}) { lw.Lock(); lw.tb.Log(args...); lw.Unlock() }
 
 func TestNewGRPCClient(t *testing.T) {
 	t.Parallel()
@@ -56,7 +65,7 @@ func TestNewGRPCClient(t *testing.T) {
 	// and the GRPC server gets killed before the tests finishes.
 	defer backend.KillZombieProcess("grpc_server_main")
 
-	grpclog.SetLogger(grpcLogTestWrap{tb: t})
+	grpclog.SetLogger(&grpcLogTestWrap{tb: t})
 
 	t.Run("Error in ParseNoSQLURL", func(t *testing.T) {
 		t.Parallel()
