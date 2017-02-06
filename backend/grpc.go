@@ -109,7 +109,8 @@ func (mc *grpcClient) DoRequest(args *ResourceArgs) (http.Header, []byte, error)
 	if err := args.Validate(); err != nil {
 		return nil, nil, errors.Wrap(err, "[esibackend] FetchHTTP.args.Validate")
 	}
-
+	// TODO(CyS) Distinguish between GET and POST like requests to reduce argument
+	// building times and allocs.
 	in := &esigrpc.ResourceArg{
 		ExternalReq: &esigrpc.ResourceArg_ExternalReq{
 			Method:           args.ExternalReq.Method,

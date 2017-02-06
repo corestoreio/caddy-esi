@@ -79,6 +79,10 @@ func (fh *fetchHTTP) DoRequest(args *ResourceArgs) (http.Header, []byte, error) 
 		return nil, nil, errors.Wrap(err, "[esibackend] FetchHTTP.args.Validate")
 	}
 
+	// TODO(CyS) external POST requests or GET with query string should forward
+	// this data. So the http.NewRequest should then change to POST if the
+	// configuration for this specific ESI tag allows it.
+
 	req, err := http.NewRequest("GET", args.URL, nil)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "[esibackend] Failed NewRequest for %q", args.URL)
