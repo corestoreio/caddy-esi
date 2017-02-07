@@ -38,7 +38,7 @@ const (
 
 type server struct{}
 
-func (s server) GetHeaderBody(_ context.Context, arg *esigrpc.ResourceArg) (*esigrpc.HeaderBody, error) {
+func (s server) GetHeaderBody(_ context.Context, arg *esigrpc.ResourceArgs) (*esigrpc.HeaderBody, error) {
 
 	if arg.GetExternalReq() == nil {
 		return nil, errors.NewEmptyf("[grpc_server] GetExternalReq cannot be empty")

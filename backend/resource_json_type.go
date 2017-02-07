@@ -21,14 +21,12 @@ package backend
 // uncomment here, generate and then edit the easyjson file and adjust the types
 
 import (
-	"log"
-	"mime/multipart"
 	"net/http"
 	"net/url"
-	"time"
 )
 
-// Request used to hack easyjson generation. Type has removed interfaces and functions.
+// Request used to hack easyjson generation. Type has removed interfaces and
+// functions.
 type Request struct {
 	Method           string
 	URL              *url.URL
@@ -42,25 +40,20 @@ type Request struct {
 	Host             string
 	Form             url.Values
 	PostForm         url.Values
-	MultipartForm    *multipart.Form
-	Trailer          http.Header
-	RemoteAddr       string
-	RequestURI       string
+	// MultipartForm    *multipart.Form
+	Trailer    http.Header
+	RemoteAddr string
+	RequestURI string
 }
 
-// ResourceArgs2 only for easyjson
+// ResourceArgs only for easyjson. Same as backend.ResourceArgs but stripped of
+// some fields for security reasons.
 //easyjson:json
-type ResourceArgs2 struct {
-	ExternalReq       *Request
-	URL               string
-	Timeout           time.Duration
-	MaxBodySize       uint64
-	Log               log.Logger `json:"-"`
-	Key               string
-	KeyTemplate       TemplateExecer `json:"-"`
-	TTL               time.Duration
-	ForwardHeaders    []string
-	ForwardHeadersAll bool
-	ReturnHeaders     []string
-	ReturnHeadersAll  bool
+type ResourceArgs struct {
+	ExternalReq      *Request
+	URL              string
+	MaxBodySize      uint64
+	Key              string
+	ReturnHeaders    []string
+	ReturnHeadersAll bool
 }

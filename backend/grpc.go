@@ -111,8 +111,8 @@ func (mc *grpcClient) DoRequest(args *ResourceArgs) (http.Header, []byte, error)
 	}
 	// TODO(CyS) Distinguish between GET and POST like requests to reduce argument
 	// building times and allocs.
-	in := &esigrpc.ResourceArg{
-		ExternalReq: &esigrpc.ResourceArg_ExternalReq{
+	in := &esigrpc.ResourceArgs{
+		ExternalReq: &esigrpc.ResourceArgs_ExternalReq{
 			Method:           args.ExternalReq.Method,
 			Url:              args.ExternalReq.URL.String(), // needed? maybe remove
 			Proto:            args.ExternalReq.Proto,
@@ -128,15 +128,11 @@ func (mc *grpcClient) DoRequest(args *ResourceArgs) (http.Header, []byte, error)
 			RemoteAddr:       args.ExternalReq.RemoteAddr,
 			RequestUri:       args.ExternalReq.RequestURI,
 		},
-		Url:               args.URL,
-		Timeout:           args.Timeout.Nanoseconds(),
-		MaxBodySize:       args.MaxBodySize,
-		Ttl:               args.TTL.Nanoseconds(),
-		Key:               args.Key,
-		ForwardHeaders:    args.ForwardHeaders,
-		ForwardHeadersAll: args.ForwardHeadersAll,
-		ReturnHeaders:     args.ReturnHeaders,
-		ReturnHeadersAll:  args.ReturnHeadersAll,
+		Url:              args.URL,
+		MaxBodySize:      args.MaxBodySize,
+		Key:              args.Key,
+		ReturnHeaders:    args.ReturnHeaders,
+		ReturnHeadersAll: args.ReturnHeadersAll,
 	}
 
 	r, err := mc.client.GetHeaderBody(args.ExternalReq.Context(), in)

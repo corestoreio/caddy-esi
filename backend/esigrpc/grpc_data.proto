@@ -22,11 +22,13 @@ package esigrpc;
 
 // Interface exported by the server.
 service HeaderBodyService {
-    rpc GetHeaderBody (ResourceArg) returns (HeaderBody) {
+    rpc GetHeaderBody (ResourceArgs) returns (HeaderBody) {
     }
 }
 
-message ResourceArg {
+// ResourceArg same as backend.ResourceArgs but stripped of some fields for
+// security reasons.
+message ResourceArgs {
     message ExternalReq {
         string method = 1;
         string url = 2;
@@ -45,15 +47,11 @@ message ResourceArg {
     }
 
     ExternalReq external_req = 1; // required
-    string url = 2;
-    int64 timeout = 3;
-    uint64 max_body_size = 34;
-    int64 ttl = 5;
-    string key = 6; // required
-    repeated string forward_headers = 7;
-    bool forward_headers_all = 8;
-    repeated string return_headers = 9;
-    bool return_headers_all = 10;
+    string url = 2; // address or alias of the microservice
+    uint64 max_body_size = 3;
+    string key = 4; // required
+    repeated string return_headers = 5;
+    bool return_headers_all = 6;
 }
 
 // HeaderBody a return value like in the backend package but here the three

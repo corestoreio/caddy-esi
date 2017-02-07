@@ -212,7 +212,7 @@ func BenchmarkNewGRPCClient_Parallel(b *testing.B) {
 	defer cmd.Process.Kill() // kills the go process but not the main started server
 	defer backend.KillZombieProcess("grpc_server_main")
 
-	grpclog.SetLogger(grpcLogTestWrap{tb: b})
+	grpclog.SetLogger(&grpcLogTestWrap{tb: b})
 
 	// Full integration benchmark test which starts a GRPC server and uses TCP
 	// to query it on the localhost.
