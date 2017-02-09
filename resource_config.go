@@ -12,7 +12,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-package backend
+package caddyesi
 
 import (
 	"bytes"
@@ -26,8 +26,8 @@ import (
 	"github.com/corestoreio/errors"
 )
 
-// ConfigItem defines a single configuration item.
-type ConfigItem struct {
+// ResourceItem defines a single configuration item.
+type ResourceItem struct {
 	// Alias can have any name which gets used in an ESI tag and refers to the
 	// connection to a resource.
 	Alias string `xml:"alias" json:"alias"`
@@ -40,9 +40,9 @@ type ConfigItem struct {
 	Query string `xml:"query,omitempty" json:"query"`
 }
 
-// NewConfigItem creates a new configuration
-func NewConfigItem(url string, aliasQuery ...string) *ConfigItem {
-	ci := &ConfigItem{
+// NewResourceItem creates a new resource item. Supports up to 3 arguments.
+func NewResourceItem(url string, aliasQuery ...string) *ResourceItem {
+	ci := &ResourceItem{
 		URL: url,
 	}
 	switch len(aliasQuery) {
@@ -55,17 +55,17 @@ func NewConfigItem(url string, aliasQuery ...string) *ConfigItem {
 	return ci
 }
 
-// ConfigItems as list of multiple configuration items. This type has internal
+// ResourceItems as list of multiple configuration items. This type has internal
 // helper functions.
-type ConfigItems []*ConfigItem
+type ResourceItems []*ResourceItem
 
 // WriteTo writes the XML into w and may return an error. It returns always zero
 // bytes written :-(.
-func (ci ConfigItems) WriteTo(w io.Writer) (n int64, err error) {
-	return 0, errors.Wrap(ci.toXML(w), "[backend] ConfigItems.WriteTo failed")
+func (ci ResourceItems) WriteTo(w io.Writer) (n int64, err error) {
+	return 0, errors.Wrap(ci.toXML(w), "[backend] ResourceItems.WriteTo failed")
 }
 
-func (ci ConfigItems) urlByAlias(alias string) string {
+func (ci ResourceItems) urlByAlias(alias string) string {
 	for _, i := range ci {
 		if i.Alias == alias && alias != "" {
 			return i.URL
@@ -76,21 +76,21 @@ func (ci ConfigItems) urlByAlias(alias string) string {
 
 // MustToXML transforms the object into a strings and panics on error. Only used
 // in testing.
-func (ci ConfigItems) toXML(w io.Writer) error {
+func (ci ResourceItems) toXML(w io.Writer) error {
 	var xi = &struct {
-		XMLName xml.Name      `xml:"items"`
-		Items   []*ConfigItem `xml:"item" json:"items"`
+		XMLName xml.Name        `xml:"items"`
+		Items   []*ResourceItem `xml:"item" json:"items"`
 	}{
 		Items: ci,
 	}
 
 	_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`))
-	return errors.Wrap(xml.NewEncoder(w).Encode(xi), "[backend] ConfigItems.toXML failed")
+	return errors.Wrap(xml.NewEncoder(w).Encode(xi), "[backend] ResourceItems.toXML failed")
 }
 
 // MustToXML transforms the object into a strings and panics on error. Only used
 // in testing.
-func (ci ConfigItems) MustToXML() string {
+func (ci ResourceItems) MustToXML() string {
 	var b bytes.Buffer
 	if err := ci.toXML(&b); err != nil {
 		panic(err)
@@ -98,14 +98,14 @@ func (ci ConfigItems) MustToXML() string {
 	return b.String()
 }
 
-// ConfigUnmarshal runs during Caddy setup and reads the extended resource
+// UnmarshalResourceItems runs during Caddy setup and reads the extended resource
 // configuration file. This file contains the alias name, the URL where the
 // resource can be accessed and how and also in case of databases the query.
 // Supported formats are for now XML and JSON. XML has the advantage of using
 // CDATA and comments where in JSON you need to encode the strings properly. For
 // security reasons you must store this fileName in a non-webserver accessible
 // directory.
-func ConfigUnmarshal(fileName string) (itms ConfigItems, err error) {
+func UnmarshalResourceItems(fileName string) (itms ResourceItems, err error) {
 	// for test purposes the fileName can also contain the real content.
 
 	// TODO: as passwords gets stored in plain text in the JSON or XML file we
@@ -156,13 +156,13 @@ func ConfigUnmarshal(fileName string) (itms ConfigItems, err error) {
 		}
 	case hasBit(extType, typeXML):
 		var xi = &struct {
-			XMLName xml.Name      `xml:"items"`
-			Items   []*ConfigItem `xml:"item" json:"items"`
+			XMLName xml.Name        `xml:"items"`
+			Items   []*ResourceItem `xml:"item" json:"items"`
 		}{}
 		if err := xml.Unmarshal(data, xi); err != nil {
 			return nil, errors.NewFatalf("[backend] Failed to parse XML: %s\n%s", err, string(data))
 		}
-		itms = ConfigItems(xi.Items)
+		itms = ResourceItems(xi.Items)
 	default:
 		return nil, errors.NewNotSupportedf("[kvconfig] Content-Type %q not supported", fileName)
 	}

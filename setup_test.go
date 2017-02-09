@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esicache"
+	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/SchumacherFM/caddyesi/esitesting"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
@@ -73,7 +73,7 @@ func testPluginSetup(config string, wantPC PathConfigs, cacheCount int, requestF
 		}
 
 		for _, kvName := range requestFuncs {
-			rf, ok := backend.LookupResourceHandler(kvName)
+			rf, ok := esitag.LookupResourceHandler(kvName)
 			assert.True(t, ok, "Should have been registered %q", kvName)
 			assert.NotNil(t, rf, "Should have a non-nil func %q", kvName)
 		}

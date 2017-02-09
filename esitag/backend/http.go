@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	loghttp "github.com/corestoreio/log/http"
@@ -29,8 +30,8 @@ import (
 
 func init() {
 	f := NewFetchHTTP(DefaultHTTPTransport)
-	RegisterResourceHandler("http", f)
-	RegisterResourceHandler("https", f)
+	esitag.RegisterResourceHandler("http", f)
+	esitag.RegisterResourceHandler("https", f)
 }
 
 // DefaultHTTPTransport our own transport for all ESI tag resources instead of
@@ -39,7 +40,7 @@ func init() {
 var DefaultHTTPTransport = &http.Transport{
 	Proxy: http.ProxyFromEnvironment,
 	DialContext: (&net.Dialer{
-		Timeout:   DefaultTimeOut,
+		Timeout:   esitag.DefaultTimeOut,
 		KeepAlive: 30 * time.Second,
 		DualStack: true,
 	}).DialContext,
@@ -51,11 +52,11 @@ var DefaultHTTPTransport = &http.Transport{
 
 // NewFetchHTTP creates a new HTTP/S backend fetcher which lives the whole
 // application running time. Thread safe.
-func NewFetchHTTP(tr http.RoundTripper) ResourceHandler {
+func NewFetchHTTP(tr http.RoundTripper) esitag.ResourceHandler {
 	f := &fetchHTTP{
 		client: &http.Client{
 			Transport: tr,
-			Timeout:   DefaultTimeOut,
+			Timeout:   esitag.DefaultTimeOut,
 		},
 	}
 	return f
@@ -74,7 +75,7 @@ type fetchHTTP struct {
 // http and https scheme. The only allowed response code from the queried server
 // is http.StatusOK. All other response codes trigger a NotSupported error
 // behaviour.
-func (fh *fetchHTTP) DoRequest(args *ResourceArgs) (http.Header, []byte, error) {
+func (fh *fetchHTTP) DoRequest(args *esitag.ResourceArgs) (http.Header, []byte, error) {
 	if err := args.Validate(); err != nil {
 		return nil, nil, errors.Wrap(err, "[esibackend] FetchHTTP.args.Validate")
 	}

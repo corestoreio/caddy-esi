@@ -21,18 +21,19 @@ import (
 	"strings"
 
 	"github.com/SchumacherFM/caddyesi/bufpool"
+	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/corestoreio/errors"
 )
 
 func init() {
-	RegisterResourceHandler("sh", NewFetchShellExec())
+	esitag.RegisterResourceHandler("sh", NewFetchShellExec())
 }
 
 type fetchShellExec struct{}
 
 // NewFetchShellExec creates a new command line executor backend fetcher which
 // lives the whole application running time. Thread safe. Slow.
-func NewFetchShellExec() ResourceHandler {
+func NewFetchShellExec() esitag.ResourceHandler {
 	return &fetchShellExec{}
 }
 
@@ -48,7 +49,7 @@ func NewFetchShellExec() ResourceHandler {
 // This command won't work and creates a weird error:
 // 		sh://php slow/php/script.php --arg1=1 --arg2=2
 // Fixes welcome!
-func (fs *fetchShellExec) DoRequest(args *ResourceArgs) (http.Header, []byte, error) {
+func (fs *fetchShellExec) DoRequest(args *esitag.ResourceArgs) (http.Header, []byte, error) {
 	if err := args.Validate(); err != nil {
 		return nil, nil, errors.Wrap(err, "[esibackend] FetchShellExec.args.Validate")
 	}

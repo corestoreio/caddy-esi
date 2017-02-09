@@ -50,7 +50,9 @@ func Parse(r io.Reader) (Entities, error) {
 		}
 
 		ret = append(ret, &Entity{
-			Log:    log.BlackHole{},
+			Config: Config{
+				Log: log.BlackHole{},
+			},
 			RawTag: sc.Bytes(),
 			DataTag: DataTag{
 				Start: fdr.begin,

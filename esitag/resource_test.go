@@ -12,36 +12,36 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-package backend_test
+package esitag_test
 
 import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"sort"
 	"strings"
 	"testing"
 	"text/template"
 	"time"
 
-	"github.com/SchumacherFM/caddyesi/backend"
+	"github.com/SchumacherFM/caddyesi/esitag"
+	"github.com/SchumacherFM/caddyesi/esitag/backend"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 )
 
-var _ fmt.Stringer = (*backend.Resource)(nil)
-var _ backend.TemplateExecer = (*template.Template)(nil)
-var _ easyjson.Marshaler = (*backend.ResourceArgs)(nil)
-var _ easyjson.Unmarshaler = (*backend.ResourceArgs)(nil)
-var _ log.Marshaler = (*backend.ResourceArgs)(nil)
+var _ fmt.Stringer = (*esitag.Resource)(nil)
+var _ esitag.TemplateExecer = (*template.Template)(nil)
+var _ easyjson.Marshaler = (*esitag.ResourceArgs)(nil)
+var _ easyjson.Unmarshaler = (*esitag.ResourceArgs)(nil)
+var _ log.Marshaler = (*esitag.ResourceArgs)(nil)
 
 func TestNewResourceHandler_Mock(t *testing.T) {
 	t.Parallel()
 
-	rh, err := backend.NewResourceHandler(backend.NewConfigItem("mockTimeout://4s"))
+	rh, err := esitag.NewResourceHandler(esitag.NewResourceOptions("mockTimeout://4s"))
 	assert.NoError(t, err)
 	_, ok := rh.(backend.ResourceMock)
 	assert.True(t, ok, "It should be type ResourceMock")
@@ -53,8 +53,10 @@ func TestNewResourceHandler_Mock(t *testing.T) {
 }
 
 func TestNewResource(t *testing.T) {
+	t.Parallel()
+
 	t.Run("URL", func(t *testing.T) {
-		r, err := backend.NewResource(0, "http://cart.service")
+		r, err := esitag.NewResource(0, "http://cart.service")
 		if err != nil {
 			t.Fatalf("%+v", err)
 		}
@@ -62,8 +64,8 @@ func TestNewResource(t *testing.T) {
 	})
 
 	t.Run("URL is an alias", func(t *testing.T) {
-		backend.RegisterResourceHandler("awsRedisCartService", nil)
-		r, err := backend.NewResource(0, "awsRedisCartService")
+		esitag.RegisterResourceHandler("awsRedisCartService", nil)
+		r, err := esitag.NewResource(0, "awsRedisCartService")
 		if err != nil {
 			t.Fatalf("%+v", err)
 		}
@@ -71,13 +73,13 @@ func TestNewResource(t *testing.T) {
 	})
 
 	t.Run("URL scheme not found", func(t *testing.T) {
-		r, err := backend.NewResource(0, "ftp://cart.service")
+		r, err := esitag.NewResource(0, "ftp://cart.service")
 		assert.Nil(t, r)
 		assert.True(t, errors.IsNotSupported(err), "%+v", err)
 	})
 
 	t.Run("URL Template", func(t *testing.T) {
-		r, err := backend.NewResource(0, "http://cart.service?product={{ .r.Header.Get }}")
+		r, err := esitag.NewResource(0, "http://cart.service?product={{ .r.Header.Get }}")
 		if err != nil {
 			t.Fatalf("%+v", err)
 		}
@@ -85,7 +87,7 @@ func TestNewResource(t *testing.T) {
 	})
 
 	t.Run("URL Template throws fatal error", func(t *testing.T) {
-		r, err := backend.NewResource(0, "http://cart.service?product={{ r.Header.Get }}")
+		r, err := esitag.NewResource(0, "http://cart.service?product={{ r.Header.Get }}")
 		assert.Nil(t, r)
 		assert.True(t, errors.IsFatal(err), "%+v", err)
 	})
@@ -94,12 +96,12 @@ func TestNewResource(t *testing.T) {
 func TestResource_CircuitBreaker(t *testing.T) {
 	t.Parallel()
 
-	r, err := backend.NewResource(1, "http://to/a/location")
+	r, err := esitag.NewResource(1, "http://to/a/location")
 	if err != nil {
 		t.Fatalf("%+v", err)
 	}
 	state, lastFailure := r.CBState()
-	assert.Exactly(t, backend.CBStateClosed, state, "CBStateClosed")
+	assert.Exactly(t, esitag.CBStateClosed, state, "CBStateClosed")
 	assert.Exactly(t, time.Unix(1, 0), lastFailure, "lastFailure")
 
 	assert.Exactly(t, uint64(0), r.CBFailures(), "CBFailures()")
@@ -110,31 +112,33 @@ func TestResource_CircuitBreaker(t *testing.T) {
 	assert.True(t, fail > 0, "Timestamp greater 0")
 
 	state, lastFailure = r.CBState()
-	assert.Exactly(t, backend.CBStateClosed, state, "CBStateClosed")
+	assert.Exactly(t, esitag.CBStateClosed, state, "CBStateClosed")
 	assert.True(t, lastFailure.UnixNano() > fail, "lastFailure greater than recorded failure")
 
 	assert.Exactly(t, uint64(2), r.CBFailures(), "CBFailures()")
 
 	var i uint64
-	for ; i < backend.CBMaxFailures; i++ {
+	for ; i < esitag.CBMaxFailures; i++ {
 		r.CBRecordFailure()
 	}
 	assert.Exactly(t, 14, int(r.CBFailures()), "CBFailures()")
 
 	state, lastFailure = r.CBState()
-	assert.Exactly(t, backend.CBStateOpen, state, "CBStateOpen")
+	assert.Exactly(t, esitag.CBStateOpen, state, "CBStateOpen")
 	assert.True(t, lastFailure.UnixNano() > fail, "lastFailure greater than recorded failure")
 }
 
 func TestResourceArgs_Validate(t *testing.T) {
+	t.Parallel()
+
 	t.Run("URL", func(t *testing.T) {
-		rfa := backend.ResourceArgs{}
+		rfa := esitag.ResourceArgs{}
 		err := rfa.Validate()
 		assert.True(t, errors.IsEmpty(err), "%+v", err)
 		assert.Contains(t, err.Error(), `URL value`)
 	})
 	t.Run("ExternalReq", func(t *testing.T) {
-		rfa := backend.ResourceArgs{
+		rfa := esitag.ResourceArgs{
 			URL: "http://www",
 		}
 		err := rfa.Validate()
@@ -142,7 +146,7 @@ func TestResourceArgs_Validate(t *testing.T) {
 		assert.Contains(t, err.Error(), `ExternalReq value`)
 	})
 	t.Run("timeout", func(t *testing.T) {
-		rfa := backend.ResourceArgs{
+		rfa := esitag.ResourceArgs{
 			URL:         "http://www",
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
 		}
@@ -151,21 +155,25 @@ func TestResourceArgs_Validate(t *testing.T) {
 		assert.Contains(t, err.Error(), `timeout value`)
 	})
 	t.Run("maxBodySize", func(t *testing.T) {
-		rfa := backend.ResourceArgs{
+		rfa := esitag.ResourceArgs{
 			URL:         "http://www",
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Timeout:     time.Second,
+			Config: esitag.Config{
+				Timeout: time.Second,
+			},
 		}
 		err := rfa.Validate()
 		assert.True(t, errors.IsEmpty(err), "%+v", err)
 		assert.Contains(t, err.Error(), `maxBodySize value`)
 	})
 	t.Run("Correct", func(t *testing.T) {
-		rfa := backend.ResourceArgs{
+		rfa := esitag.ResourceArgs{
 			URL:         "http://www",
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Timeout:     time.Second,
-			MaxBodySize: 5,
+			Config: esitag.Config{
+				Timeout:     time.Second,
+				MaxBodySize: 5,
+			},
 		}
 		err := rfa.Validate()
 		assert.NoError(t, err, "%+v", err)
@@ -173,8 +181,12 @@ func TestResourceArgs_Validate(t *testing.T) {
 }
 
 func TestResourceArgs_MaxBodySizeHumanized(t *testing.T) {
-	rfa := backend.ResourceArgs{
-		MaxBodySize: 123456789,
+	t.Parallel()
+
+	rfa := esitag.ResourceArgs{
+		Config: esitag.Config{
+			MaxBodySize: 123456789,
+		},
 	}
 	assert.Exactly(t, `124 MB`, rfa.MaxBodySizeHumanized())
 }
@@ -216,12 +228,15 @@ var resourceRespWithExtendedHeaders = http.Header{
 }
 
 func TestResourceArgs_PrepareForwardHeaders(t *testing.T) {
+	t.Parallel()
 
-	rfa := &backend.ResourceArgs{
+	rfa := &esitag.ResourceArgs{
 		URL:         "http://whatever.anydomain/page.html",
 		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Timeout:     time.Second,
-		MaxBodySize: 15,
+		Config: esitag.Config{
+			Timeout:     time.Second,
+			MaxBodySize: 15,
+		},
 	}
 
 	t.Run("ForwardHeaders none", func(t *testing.T) {
@@ -269,12 +284,15 @@ func TestResourceArgs_PrepareForwardHeaders(t *testing.T) {
 }
 
 func TestResourceArgs_PrepareForm_GET(t *testing.T) {
+	t.Parallel()
 
-	rfa := &backend.ResourceArgs{
+	rfa := &esitag.ResourceArgs{
 		URL:         "http://whatever.anydomain/page.html",
 		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Timeout:     time.Second,
-		MaxBodySize: 15,
+		Config: esitag.Config{
+			Timeout:     time.Second,
+			MaxBodySize: 15,
+		},
 	}
 
 	rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm/search?q=foo&q=bar&both=x&prio=1&orphan=nope&empty=not",
@@ -291,122 +309,136 @@ func TestResourceArgs_PrepareForm_GET(t *testing.T) {
 }
 
 func TestResourceArgs_PrepareForm_GET_POST(t *testing.T) {
+	t.Parallel()
 
-	rfa := &backend.ResourceArgs{
+	rfa := &esitag.ResourceArgs{
 		URL:         "http://whatever.anydomain/page.html",
 		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Timeout:     time.Second,
-		MaxBodySize: 15,
+		Config: esitag.Config{
+			Timeout:     time.Second,
+			MaxBodySize: 15,
+		},
 	}
 
 	rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm/search?q=foo&q=bar&both=x&prio=1&orphan=nope&empty=not",
 		strings.NewReader("z=post&both=y&prio=2&=nokey&orphan;empty=&"))
 	rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
 
-	have := rfa.PrepareForm()
-	want := []string{"empty", "", "empty", "not", "z", "post", "both", "y", "both", "x", "prio", "2", "prio", "1", "", "nokey", "q", "foo", "q", "bar", "orphan", "", "orphan", "nope"}
+	t.Run("Both", func(t *testing.T) {
+		rfa.ForwardPostData = true
 
-	// because url.Values is a map we must sort it first before comparing it.
-	sort.Strings(have)
-	sort.Strings(want)
-	assert.Exactly(t, want, have)
+		have := rfa.PrepareForm()
+		want := []string{"empty", "", "empty", "not", "z", "post", "both", "y", "both", "x", "prio", "2", "prio", "1", "", "nokey", "q", "foo", "q", "bar", "orphan", "", "orphan", "nope"}
+
+		// because url.Values is a map we must sort it first before comparing it.
+		sort.Strings(have)
+		sort.Strings(want)
+		assert.Exactly(t, want, have)
+	})
+
+	t.Run("GET only", func(t *testing.T) {
+		rfa.ForwardPostData = false
+
+		have := rfa.PrepareForm()
+		want := []string{"empty", "not", "q", "foo", "q", "bar", "both", "x", "prio", "1", "orphan", "nope"}
+
+		// because url.Values is a map we must sort it first before comparing it.
+		sort.Strings(have)
+		sort.Strings(want)
+		assert.Exactly(t, want, have)
+	})
+
 }
 
 func TestResourceArgs_PrepareForm_POST(t *testing.T) {
+	t.Parallel()
 
-	rfa := &backend.ResourceArgs{
+	rfa := &esitag.ResourceArgs{
 		URL:         "http://whatever.anydomain/page.html",
 		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Timeout:     time.Second,
-		MaxBodySize: 15,
+		Config: esitag.Config{
+			Timeout:     time.Second,
+			MaxBodySize: 15,
+		},
 	}
 
 	rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm/search",
 		strings.NewReader("z=post&both=y&prio=2&=nokey&orphan;empty=&"))
 	rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
 
-	have := rfa.PrepareForm()
-	want := []string{"prio", "2", "", "nokey", "orphan", "", "empty", "", "z", "post", "both", "y"}
+	t.Run("Forward Post Disabled", func(t *testing.T) {
+		have := rfa.PrepareForm()
+		var want []string
 
-	// because url.Values is a map we must sort it first before comparing it.
-	sort.Strings(have)
-	sort.Strings(want)
-	assert.Exactly(t, want, have)
+		assert.Exactly(t, want, have)
+	})
+	t.Run("Forward Post Enabled", func(t *testing.T) {
+		rfa.ForwardPostData = true
+		have := rfa.PrepareForm()
+		expectedPostData := []string{"prio", "2", "", "nokey", "orphan", "", "empty", "", "z", "post", "both", "y"}
+
+		// because url.Values is a map we must sort it first before comparing it.
+		sort.Strings(have)
+		sort.Strings(expectedPostData)
+		assert.Exactly(t, expectedPostData, have)
+	})
+
 }
 
-func TestResourceArgs_PreparePostForm_GET(t *testing.T) {
+func TestResourceArgs_PreparePostForm(t *testing.T) {
+	t.Parallel()
 
-	rfa := &backend.ResourceArgs{
+	rfa := &esitag.ResourceArgs{
 		URL:         "http://whatever.anydomain/page.html",
 		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Timeout:     time.Second,
-		MaxBodySize: 15,
+		Config: esitag.Config{
+			Timeout:     time.Second,
+			MaxBodySize: 15,
+		},
 	}
 
-	rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm/search?q=foo&q=bar&both=x&prio=1&orphan=nope&empty=not",
-		nil)
-	rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+	t.Run("ignores GET params", func(t *testing.T) {
 
-	have := rfa.PreparePostForm()
-	want := []string{}
+		rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm/search?q=foo&q=bar&both=x&prio=1&orphan=nope&empty=not",
+			nil)
+		rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
 
-	// because url.Values is a map we must sort it first before comparing it.
-	sort.Strings(have)
-	sort.Strings(want)
-	assert.Exactly(t, want, have)
-}
+		have := rfa.PreparePostForm()
+		var want []string
 
-func TestResourceArgs_PreparePostForm_GET_POST(t *testing.T) {
+		// because url.Values is a map we must sort it first before comparing it.
+		sort.Strings(have)
+		sort.Strings(want)
+		assert.Exactly(t, want, have)
+	})
 
-	rfa := &backend.ResourceArgs{
-		URL:         "http://whatever.anydomain/page.html",
-		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Timeout:     time.Second,
-		MaxBodySize: 15,
-	}
+	t.Run("ignores GET but returns POST", func(t *testing.T) {
+		rfa.Config.ForwardPostData = true
 
-	rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm/search?q=foo&q=bar&both=x&prio=1&orphan=nope&empty=not",
-		strings.NewReader("z=post&both=y&prio=2&=nokey&orphan;empty=&"))
-	rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
+		rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm/search?q=foo&q=bar&both=x&prio=1&orphan=nope&empty=not",
+			strings.NewReader("z=post&both=y&prio=2&=nokey&orphan;empty=&"))
+		rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
 
-	have := rfa.PreparePostForm()
-	want := []string{"orphan", "", "empty", "", "z", "post", "both", "y", "prio", "2", "", "nokey"}
+		have := rfa.PreparePostForm()
+		expectedPostData := []string{"prio", "2", "", "nokey", "orphan", "", "empty", "", "z", "post", "both", "y"}
 
-	// because url.Values is a map we must sort it first before comparing it.
-	sort.Strings(have)
-	sort.Strings(want)
-	assert.Exactly(t, want, have)
-}
-
-func TestResourceArgs_PreparePostForm_POST(t *testing.T) {
-
-	rfa := &backend.ResourceArgs{
-		URL:         "http://whatever.anydomain/page.html",
-		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Timeout:     time.Second,
-		MaxBodySize: 15,
-	}
-
-	rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm",
-		strings.NewReader("z=post&both=y&prio=2&=nokey&orphan;empty=&"))
-	rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
-
-	have := rfa.PreparePostForm()
-	want := []string{"", "nokey", "orphan", "", "empty", "", "z", "post", "both", "y", "prio", "2"}
-
-	// because url.Values is a map we must sort it first before comparing it.
-	sort.Strings(have)
-	sort.Strings(want)
-	assert.Exactly(t, want, have)
+		// because url.Values is a map we must sort it first before comparing it.
+		sort.Strings(have)
+		sort.Strings(expectedPostData)
+		assert.Exactly(t, expectedPostData, have)
+	})
 }
 
 func TestResourceArgs_PrepareReturnHeaders(t *testing.T) {
+	t.Parallel()
 
-	rfa := &backend.ResourceArgs{
+	rfa := &esitag.ResourceArgs{
 		URL:         "http://whatever.anydomain/page.html",
 		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Timeout:     time.Second,
-		MaxBodySize: 15,
+		Config: esitag.Config{
+			Timeout:     time.Second,
+			MaxBodySize: 15,
+		},
 	}
 
 	t.Run("ReturnHeaders none", func(t *testing.T) {
@@ -443,165 +475,12 @@ func TestResourceArgs_PrepareReturnHeaders(t *testing.T) {
 }
 
 func TestResourceArgs_TemplateToURL(t *testing.T) {
-	rfa := &backend.ResourceArgs{}
+	t.Parallel()
+
+	rfa := &esitag.ResourceArgs{}
 	tURL, err := rfa.TemplateToURL(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Exactly(t, ``, tURL, "Should return an empty string")
-}
-
-func TestParseNoSQLURL(t *testing.T) {
-	t.Parallel()
-
-	var defaultPoolConnectionParameters = map[string][]string{
-		"db":           {"0"},
-		"max_active":   {"10"},
-		"max_idle":     {"400"},
-		"idle_timeout": {"240s"},
-		"cancellable":  {"0"},
-	}
-
-	runner := func(raw string, wantAddress string, wantPassword string, wantParams url.Values, wantErr bool) func(*testing.T) {
-		return func(t *testing.T) {
-			t.Parallel()
-
-			haveAddress, havePW, params, haveErr := backend.ParseNoSQLURL(raw)
-			if wantErr {
-				if have, want := wantErr, haveErr != nil; have != want {
-					t.Errorf("(%q)\nError: Have: %v Want: %v\n%+v", t.Name(), have, want, haveErr)
-				}
-				return
-			}
-
-			if haveErr != nil {
-				t.Errorf("(%q) Did not expect an Error: %+v", t.Name(), haveErr)
-			}
-
-			if have, want := haveAddress, wantAddress; have != want {
-				t.Errorf("(%q) Address: Have: %v Want: %v", t.Name(), have, want)
-			}
-			if have, want := havePW, wantPassword; have != want {
-				t.Errorf("(%q) Password: Have: %v Want: %v", t.Name(), have, want)
-			}
-			if wantParams == nil {
-				wantParams = defaultPoolConnectionParameters
-			}
-
-			for k := range wantParams {
-				assert.Exactly(t, wantParams[k], params[k], "Test %q Parameter %q", t.Name(), k)
-			}
-		}
-	}
-	t.Run("invalid redis URL scheme none", runner("localhost", "", "", nil, true))
-	t.Run("invalid redis URL scheme http", runner("http://www.google.com", "", "", nil, true))
-	t.Run("invalid redis URL string", runner("redis://weird url", "", "", nil, true))
-	t.Run("too many colons in URL", runner("redis://foo:bar:baz", "", "", nil, true))
-	t.Run("ignore path in URL", runner("redis://localhost:6379/abc123", "localhost:6379", "", nil, false))
-	t.Run("URL contains only scheme", runner("redis://", "localhost:6379", "", nil, false))
-
-	t.Run("set DB with hostname", runner(
-		"redis://localh0Rst:6379/?db=123",
-		"localh0Rst:6379",
-		"",
-		map[string][]string{
-			"db":           {"123"},
-			"max_active":   {"10"},
-			"max_idle":     {"400"},
-			"idle_timeout": {"240s"},
-			"cancellable":  {"0"},
-			"scheme":       {"redis"},
-		},
-		false))
-	t.Run("set DB without hostname", runner(
-		"redis://:6379/?db=345",
-		"localhost:6379",
-		"",
-		map[string][]string{
-			"db":           {"345"},
-			"max_active":   {"10"},
-			"max_idle":     {"400"},
-			"idle_timeout": {"240s"},
-			"cancellable":  {"0"},
-			"scheme":       {"redis"},
-		},
-		false))
-	t.Run("URL contains IP address", runner(
-		"redis://192.168.0.234/?db=123",
-		"192.168.0.234:6379",
-		"",
-		map[string][]string{
-			"db":           {"123"},
-			"max_active":   {"10"},
-			"max_idle":     {"400"},
-			"idle_timeout": {"240s"},
-			"cancellable":  {"0"},
-			"scheme":       {"redis"},
-		},
-		false))
-	t.Run("URL contains password", runner(
-		"redis://empty:SuperSecurePa55w0rd@192.168.0.234/?db=3",
-		"192.168.0.234:6379",
-		"SuperSecurePa55w0rd",
-		map[string][]string{
-			"db":           {"3"},
-			"max_active":   {"10"},
-			"max_idle":     {"400"},
-			"idle_timeout": {"240s"},
-			"cancellable":  {"0"},
-			"scheme":       {"redis"},
-		},
-		false))
-	t.Run("Apply all params", runner(
-		"redis://empty:SuperSecurePa55w0rd@192.168.0.234/?db=4&max_active=2718&max_idle=3141&idle_timeout=5h3s&cancellable=1",
-		"192.168.0.234:6379",
-		"SuperSecurePa55w0rd",
-		map[string][]string{
-			"db":           {"4"},
-			"max_active":   {"2718"},
-			"max_idle":     {"3141"},
-			"idle_timeout": {"5h3s"},
-			"cancellable":  {"1"},
-			"scheme":       {"redis"},
-		},
-		false))
-	t.Run("Memcache default", runner(
-		"memcache://",
-		"localhost:11211",
-		"",
-		map[string][]string{
-			"scheme": {"memcache"},
-		},
-		false))
-	t.Run("Memcache default with additional servers", runner(
-		"memcache://?server=localhost:11212&server=localhost:11213",
-		"localhost:11211",
-		"",
-		map[string][]string{
-			"scheme": {"memcache"},
-			"server": {"localhost:11212", "localhost:11213"},
-		},
-		false))
-	t.Run("Memcache custom port", runner(
-		"memcache://192.123.432.232:334455",
-		"192.123.432.232:334455",
-		"",
-		map[string][]string{
-			"scheme": {"memcache"},
-		},
-		false))
-	t.Run("GRPC no port", runner(
-		"grpc://192.123.432.232",
-		"",
-		"",
-		nil,
-		true))
-	t.Run("GRPC port", runner(
-		"grpc://192.123.432.232:33",
-		"192.123.432.232:33",
-		"",
-		map[string][]string{
-			"scheme": {"grpc"},
-		},
-		false))
 }

@@ -23,7 +23,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/SchumacherFM/caddyesi/helper"
@@ -161,11 +160,13 @@ func (pc *PathConfig) UpsertESITags(pageID uint64, entities esitag.Entities) {
 
 		// create sync.pool of arguments for the resources. Now with all correct
 		// default values.
-		et.InitPoolRFA(&backend.ResourceArgs{
-			Log:         pc.Log,
-			MaxBodySize: pc.MaxBodySize,
-			Timeout:     pc.Timeout,
-			TTL:         pc.TTL,
+		et.InitPoolRFA(&esitag.ResourceArgs{
+			Config: esitag.Config{
+				Log:         pc.Log,
+				MaxBodySize: pc.MaxBodySize,
+				Timeout:     pc.Timeout,
+				TTL:         pc.TTL,
+			},
 		})
 	}
 

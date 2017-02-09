@@ -24,16 +24,19 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/SchumacherFM/caddyesi/backend"
+	"github.com/SchumacherFM/caddyesi/esitag"
+	"github.com/SchumacherFM/caddyesi/esitag/backend"
 )
 
 var benchmarkResourceArgs_PrepareForwardHeaders []string
 
 func BenchmarkResourceArgs_PrepareForwardHeaders(b *testing.B) {
 
-	rfa := &backend.ResourceArgs{
-		ExternalReq:       getExternalReqWithExtendedHeaders(),
-		ForwardHeadersAll: true,
+	rfa := &esitag.ResourceArgs{
+		ExternalReq: getExternalReqWithExtendedHeaders(),
+		Config: esitag.Config{
+			ForwardHeadersAll: true,
+		},
 	}
 
 	b.Run("All", func(b *testing.B) {
@@ -65,9 +68,11 @@ var benchmarkResourceArgs_PrepareReturnHeaders http.Header
 
 func BenchmarkResourceArgs_PrepareReturnHeaders(b *testing.B) {
 
-	rfa := &backend.ResourceArgs{
-		ExternalReq:      getExternalReqWithExtendedHeaders(),
-		ReturnHeadersAll: true,
+	rfa := &esitag.ResourceArgs{
+		ExternalReq: getExternalReqWithExtendedHeaders(),
+		Config: esitag.Config{
+			ReturnHeadersAll: true,
+		},
 	}
 
 	b.Run("All", func(b *testing.B) {
@@ -103,14 +108,16 @@ func BenchmarkResourceArgs_TemplateToURL(b *testing.B) {
 		b.Fatalf("%+v", err)
 	}
 
-	rfa := &backend.ResourceArgs{
+	rfa := &esitag.ResourceArgs{
 		ExternalReq: func() *http.Request {
 			req := httptest.NewRequest("GET", "/", nil)
 			req.Header.Set("X-Product-ID", "GopherPlushXXL")
 			return req
 		}(),
-		Key:         key,
-		KeyTemplate: tpl,
+		Config: esitag.Config{
+			Key:         key,
+			KeyTemplate: tpl,
+		},
 	}
 
 	b.ResetTimer()
@@ -130,15 +137,17 @@ func BenchmarkResourceArgs_TemplateToURL(b *testing.B) {
 // BenchmarkResourceArgs_MarshalEasyJSON-4   	  300000	      4844 ns/op	    1922 B/op	       6 allocs/op
 func BenchmarkResourceArgs_MarshalEasyJSON(b *testing.B) {
 
-	rfa := &backend.ResourceArgs{
-		URL:            "https://corestore.io",
-		ExternalReq:    getExternalReqWithExtendedHeaders(),
-		Timeout:        5 * time.Second,
-		MaxBodySize:    50000,
-		Key:            "a_r€dis_ky",
-		TTL:            33 * time.Second,
-		ForwardHeaders: []string{"X-Cart-Id", "Cookie"},
-		ReturnHeaders:  []string{"Set-Cookie"},
+	rfa := &esitag.ResourceArgs{
+		URL:         "https://corestore.io",
+		ExternalReq: getExternalReqWithExtendedHeaders(),
+		Config: esitag.Config{
+			Timeout:        5 * time.Second,
+			MaxBodySize:    50000,
+			Key:            "a_r€dis_ky",
+			TTL:            33 * time.Second,
+			ForwardHeaders: []string{"X-Cart-Id", "Cookie"},
+			ReturnHeaders:  []string{"Set-Cookie"},
+		},
 	}
 	var haveData []byte
 	for i := 0; i < b.N; i++ {
@@ -186,11 +195,13 @@ func BenchmarkNewFetchHTTP_Parallel(b *testing.B) {
 	b.Run("Insecure", func(b *testing.B) {
 
 		fh := backend.NewFetchHTTP(backend.DefaultHTTPTransport)
-		rfa := &backend.ResourceArgs{
+		rfa := &esitag.ResourceArgs{
 			ExternalReq: getExternalReqWithExtendedHeaders(),
 			URL:         backendURL,
-			Timeout:     time.Second,
-			MaxBodySize: 22001,
+			Config: esitag.Config{
+				Timeout:     time.Second,
+				MaxBodySize: 22001,
+			},
 		}
 
 		b.ResetTimer()
@@ -236,11 +247,13 @@ func BenchmarkNewFetchShellExec_Parallel(b *testing.B) {
 
 	// ProTip: providing the full path to the script/binary reduces lookup time
 	// and searching in the env PATH variable. So we use /bin/cat
-	rfa := &backend.ResourceArgs{
+	rfa := &esitag.ResourceArgs{
 		ExternalReq: getExternalReqWithExtendedHeaders(),
 		URL:         "sh:///bin/cat testdata/cart_example.html",
-		Timeout:     time.Second,
-		MaxBodySize: 22001,
+		Config: esitag.Config{
+			Timeout:     time.Second,
+			MaxBodySize: 22001,
+		},
 	}
 
 	b.ResetTimer()

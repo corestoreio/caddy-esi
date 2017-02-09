@@ -12,11 +12,10 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-package backend
+package esitag
 
 import (
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -67,24 +66,33 @@ func ParseTemplate(name, text string) (TemplateExecer, error) {
 	return template.New(name).Parse(text)
 }
 
-// ResourceArgs arguments to ResourceHandler.DoRequest. Might get extended.
-// For now this structure and using it as an argument works quite well.
-// Maybe refactor.
-type ResourceArgs struct {
-	ExternalReq *http.Request // required
-	URL         string        // required
-	Timeout     time.Duration // required
-	MaxBodySize uint64        // required
-	Log         log.Logger    // optional
+// Config provides the configuration of a single ESI tag. This information gets
+// passed on as an argument towards the backend resources and enriches the
+// Entity type.
+type Config struct {
+	Log     log.Logger    // optional
+	Timeout time.Duration // required
+	// MaxBodySize allowed max body size to read from the backend resource.
+	MaxBodySize uint64 // required
 	// Key also in type esitag.Entity
 	Key string // optional (for KV Service)
 	// KeyTemplate also in type esitag.Entity
-	KeyTemplate       TemplateExecer // optional (for KV Service)
-	TTL               time.Duration  // optional
-	ForwardHeaders    []string       // optional, already treated with http.CanonicalHeaderKey
-	ForwardHeadersAll bool           // optional
-	ReturnHeaders     []string       // optional, already treated with http.CanonicalHeaderKey
-	ReturnHeadersAll  bool           // optional
+	KeyTemplate TemplateExecer // optional (for KV Service)
+	// TTL retrieved content from a backend can live this time in the middleware
+	// cache.
+	TTL               time.Duration // optional
+	ForwardPostData   bool          // optional
+	ForwardHeaders    []string      // optional, already treated with http.CanonicalHeaderKey
+	ForwardHeadersAll bool          // optional
+	ReturnHeaders     []string      // optional, already treated with http.CanonicalHeaderKey
+	ReturnHeadersAll  bool          // optional
+}
+
+// ResourceArgs arguments to ResourceHandler.DoRequest. Might get extended.
+type ResourceArgs struct {
+	ExternalReq *http.Request // required
+	URL         string        // required
+	Config
 }
 
 // Validate checks if required arguments have been set
@@ -149,9 +157,25 @@ func (a *ResourceArgs) PrepareForm() []string {
 		a.Log.Info("backend.ResourceArgs.PrepareForm.ExternalReq.ParseForm",
 			log.Err(err), loghttp.Request("request", a.ExternalReq), log.Marshal("resource_args", a))
 	}
-	ret := make([]string, 0, len(a.ExternalReq.Form))
 
-	for k, vals := range a.ExternalReq.Form {
+	form := a.ExternalReq.Form
+
+	if !a.ForwardPostData && a.ExternalReq.URL != nil {
+		// if disabled then parse only GET parameters
+		var err error
+		form, err = url.ParseQuery(a.ExternalReq.URL.RawQuery)
+		if err != nil {
+			a.Log.Info("backend.ResourceArgs.PrepareForm.ExternalReq.ParseQuery",
+				log.Err(err), loghttp.Request("request", a.ExternalReq), log.Marshal("resource_args", a))
+			return nil
+		}
+		if len(form) == 0 {
+			return nil
+		}
+	}
+
+	ret := make([]string, 0, len(form))
+	for k, vals := range form {
 		for _, val := range vals {
 			ret = append(ret, k, val)
 		}
@@ -161,13 +185,23 @@ func (a *ResourceArgs) PrepareForm() []string {
 
 // PreparePostForm prepares (POST,PUT,PATCH) form values in a balanced slice: i
 // == key and i+1 == value. A key can occur multiple times. Errors parsing the
-// form gets logged on Info level.
+// form gets logged on Info level and will return nil. Does not consider GET
+// params.
 func (a *ResourceArgs) PreparePostForm() []string {
+	if !a.ForwardPostData {
+		return nil
+	}
+
 	if err := a.ExternalReq.ParseForm(); err != nil {
 		a.Log.Info("backend.ResourceArgs.PreparePostForm.ExternalReq.ParseForm",
 			log.Err(err), loghttp.Request("request", a.ExternalReq), log.Marshal("resource_args", a))
+		return nil
 	}
-	ret := make([]string, 0, len(a.ExternalReq.PostForm))
+
+	var ret []string
+	if lpf := len(a.ExternalReq.PostForm); lpf > 0 {
+		ret = make([]string, 0, lpf)
+	}
 
 	for k, vals := range a.ExternalReq.PostForm {
 		for _, val := range vals {
@@ -275,6 +309,7 @@ func (a *ResourceArgs) MarshalLog(kv log.KeyValuer) error {
 	kv.AddString("ra_max_body_size_h", a.MaxBodySizeHumanized())
 	kv.AddString("ra_key", a.Key)
 	kv.AddInt64("ra_ttl", a.TTL.Nanoseconds())
+	kv.AddBool("ra_forward_post_data", a.ForwardPostData)
 	kv.AddString("ra_forward_headers", strings.Join(a.ForwardHeaders, "|"))
 	kv.AddBool("ra_forward_headers_all", a.ForwardHeadersAll)
 	kv.AddString("ra_return_headers", strings.Join(a.ReturnHeaders, "|"))
@@ -336,9 +371,6 @@ func CloseAllResourceHandler() error {
 	return nil
 }
 
-// ResourceHandlerFactoryFunc creates a new handler or an error.
-type ResourceHandlerFactoryFunc func(cfg *ConfigItem) (ResourceHandler, error)
-
 var factoryResourceHandlers = &struct {
 	sync.RWMutex
 	factories map[string]ResourceHandlerFactoryFunc
@@ -346,22 +378,57 @@ var factoryResourceHandlers = &struct {
 	factories: make(map[string]ResourceHandlerFactoryFunc),
 }
 
+// ResourceOptions has the same structure as caddyesi.ResourceItem. Defines a
+// single configuration item for creating a new backend resource, especially in
+// ResourceHandlerFactoryFunc.
+type ResourceOptions struct {
+	// Alias ,optional, can have any name which gets used in an ESI tag and
+	// refers to the connection to a resource.
+	Alias string
+	// URL, required, defines the authentication and target to a resource. If an
+	// URL contains the name of an Alias then the URl data from that alias will
+	// be copied into this URL field.
+	URL string
+	// Query, optional, contains mostly a SQL query which runs as a prepared
+	// statement so you must use the question mark or any other placeholder.
+	Query string
+}
+
+// NewResourceOptions creates a new option. URL is mandatory but alias and query
+// are optional. Up to three arguments in total are supported.
+func NewResourceOptions(url string, aliasQuery ...string) *ResourceOptions {
+	ci := &ResourceOptions{
+		URL: url,
+	}
+	switch len(aliasQuery) {
+	case 1:
+		ci.Alias = aliasQuery[0]
+	case 2:
+		ci.Alias = aliasQuery[0]
+		ci.Query = aliasQuery[1]
+	}
+	return ci
+}
+
+// ResourceHandlerFactoryFunc can create a new resource handler or an error.
+type ResourceHandlerFactoryFunc func(*ResourceOptions) (ResourceHandler, error)
+
 // RegisterResourceHandlerFactory registers a new factory function to create a
 // new ResourceHandler. Useful when you have entries in the
 // resources_config.xml|json file.
-func RegisterResourceHandlerFactory(alias string, f ResourceHandlerFactoryFunc) {
+func RegisterResourceHandlerFactory(scheme string, f ResourceHandlerFactoryFunc) {
 	factoryResourceHandlers.Lock()
-	factoryResourceHandlers.factories[alias] = f
+	factoryResourceHandlers.factories[scheme] = f
 	factoryResourceHandlers.Unlock()
 }
 
-func newResourceHandlerFromFactory(alias string, cfg *ConfigItem) (ResourceHandler, error) {
+func newResourceHandlerFromFactory(scheme string, opt *ResourceOptions) (ResourceHandler, error) {
 	factoryResourceHandlers.RLock()
 	defer factoryResourceHandlers.RUnlock()
-	if f, ok := factoryResourceHandlers.factories[alias]; ok && alias != "" {
-		return f(cfg)
+	if f, ok := factoryResourceHandlers.factories[scheme]; ok && scheme != "" {
+		return f(opt)
 	}
-	return nil, errors.NewNotSupportedf("[backend] Alias %q not supported in factory registry", alias)
+	return nil, errors.NewNotSupportedf("[backend] Alias %q not supported in factory registry", scheme)
 }
 
 // ResourceHandler gets implemented by any client which is able to speak to any
@@ -384,16 +451,16 @@ type ResourceHandler interface {
 // NewResourceHandler a given URL gets checked which service it should
 // instantiate and connect to. A handler must be previously registered via
 // function RegisterResourceHandlerFactory.
-func NewResourceHandler(cfg *ConfigItem) (ResourceHandler, error) {
-	idx := strings.Index(cfg.URL, "://")
+func NewResourceHandler(opt *ResourceOptions) (ResourceHandler, error) {
+	idx := strings.Index(opt.URL, "://")
 	if idx < 0 {
-		return nil, errors.NewNotValidf("[backend] Unknown scheme in URL: %q. Does not contain ://", cfg.URL)
+		return nil, errors.NewNotValidf("[backend] Unknown scheme in URL: %q. Does not contain ://", opt.URL)
 	}
-	scheme := cfg.URL[:idx]
+	scheme := opt.URL[:idx]
 
-	rh, err := newResourceHandlerFromFactory(scheme, cfg)
+	rh, err := newResourceHandlerFromFactory(scheme, opt)
 	if err != nil {
-		return nil, errors.Wrapf(err, "[backend] Failed to create new ResourceHandler object: %q", cfg.URL)
+		return nil, errors.Wrapf(err, "[backend] Failed to create new ResourceHandler object: %q", opt.URL)
 	}
 	return rh, nil
 }
@@ -554,77 +621,4 @@ func (r *Resource) CBRecordFailure() (failedUnixNano int64) {
 	failedUnixNano = time.Now().UnixNano()
 	atomic.StoreUint64(r.cbLastFailureTime, uint64(failedUnixNano))
 	return failedUnixNano
-}
-
-// defaultPoolConnectionParameters this var also exists in the test file
-var defaultPoolConnectionParameters = [...]string{
-	"db", "0",
-	"max_active", "10",
-	"max_idle", "400",
-	"idle_timeout", "240s",
-	"cancellable", "0",
-	"lazy", "0", // if 1 disables the ping to redis during caddy startup
-}
-
-// ParseNoSQLURL parses a given URL using a custom URI scheme.
-// For example:
-// 		redis://localhost:6379/?db=3
-// 		memcache://localhost:1313/?lazy=1
-// 		redis://:6380/?db=0 => connects to localhost:6380
-// 		redis:// => connects to localhost:6379 with DB 0
-// 		memcache:// => connects to localhost:11211
-//		memcache://?server=localhost:11212&server=localhost:11213
-//			=> connects to: localhost:11211, localhost:11212, localhost:11213
-// 		redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/?db=0
-// Available parameters: db, max_active (int, Connections), max_idle (int,
-// Connections), idle_timeout (time.Duration, Connection), cancellable (0,1
-// request towards redis), lazy (0, 1 disables ping during connection setup). On
-// successful parse the key "scheme" is also set in the params return value.
-func ParseNoSQLURL(raw string) (address, password string, params url.Values, err error) {
-	u, err := url.Parse(raw)
-	if err != nil {
-		return "", "", nil, errors.Errorf("[backend] url.Parse: %s", err)
-	}
-
-	host, port, err := net.SplitHostPort(u.Host)
-	if sErr, ok := err.(*net.AddrError); ok && sErr != nil && sErr.Err == "too many colons in address" {
-		return "", "", nil, errors.Errorf("[backend] SplitHostPort: %s", err)
-	}
-	if err != nil {
-		// assume port is missing
-		host = u.Host
-		if port == "" {
-			switch u.Scheme {
-			case "redis":
-				port = "6379"
-			case "memcache":
-				port = "11211"
-			default:
-				// might leak password because raw URL gets output ...
-				return "", "", nil, errors.NewNotSupportedf("[backend] ParseNoSQLURL unsupported scheme %q because Port is empty. URL: %q", u.Scheme, raw)
-			}
-		}
-	}
-	if host == "" {
-		host = "localhost"
-	}
-	address = net.JoinHostPort(host, port)
-
-	if u.User != nil {
-		password, _ = u.User.Password()
-	}
-
-	params, err = url.ParseQuery(u.RawQuery)
-	if err != nil {
-		return "", "", nil, errors.NewNotValidf("[backend] ParseNoSQLURL: Failed to parse %q for parameters in URL %q with error %s", u.RawQuery, raw, err)
-	}
-
-	for i := 0; i < len(defaultPoolConnectionParameters); i = i + 2 {
-		if params.Get(defaultPoolConnectionParameters[i]) == "" {
-			params.Set(defaultPoolConnectionParameters[i], defaultPoolConnectionParameters[i+1])
-		}
-	}
-	params.Set("scheme", u.Scheme)
-
-	return
 }

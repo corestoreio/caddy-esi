@@ -16,8 +16,6 @@ package esitag
 
 import (
 	"net/http"
-
-	"github.com/SchumacherFM/caddyesi/backend"
 )
 
 // Conditioner does not represent your favorite shampoo but it gives you the
@@ -28,7 +26,7 @@ type Conditioner interface {
 }
 
 type condition struct {
-	tpl backend.TemplateExecer
+	tpl TemplateExecer
 }
 
 func (c condition) OK(r *http.Request) bool {

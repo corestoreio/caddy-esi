@@ -22,6 +22,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/SchumacherFM/caddyesi/esitag"
+	"github.com/SchumacherFM/caddyesi/helper"
 	"github.com/corestoreio/errors"
 	"github.com/garyburd/redigo/redis"
 )
@@ -29,7 +31,7 @@ import (
 // https://github.com/garyburd/redigo/issues/207 <-- context to be added to the package: declined.
 
 func init() {
-	RegisterResourceHandlerFactory("redis", NewRedis)
+	esitag.RegisterResourceHandlerFactory("redis", NewRedis)
 }
 
 type esiRedis struct {
@@ -39,28 +41,28 @@ type esiRedis struct {
 }
 
 // NewRedis provides, for now, a basic implementation for simple key fetching.
-func NewRedis(cfg *ConfigItem) (ResourceHandler, error) {
-	addr, pw, params, err := ParseNoSQLURL(cfg.URL)
+func NewRedis(opt *esitag.ResourceOptions) (esitag.ResourceHandler, error) {
+	addr, pw, params, err := helper.ParseNoSQLURL(opt.URL)
 	if err != nil {
-		return nil, errors.NewNotValidf("[backend] Redis error parsing URL %q => %s", cfg.URL, err)
+		return nil, errors.NewNotValidf("[backend] Redis error parsing URL %q => %s", opt.URL, err)
 	}
 
 	maxActive, err := strconv.Atoi(params.Get("max_active"))
 	if err != nil {
-		return nil, errors.NewNotValidf("[backend] NewRedis.ParseNoSQLURL. Parameter max_active not valid in  %q", cfg.URL)
+		return nil, errors.NewNotValidf("[backend] NewRedis.ParseNoSQLURL. Parameter max_active not valid in  %q", opt.URL)
 	}
 	maxIdle, err := strconv.Atoi(params.Get("max_idle"))
 	if err != nil {
-		return nil, errors.NewNotValidf("[backend] NewRedis.ParseNoSQLURL. Parameter max_idle not valid in  %q", cfg.URL)
+		return nil, errors.NewNotValidf("[backend] NewRedis.ParseNoSQLURL. Parameter max_idle not valid in  %q", opt.URL)
 	}
 	idleTimeout, err := time.ParseDuration(params.Get("idle_timeout"))
 	if err != nil {
-		return nil, errors.NewNotValidf("[backend] NewRedis.ParseNoSQLURL. Parameter idle_timeout not valid in  %q", cfg.URL)
+		return nil, errors.NewNotValidf("[backend] NewRedis.ParseNoSQLURL. Parameter idle_timeout not valid in  %q", opt.URL)
 	}
 
 	r := &esiRedis{
 		isCancellable: params.Get("cancellable") == "1",
-		url:           cfg.URL,
+		url:           opt.URL,
 		pool: &redis.Pool{
 			MaxActive:   maxActive,
 			MaxIdle:     maxIdle,
@@ -112,7 +114,7 @@ func (er *esiRedis) Close() error {
 // DoRequest returns a value from the field Key in the args argument. Header is
 // not supported. Request cancellation through a timeout (when the client
 // request gets cancelled) is supported.
-func (er *esiRedis) DoRequest(args *ResourceArgs) (_ http.Header, _ []byte, err error) {
+func (er *esiRedis) DoRequest(args *esitag.ResourceArgs) (_ http.Header, _ []byte, err error) {
 	if er.isCancellable {
 		// 50000	     28794 ns/op	    1026 B/op	      33 allocs/op
 		return er.doRequestCancel(args)
@@ -121,7 +123,7 @@ func (er *esiRedis) DoRequest(args *ResourceArgs) (_ http.Header, _ []byte, err 
 	return er.doRequest(args)
 }
 
-func (er *esiRedis) validateArgs(args *ResourceArgs) (err error) {
+func (er *esiRedis) validateArgs(args *esitag.ResourceArgs) (err error) {
 	switch {
 	case args.Key == "":
 		err = errors.NewEmptyf("[esibackend] For ResourceArgs %#v the URL value is empty", args)
@@ -135,7 +137,7 @@ func (er *esiRedis) validateArgs(args *ResourceArgs) (err error) {
 	return
 }
 
-func (er *esiRedis) doRequest(args *ResourceArgs) (_ http.Header, _ []byte, err error) {
+func (er *esiRedis) doRequest(args *esitag.ResourceArgs) (_ http.Header, _ []byte, err error) {
 	if err := er.validateArgs(args); err != nil {
 		return nil, nil, errors.Wrap(err, "[backend] doRequest.validateArgs")
 	}
@@ -171,7 +173,7 @@ func (er *esiRedis) doRequest(args *ResourceArgs) (_ http.Header, _ []byte, err 
 // DoRequest returns a value from the field Key in the args argument. Header is
 // not supported. Request cancellation through a timeout (when the client
 // request gets cancelled) is supported.
-func (er *esiRedis) doRequestCancel(args *ResourceArgs) (_ http.Header, _ []byte, err error) {
+func (er *esiRedis) doRequestCancel(args *esitag.ResourceArgs) (_ http.Header, _ []byte, err error) {
 	if err := er.validateArgs(args); err != nil {
 		return nil, nil, errors.Wrap(err, "[backend] doRequestCancel.validateArgs")
 	}

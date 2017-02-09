@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SchumacherFM/caddyesi/backend/esigrpc"
+	"github.com/SchumacherFM/caddyesi/esitag/backend/esigrpc"
 	"github.com/corestoreio/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"

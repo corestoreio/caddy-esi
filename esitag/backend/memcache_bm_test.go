@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SchumacherFM/caddyesi/backend"
+	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/bradfitz/gomemcache/memcache"
 )
 
@@ -46,17 +46,21 @@ func BenchmarkNewMemCache_Parallel(b *testing.B) {
 	runner := func(uriQueryString string) func(*testing.B) {
 		return func(b *testing.B) {
 
-			be, err := backend.NewResourceHandler(backend.NewConfigItem(fmt.Sprintf("memcache://127.0.0.1:11211%s", uriQueryString)))
+			be, err := esitag.NewResourceHandler(esitag.NewResourceOptions(
+				fmt.Sprintf("memcache://127.0.0.1:11211%s", uriQueryString),
+			))
 			if err != nil {
 				b.Fatalf("%+v", err)
 			}
 			defer be.Close()
 
-			rfa := &backend.ResourceArgs{
+			rfa := &esitag.ResourceArgs{
 				ExternalReq: httptest.NewRequest("GET", "/", nil),
-				Key:         "product_price_4711",
-				Timeout:     time.Second,
-				MaxBodySize: 10,
+				Config: esitag.Config{
+					Key:         "product_price_4711",
+					Timeout:     time.Second,
+					MaxBodySize: 10,
+				},
 			}
 
 			b.ReportAllocs()

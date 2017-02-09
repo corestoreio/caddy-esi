@@ -20,12 +20,12 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
-	"sync"
-
-	"github.com/SchumacherFM/caddyesi/backend"
+	"github.com/SchumacherFM/caddyesi/esitag"
+	"github.com/SchumacherFM/caddyesi/esitag/backend"
 	"github.com/SchumacherFM/caddyesi/esitesting"
 	"github.com/corestoreio/errors"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +34,7 @@ import (
 func TestNewFetchHTTP_Serial(t *testing.T) {
 	t.Parallel()
 
-	rfa := &backend.ResourceArgs{
+	rfa := &esitag.ResourceArgs{
 		URL: "http://whatever.anydomain/page.html",
 		ExternalReq: func() *http.Request {
 			req := httptest.NewRequest("GET", "/", nil)
@@ -43,15 +43,17 @@ func TestNewFetchHTTP_Serial(t *testing.T) {
 			req.Header.Set("Cookie", "x-wl-uid=1vnTVF5WyZIe5Fymf2a4H+pFPyJa4wxNmzCKdImj1UqQPV5ecUs1sn46vDbGJUI+sE=")
 			return req
 		}(),
-		Timeout:        time.Second,
-		MaxBodySize:    15,
-		ForwardHeaders: []string{"X-Cart-Id", "Cookie"},
-		ReturnHeaders:  []string{"Set-Cookie"},
+		Config: esitag.Config{
+			Timeout:        time.Second,
+			MaxBodySize:    15,
+			ForwardHeaders: []string{"X-Cart-Id", "Cookie"},
+			ReturnHeaders:  []string{"Set-Cookie"},
+		},
 	}
 
 	t.Run("Forward and Return Headers", func(t *testing.T) {
 
-		rfa2 := new(backend.ResourceArgs)
+		rfa2 := new(esitag.ResourceArgs)
 		*rfa2 = *rfa
 		rfa2.MaxBodySize = 3000
 
@@ -78,7 +80,7 @@ func TestNewFetchHTTP_Serial(t *testing.T) {
 
 	t.Run("LimitedReader", func(t *testing.T) {
 
-		rfa2 := new(backend.ResourceArgs)
+		rfa2 := new(esitag.ResourceArgs)
 		*rfa2 = *rfa
 		rfa2.ReturnHeaders = nil
 
@@ -107,7 +109,7 @@ func TestNewFetchHTTP_Serial(t *testing.T) {
 
 	t.Run("Request context cancel", func(t *testing.T) {
 
-		rfa2 := new(backend.ResourceArgs)
+		rfa2 := new(esitag.ResourceArgs)
 		*rfa2 = *rfa
 
 		rfa2.ReturnHeaders = nil
@@ -127,7 +129,7 @@ func TestNewFetchHTTP_Serial(t *testing.T) {
 
 		t.Skip("Seems somehow not possible to test :-(((")
 
-		//rfa2 := new(backend.ResourceArgs)
+		//rfa2 := new(esitag.ResourceArgs)
 		//*rfa2 = *rfa
 		//
 		//rfa2.ReturnHeaders = nil
@@ -173,11 +175,13 @@ func TestNewFetchHTTP_Parallel(t *testing.T) {
 		go func(wg *sync.WaitGroup) {
 			defer wg.Done()
 
-			hdr, content, err := fh.DoRequest(&backend.ResourceArgs{
+			hdr, content, err := fh.DoRequest(&esitag.ResourceArgs{
 				ExternalReq: getExternalReqWithExtendedHeaders(),
 				URL:         srv.URL,
-				Timeout:     time.Second,
-				MaxBodySize: 300,
+				Config: esitag.Config{
+					Timeout:     time.Second,
+					MaxBodySize: 300,
+				},
 			})
 			if err != nil {
 				t.Fatalf("%+v", err)

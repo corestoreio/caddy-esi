@@ -21,12 +21,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/SchumacherFM/caddyesi/esitag"
+	"github.com/SchumacherFM/caddyesi/helper"
 	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/corestoreio/errors"
 )
 
 func init() {
-	RegisterResourceHandlerFactory("memcache", NewMemCache)
+	esitag.RegisterResourceHandlerFactory("memcache", NewMemCache)
 }
 
 type esiMemCache struct {
@@ -36,15 +38,15 @@ type esiMemCache struct {
 }
 
 // NewMemCache creates a new memcache resource handler supporting n-memcache server.
-func NewMemCache(cfg *ConfigItem) (ResourceHandler, error) {
-	addr, _, params, err := ParseNoSQLURL(cfg.URL)
+func NewMemCache(opt *esitag.ResourceOptions) (esitag.ResourceHandler, error) {
+	addr, _, params, err := helper.ParseNoSQLURL(opt.URL)
 	if err != nil {
-		return nil, errors.NewNotValidf("[backend] NewMemCache error parsing URL %q => %s", cfg.URL, err)
+		return nil, errors.NewNotValidf("[backend] NewMemCache error parsing URL %q => %s", opt.URL, err)
 	}
 
 	idleTimeout, err := time.ParseDuration(params.Get("idle_timeout"))
 	if err != nil {
-		return nil, errors.NewNotValidf("[backend] NewMemCache.ParseNoSQLURL. Parameter idle_timeout not valid in  %q", cfg.URL)
+		return nil, errors.NewNotValidf("[backend] NewMemCache.ParseNoSQLURL. Parameter idle_timeout not valid in  %q", opt.URL)
 	}
 
 	servers := []string{addr}
@@ -54,7 +56,7 @@ func NewMemCache(cfg *ConfigItem) (ResourceHandler, error) {
 
 	mc := &esiMemCache{
 		isCancellable: params.Get("cancellable") == "1",
-		url:           cfg.URL,
+		url:           opt.URL,
 		pool:          memcache.New(servers...),
 	}
 	mc.pool.Timeout = idleTimeout
@@ -80,7 +82,7 @@ func (mc *esiMemCache) Close() error {
 // DoRequest returns a value from the field Key in the args argument. Header is
 // not supported. Request cancellation through a timeout (when the client
 // request gets cancelled) is supported.
-func (mc *esiMemCache) DoRequest(args *ResourceArgs) (_ http.Header, _ []byte, err error) {
+func (mc *esiMemCache) DoRequest(args *esitag.ResourceArgs) (_ http.Header, _ []byte, err error) {
 	if mc.isCancellable {
 		// 50000	     28794 ns/op	    1026 B/op	      33 allocs/op
 		return mc.doRequestCancel(args)
@@ -89,7 +91,7 @@ func (mc *esiMemCache) DoRequest(args *ResourceArgs) (_ http.Header, _ []byte, e
 	return mc.doRequest(args)
 }
 
-func (mc *esiMemCache) validateArgs(args *ResourceArgs) (err error) {
+func (mc *esiMemCache) validateArgs(args *esitag.ResourceArgs) (err error) {
 	switch {
 	case args.Key == "":
 		err = errors.NewEmptyf("[esibackend] For ResourceArgs %#v the URL value is empty", args)
@@ -103,7 +105,7 @@ func (mc *esiMemCache) validateArgs(args *ResourceArgs) (err error) {
 	return
 }
 
-func (mc *esiMemCache) doRequest(args *ResourceArgs) (_ http.Header, _ []byte, err error) {
+func (mc *esiMemCache) doRequest(args *esitag.ResourceArgs) (_ http.Header, _ []byte, err error) {
 	if err := mc.validateArgs(args); err != nil {
 		return nil, nil, errors.Wrap(err, "[backend] doRequest.validateArgs")
 	}
@@ -136,7 +138,7 @@ func (mc *esiMemCache) doRequest(args *ResourceArgs) (_ http.Header, _ []byte, e
 // DoRequest returns a value from the field Key in the args argument. Header is
 // not supported. Request cancellation through a timeout (when the client
 // request gets cancelled) is supported.
-func (mc *esiMemCache) doRequestCancel(args *ResourceArgs) (_ http.Header, _ []byte, err error) {
+func (mc *esiMemCache) doRequestCancel(args *esitag.ResourceArgs) (_ http.Header, _ []byte, err error) {
 	if err := mc.validateArgs(args); err != nil {
 		return nil, nil, errors.Wrap(err, "[backend] doRequestCancel.validateArgs")
 	}

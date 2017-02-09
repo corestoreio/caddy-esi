@@ -22,7 +22,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/SchumacherFM/caddyesi/backend/esigrpc"
+	"github.com/SchumacherFM/caddyesi/esitag"
+	"github.com/SchumacherFM/caddyesi/esitag/backend/esigrpc"
+	"github.com/SchumacherFM/caddyesi/helper"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	"github.com/gavv/monotime"
@@ -31,7 +33,7 @@ import (
 )
 
 func init() {
-	RegisterResourceHandlerFactory("grpc", NewGRPCClient)
+	esitag.RegisterResourceHandlerFactory("grpc", NewGRPCClient)
 }
 
 type grpcClient struct {
@@ -45,13 +47,13 @@ type grpcClient struct {
 // (1 for enabled, then the next parameters must be provided), ca_file (file
 // containing the CA root cert file), server_host_override (server name used to
 // verify the hostname returned by TLS handshake)
-// Examples for cfg.URL:
+// Examples for url:
 //		grpc://micro.service.tld:9876
 //		grpc://micro.service.tld:34567?timeout=20s&tls=1&ca_file=path/to/ca.pem
-func NewGRPCClient(cfg *ConfigItem) (ResourceHandler, error) {
-	addr, _, params, err := ParseNoSQLURL(cfg.URL)
+func NewGRPCClient(opt *esitag.ResourceOptions) (esitag.ResourceHandler, error) {
+	addr, _, params, err := helper.ParseNoSQLURL(opt.URL)
 	if err != nil {
-		return nil, errors.NewNotValidf("[esibackend_grpc] Error parsing URL %q => %s", cfg.URL, err)
+		return nil, errors.NewNotValidf("[esibackend_grpc] Error parsing URL %q => %s", opt.URL, err)
 	}
 
 	opts := make([]grpc.DialOption, 0, 4)
@@ -89,7 +91,7 @@ func NewGRPCClient(cfg *ConfigItem) (ResourceHandler, error) {
 	}
 
 	return &grpcClient{
-		url:    cfg.URL,
+		url:    opt.URL,
 		con:    conn,
 		client: esigrpc.NewHeaderBodyServiceClient(conn),
 	}, nil
@@ -103,7 +105,7 @@ func (mc *grpcClient) Close() error {
 // DoRequest returns a value from the field Key in the args argument. Header is
 // not supported. Request cancellation through a timeout (when the client
 // request gets cancelled) is supported.
-func (mc *grpcClient) DoRequest(args *ResourceArgs) (http.Header, []byte, error) {
+func (mc *grpcClient) DoRequest(args *esitag.ResourceArgs) (http.Header, []byte, error) {
 	timeStart := monotime.Now()
 
 	if err := args.Validate(); err != nil {
@@ -150,7 +152,7 @@ func (mc *grpcClient) DoRequest(args *ResourceArgs) (http.Header, []byte, error)
 	return nil, r.GetBody(), nil
 }
 
-func (mc *grpcClient) validateArgs(args *ResourceArgs) (err error) {
+func (mc *grpcClient) validateArgs(args *esitag.ResourceArgs) (err error) {
 	switch {
 	case args.Key == "":
 		err = errors.NewEmptyf("[esibackend] For ResourceArgs %#v the URL value is empty", args)

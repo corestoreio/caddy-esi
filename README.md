@@ -152,6 +152,7 @@ Implemented:
 - [ ] Flip src to AJAX call after timeout
 - [x] Forward all headers
 - [x] Forward some headers
+- [ ] Forward POST,PATCH, PUT data
 - [ ] Return all headers
 - [ ] Return some headers
 - [ ] Forward QUERY STRING and/or POST form data
@@ -277,6 +278,16 @@ to an AJAX call in the frontend. TODO: JS code of the template ...
 
 ```
 <esi:include src="https://micro.service/esi/foo" timeout="time.Duration" onerror="ajax"/>
+```
+
+### Forward POST, PATCH or PUT data (optional)
+
+The basic tag with the attribute `forwardpostdata` forwards all incoming request
+POST, PATCH, PUT data to the `src`. Other attributes can be additionally defined.
+Default value `false` which does not forward anything.
+
+```
+<esi:include src="https://micro.service/esi/foo" forwardpostdata="true"/>
 ```
 
 ### Forward all headers (optional)

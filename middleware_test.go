@@ -24,7 +24,8 @@ import (
 	"time"
 
 	"github.com/SchumacherFM/caddyesi"
-	"github.com/SchumacherFM/caddyesi/backend"
+	"github.com/SchumacherFM/caddyesi/esitag"
+	"github.com/SchumacherFM/caddyesi/esitag/backend"
 	"github.com/SchumacherFM/caddyesi/esitesting"
 	"github.com/corestoreio/errors"
 	"github.com/mholt/caddy"
@@ -129,7 +130,7 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 	// t.Parallel() not possible due to the global map in backend
 
 	const errMsg = `mwTest01: A random micro service error`
-	defer backend.RegisterResourceHandler("mwtest01", backend.MockRequestError(errors.NewWriteFailedf(errMsg))).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("mwtest01", backend.MockRequestError(errors.NewWriteFailedf(errMsg))).DeferredDeregister()
 
 	t.Run("Protocol scheme in ESI tag not supported triggers error", mwTestRunner(
 		`esi {
@@ -178,9 +179,9 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 		nil,
 	))
 
-	defer backend.RegisterResourceHandler("mwtest02a", backend.MockRequestContent("Micro1Service1")).DeferredDeregister()
-	defer backend.RegisterResourceHandler("mwtest02b", backend.MockRequestContent("Micro2Service2")).DeferredDeregister()
-	defer backend.RegisterResourceHandler("mwtest02c", backend.MockRequestContent("Micro3Service3")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("mwtest02a", backend.MockRequestContent("Micro1Service1")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("mwtest02b", backend.MockRequestContent("Micro2Service2")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("mwtest02c", backend.MockRequestContent("Micro3Service3")).DeferredDeregister()
 	t.Run("Load from three resources in page02.html successfully", mwTestRunner(
 		`esi`,
 		httptest.NewRequest("GET", "/page02.html", nil),
@@ -214,15 +215,15 @@ func TestMiddleware_ServeHTTP_Parallel(t *testing.T) {
 	var reqCount2b = new(uint64)
 	var reqCount2c = new(uint64)
 
-	defer backend.RegisterResourceHandler("mwtest02a", backend.MockRequestContentCB("Micro1Service11", func() error {
+	defer esitag.RegisterResourceHandler("mwtest02a", backend.MockRequestContentCB("Micro1Service11", func() error {
 		atomic.AddUint64(reqCount2a, 1)
 		return nil
 	})).DeferredDeregister()
-	defer backend.RegisterResourceHandler("mwtest02b", backend.MockRequestContentCB("Micro2Service22", func() error {
+	defer esitag.RegisterResourceHandler("mwtest02b", backend.MockRequestContentCB("Micro2Service22", func() error {
 		atomic.AddUint64(reqCount2b, 1)
 		return nil
 	})).DeferredDeregister()
-	defer backend.RegisterResourceHandler("mwtest02c", backend.MockRequestContentCB("Micro3Service33", func() error {
+	defer esitag.RegisterResourceHandler("mwtest02c", backend.MockRequestContentCB("Micro3Service33", func() error {
 		atomic.AddUint64(reqCount2c, 1)
 		return nil
 	})).DeferredDeregister()
@@ -264,7 +265,7 @@ func TestMiddleware_HandleHeaderCommands(t *testing.T) {
 	t.Parallel()
 
 	const myMsg = `mwTest01: Another random micro service message`
-	defer backend.RegisterResourceHandler("mwtest01", backend.MockRequestContent(myMsg)).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("mwtest01", backend.MockRequestContent(myMsg)).DeferredDeregister()
 
 	tmpLogFile, clean := esitesting.Tempfile(t)
 	defer clean()

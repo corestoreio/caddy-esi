@@ -22,7 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SchumacherFM/caddyesi/backend"
+	"github.com/SchumacherFM/caddyesi/esitag"
+	"github.com/SchumacherFM/caddyesi/esitag/backend"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	"github.com/stretchr/testify/assert"
@@ -69,9 +70,7 @@ func TestNewGRPCClient(t *testing.T) {
 
 	t.Run("Error in ParseNoSQLURL", func(t *testing.T) {
 		t.Parallel()
-		cl, err := backend.NewGRPCClient(&backend.ConfigItem{
-			URL: "grpc://127::01:1:90000",
-		})
+		cl, err := backend.NewGRPCClient(esitag.NewResourceOptions("grpc://127::01:1:90000"))
 		if err == nil {
 			t.Error("Missing required error")
 		}
@@ -85,9 +84,7 @@ func TestNewGRPCClient(t *testing.T) {
 
 	t.Run("Error in timeout in query string", func(t *testing.T) {
 		t.Parallel()
-		cl, err := backend.NewGRPCClient(&backend.ConfigItem{
-			URL: serverListenAddr + "?timeout=",
-		})
+		cl, err := backend.NewGRPCClient(esitag.NewResourceOptions(serverListenAddr + "?timeout="))
 		if err == nil {
 			t.Error("Missing required error")
 		}
@@ -102,9 +99,9 @@ func TestNewGRPCClient(t *testing.T) {
 
 	t.Run("Error because ca_file not found", func(t *testing.T) {
 		t.Parallel()
-		cl, err := backend.NewGRPCClient(&backend.ConfigItem{
-			URL: serverListenAddr + "?timeout=10s&tls=1&ca_file=testdata/non_existent.pem",
-		})
+		cl, err := backend.NewGRPCClient(esitag.NewResourceOptions(
+			serverListenAddr + "?timeout=10s&tls=1&ca_file=testdata/non_existent.pem",
+		))
 		if err == nil {
 			t.Error("Missing required error")
 		}
@@ -120,9 +117,9 @@ func TestNewGRPCClient(t *testing.T) {
 		t.Parallel()
 		// limit timeout to 1s otherwise we'll maybe wait too long, after 1sec
 		// the context gets cancelled.
-		cl, err := backend.NewGRPCClient(&backend.ConfigItem{
-			URL: "grpc://127.0.0.1:81049?timeout=1s",
-		})
+		cl, err := backend.NewGRPCClient(esitag.NewResourceOptions(
+			"grpc://127.0.0.1:81049?timeout=1s",
+		))
 		if err == nil {
 			t.Error("Missing required error")
 		}
@@ -135,11 +132,11 @@ func TestNewGRPCClient(t *testing.T) {
 		}
 	})
 
-	grpcInsecureClient, err := backend.NewGRPCClient(&backend.ConfigItem{
+	grpcInsecureClient, err := backend.NewGRPCClient(esitag.NewResourceOptions(
 		// 60s deadline to wait until server is up and running. GRPC will do
 		// a reconnection. Race detector slows down the program.
-		URL: serverListenAddr + "?timeout=60s",
-	})
+		serverListenAddr + "?timeout=60s",
+	))
 	if err != nil {
 		t.Fatalf("Whooops: %+v", err)
 	}
@@ -154,13 +151,15 @@ func TestNewGRPCClient(t *testing.T) {
 			go func(wg *sync.WaitGroup) { // food for the race detector
 				defer wg.Done()
 
-				rfa := &backend.ResourceArgs{
+				rfa := &esitag.ResourceArgs{
 					ExternalReq: getExternalReqWithExtendedHeaders(),
 					URL:         "grpcShoppingCart1",
-					Timeout:     5 * time.Second,
-					MaxBodySize: 3333,
-					Key:         key,
-					Log:         log.BlackHole{},
+					Config: esitag.Config{
+						Timeout:     5 * time.Second,
+						MaxBodySize: 3333,
+						Key:         key,
+						Log:         log.BlackHole{},
+					},
 				}
 
 				hdr, content, err := grpcInsecureClient.DoRequest(rfa)
@@ -182,13 +181,15 @@ func TestNewGRPCClient(t *testing.T) {
 
 	t.Run("Connect insecure and retrieve error from server", func(t *testing.T) {
 
-		rfa := &backend.ResourceArgs{
+		rfa := &esitag.ResourceArgs{
 			ExternalReq: getExternalReqWithExtendedHeaders(),
 			URL:         "grpcShoppingCart2",
-			Timeout:     5 * time.Second,
-			MaxBodySize: 3333,
-			Key:         "word error in the key triggers an error on the server",
-			Log:         log.BlackHole{},
+			Config: esitag.Config{
+				Timeout:     5 * time.Second,
+				MaxBodySize: 3333,
+				Key:         "word error in the key triggers an error on the server",
+				Log:         log.BlackHole{},
+			},
 		}
 
 		hdr, content, err := grpcInsecureClient.DoRequest(rfa)
@@ -221,22 +222,24 @@ func BenchmarkNewGRPCClient_Parallel(b *testing.B) {
 
 	b.Run("Insecure", func(b *testing.B) {
 
-		grpcInsecureClient, err := backend.NewGRPCClient(&backend.ConfigItem{
+		grpcInsecureClient, err := backend.NewGRPCClient(esitag.NewResourceOptions(
 			// 20s deadline to wait until server is up and running. GRPC will do
 			// a reconnection.
-			URL: serverListenAddr + "?timeout=20s",
-		})
+			serverListenAddr + "?timeout=20s",
+		))
 		if err != nil {
 			b.Fatalf("Whooops: %+v", err)
 		}
 
-		rfa := &backend.ResourceArgs{
+		rfa := &esitag.ResourceArgs{
 			ExternalReq: getExternalReqWithExtendedHeaders(),
 			URL:         "http://totally-uninteresting.what",
-			Key:         `cart_example.html`,
-			Timeout:     time.Second,
-			MaxBodySize: 22001,
-			Log:         log.BlackHole{},
+			Config: esitag.Config{
+				Key:         `cart_example.html`,
+				Timeout:     time.Second,
+				MaxBodySize: 22001,
+				Log:         log.BlackHole{},
+			},
 		}
 
 		b.ResetTimer()

@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esitesting"
 	"github.com/alicebob/miniredis"
 	"github.com/corestoreio/errors"
@@ -74,8 +73,8 @@ func TestPluginSetup_Backends(t *testing.T) {
 		nil,
 	))
 
-	esiCfg, clean := esitesting.WriteXMLTempFile(t, backend.ConfigItems{
-		backend.NewConfigItem(`redis://`+mr.Addr()+`/0`, "backend"),
+	esiCfg, clean := esitesting.WriteXMLTempFile(t, ResourceItems{
+		NewResourceItem(`redis://`+mr.Addr()+`/0`, "backend"),
 	})
 	defer clean()
 	t.Run("With timeout, ttl and resources", testPluginSetup(
@@ -96,8 +95,8 @@ func TestPluginSetup_Backends(t *testing.T) {
 		nil,
 	))
 
-	esiCfg, clean = esitesting.WriteXMLTempFile(t, backend.ConfigItems{
-		backend.NewConfigItem(`redis//`+mr.Addr()+`/0`, "backend"), // missing colon
+	esiCfg, clean = esitesting.WriteXMLTempFile(t, ResourceItems{
+		NewResourceItem(`redis//`+mr.Addr()+`/0`, "backend"), // missing colon
 	})
 	defer clean()
 
@@ -113,9 +112,9 @@ func TestPluginSetup_Backends(t *testing.T) {
 		errors.IsNotValid,
 	))
 
-	esiCfg, clean = esitesting.WriteXMLTempFile(t, backend.ConfigItems{
-		backend.NewConfigItem(`redis://`+mr.Addr()+`/0`, "backend"),
-		backend.NewConfigItem(`redis://`+mr.Addr()+`/1`, "backend"),
+	esiCfg, clean = esitesting.WriteXMLTempFile(t, ResourceItems{
+		NewResourceItem(`redis://`+mr.Addr()+`/0`, "backend"),
+		NewResourceItem(`redis://`+mr.Addr()+`/1`, "backend"),
 	})
 	defer clean()
 	t.Run("Overwrite duplicate key in KVServices", testPluginSetup(
@@ -136,9 +135,9 @@ func TestPluginSetup_Backends(t *testing.T) {
 		nil,
 	))
 
-	esiCfg, clean = esitesting.WriteXMLTempFile(t, backend.ConfigItems{
-		backend.NewConfigItem(`redis://`+mr.Addr()+`/0`, "redis1"),
-		backend.NewConfigItem(`redis://`+mr.Addr()+`/1`, "redis2"),
+	esiCfg, clean = esitesting.WriteXMLTempFile(t, ResourceItems{
+		NewResourceItem(`redis://`+mr.Addr()+`/0`, "redis1"),
+		NewResourceItem(`redis://`+mr.Addr()+`/1`, "redis2"),
 	})
 	defer clean()
 	t.Run("Create two KVServices", testPluginSetup(
@@ -159,14 +158,14 @@ func TestPluginSetup_Backends(t *testing.T) {
 		nil,
 	))
 
-	esiCfg1, clean := esitesting.WriteXMLTempFile(t, backend.ConfigItems{
-		backend.NewConfigItem(`redis://`+mr.Addr()+`/2`, "redisAWS1"),
-		backend.NewConfigItem(`redis://`+mr.Addr()+`/3`, "redisLocal1"),
-		backend.NewConfigItem(`redis://`+mr.Addr()+`/1`, "redisLocal2"),
+	esiCfg1, clean := esitesting.WriteXMLTempFile(t, ResourceItems{
+		NewResourceItem(`redis://`+mr.Addr()+`/2`, "redisAWS1"),
+		NewResourceItem(`redis://`+mr.Addr()+`/3`, "redisLocal1"),
+		NewResourceItem(`redis://`+mr.Addr()+`/1`, "redisLocal2"),
 	})
 	defer clean()
-	esiCfg2, clean := esitesting.WriteXMLTempFile(t, backend.ConfigItems{
-		backend.NewConfigItem(`redis://`+mr.Addr()+`/3`, "redisLocal3"),
+	esiCfg2, clean := esitesting.WriteXMLTempFile(t, ResourceItems{
+		NewResourceItem(`redis://`+mr.Addr()+`/3`, "redisLocal3"),
 	})
 	defer clean()
 	t.Run("2x esi directives with different KVServices", testPluginSetup(

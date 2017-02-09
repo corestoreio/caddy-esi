@@ -25,7 +25,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/helper"
 	"github.com/corestoreio/errors"
@@ -35,46 +34,22 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// TemplateIdentifier if some strings contain these characters then a
-// template.Template will be created. For now a resource key or an URL is
-// supported.
-const TemplateIdentifier = "{{"
-
 // Entity represents a single fully parsed ESI tag
 type Entity struct {
-	Log     log.Logger
 	RawTag  []byte
 	DataTag DataTag
-
-	// <pool> but kept here for easy testing, for now.
-	MaxBodySize       uint64 // DefaultMaxBodySize 5MB
-	Timeout           time.Duration
-	ForwardHeaders    []string
-	ForwardHeadersAll bool
-	ReturnHeaders     []string
-	ReturnHeadersAll  bool
-	TTL               time.Duration
-	// </pool>
-
 	// OnError contains the content which gets injected into an erroneous ESI
 	// tag when all reuqests are failing to its backends. If onError in the ESI
 	// tag contains a file name, then that content gets loaded.
 	OnError []byte
-	// Key defines a key in a KeyValue server to fetch the value from.
-	Key string
-	// KeyTemplate gets created when the Key field contains the template
-	// identifier. Then the Key field would be empty.
-	KeyTemplate backend.TemplateExecer
-
+	Config
 	// Coalesce TODO(CyS) multiple external requests which triggers a backend
 	// resource request gets merged into one backend request
 	Coalesce bool
-
 	// Race TODO(CyS) From the README: Add the attribute `race="true"` to fire
 	// all resource requests at once and the one which is the fastest gets
 	// served and the others dropped.
 	Race bool
-
 	// Resources contains multiple unique Resource entries, aka backend systems
 	// likes redis instances or other micro services. Resources occur within one
 	// single ESI tag. The resource attribute (src="") can occur multiple times.
@@ -82,11 +57,9 @@ type Entity struct {
 	// the response. If one item fails and we have multiple resources, the next
 	// resource gets queried. All resources share the same scheme/protocol which
 	// must handle the ResourceHandler.
-	Resources []*backend.Resource // Any 3rd party servers
-
+	Resources []*Resource // Any 3rd party servers
 	// Conditioner TODO(CyS) depending on a condition an ESI tag gets executed or not.
 	Conditioner
-
 	// resourceRFAPool for the request arguments
 	// https://twitter.com/_rsc/status/816710229861793795 ;-)
 	resourceRFAPool sync.Pool
@@ -139,7 +112,7 @@ func (et *Entity) ParseRaw() error {
 	if len(et.RawTag) == 0 {
 		return nil
 	}
-	et.Resources = make([]*backend.Resource, 0, 2)
+	et.Resources = make([]*Resource, 0, 2)
 
 	matches, err := SplitAttributes(string(et.RawTag))
 	if err != nil {
@@ -188,6 +161,9 @@ func (et *Entity) ParseRaw() error {
 			if err != nil {
 				return errors.NewNotValidf("[caddyesi] ESITag.ParseRaw. Cannot max body size in maxbodysize: %s => %q\nTag: %q", err, value, et.RawTag)
 			}
+		case "forwardpostdata":
+			value = strings.ToLower(value)
+			et.ForwardPostData = value == "1" || value == "true"
 		case "forwardheaders":
 			if value == "all" {
 				et.ForwardHeadersAll = true
@@ -243,7 +219,7 @@ func (et *Entity) parseOnError(val string) (err error) {
 }
 
 func (et *Entity) parseCondition(s string) error {
-	tpl, err := backend.ParseTemplate("condition_tpl", s)
+	tpl, err := ParseTemplate("condition_tpl", s)
 	if err != nil {
 		return errors.NewFatalf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", s, err, et.RawTag)
 	}
@@ -252,7 +228,7 @@ func (et *Entity) parseCondition(s string) error {
 }
 
 func (et *Entity) parseResource(idx int, val string) error {
-	r, err := backend.NewResource(idx, val)
+	r, err := NewResource(idx, val)
 	if err != nil {
 		return errors.Wrapf(err, "[caddyesi] ESITag.ParseRaw. Failed to parse %q\nTag: %q", val, et.RawTag)
 	}
@@ -263,7 +239,7 @@ func (et *Entity) parseResource(idx int, val string) error {
 func (et *Entity) parseKey(val string) (err error) {
 	et.Key = val
 	if strings.Contains(val, TemplateIdentifier) {
-		et.KeyTemplate, err = backend.ParseTemplate("key_tpl", val)
+		et.KeyTemplate, err = ParseTemplate("key_tpl", val)
 		if err != nil {
 			return errors.NewFatalf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", val, err, et.RawTag)
 		}
@@ -274,7 +250,7 @@ func (et *Entity) parseKey(val string) (err error) {
 // InitPoolRFA used in PathConfig.UpsertESITags and in Entity.ParseRaw to set
 // the pool function. When called in PathConfig.UpsertESITags all default config
 // values have been applied correctly.
-func (et *Entity) InitPoolRFA(defaultRFA *backend.ResourceArgs) {
+func (et *Entity) InitPoolRFA(defaultRFA *ResourceArgs) {
 
 	if et.Log == nil && defaultRFA != nil {
 		et.Log = defaultRFA.Log
@@ -290,29 +266,21 @@ func (et *Entity) InitPoolRFA(defaultRFA *backend.ResourceArgs) {
 	}
 
 	et.resourceRFAPool.New = func() interface{} {
-		return &backend.ResourceArgs{
-			Log:               et.Log,
-			Key:               et.Key,
-			KeyTemplate:       et.KeyTemplate,
-			Timeout:           et.Timeout,
-			MaxBodySize:       et.MaxBodySize,
-			ForwardHeaders:    et.ForwardHeaders,
-			ForwardHeadersAll: et.ForwardHeadersAll,
-			ReturnHeaders:     et.ReturnHeaders,
-			ReturnHeadersAll:  et.ReturnHeadersAll,
+		return &ResourceArgs{
+			Config: et.Config,
 		}
 	}
 }
 
 // used in Entity.QueryResources
-func (et *Entity) poolGetRFA(externalReq *http.Request) *backend.ResourceArgs {
-	rfa := et.resourceRFAPool.Get().(*backend.ResourceArgs)
+func (et *Entity) poolGetRFA(externalReq *http.Request) *ResourceArgs {
+	rfa := et.resourceRFAPool.Get().(*ResourceArgs)
 	rfa.ExternalReq = externalReq
 	return rfa
 }
 
 // used in Entity.QueryResources
-func (et *Entity) poolPutRFA(rfa *backend.ResourceArgs) {
+func (et *Entity) poolPutRFA(rfa *ResourceArgs) {
 	rfa.ExternalReq = nil
 	rfa.URL = ""
 	et.resourceRFAPool.Put(rfa)
@@ -326,7 +294,9 @@ func (et *Entity) poolPutRFA(rfa *backend.ResourceArgs) {
 func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 	timeStart := monotime.Now()
 
-	var mErr *errors.MultiErr // just for collecting errors for informational purposes at the Temporary error at the end.
+	// mErr: just for collecting errors for informational purposes at the
+	// Temporary error at the end.
+	var mErr *errors.MultiErr
 	rfa := et.poolGetRFA(externalReq)
 	defer et.poolPutRFA(rfa)
 
@@ -339,7 +309,7 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 
 		switch state, lastFailure := r.CBState(); state {
 
-		case backend.CBStateHalfOpen, backend.CBStateClosed:
+		case CBStateHalfOpen, CBStateClosed:
 			// TODO(CyS) add ReturnHeader
 			_, data, err := r.DoRequest(rfa)
 
@@ -364,7 +334,7 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 				continue // go to next resource in this loop
 			}
 
-			if state == backend.CBStateHalfOpen {
+			if state == CBStateHalfOpen {
 				r.CBReset()
 				if et.Log.IsDebug() {
 					et.Log.Debug("esitag.Entity.QueryResources.ResourceHandler.CBStateHalfOpen",
@@ -381,7 +351,7 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 			// TODO(CyS): Log header, create special function to log header; LOG rfa with special format
 			return data, nil
 
-		case backend.CBStateOpen:
+		case CBStateOpen:
 			if et.Log.IsDebug() {
 				et.Log.Debug("esitag.Entity.QueryResources.ResourceHandler.CBStateOpen",
 					log.Duration(log.KeyNameDuration, monotime.Since(timeStart)),
@@ -474,7 +444,7 @@ func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 	}
 	go func() {
 		g.Wait()
-		close(cTag)
+		close(cTag) // why not defer close(cTag)
 	}()
 
 	for t := range cTag {

@@ -27,7 +27,8 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/SchumacherFM/caddyesi/backend"
+	"github.com/SchumacherFM/caddyesi/esitag"
+	"github.com/SchumacherFM/caddyesi/esitag/backend"
 	"github.com/alicebob/miniredis"
 	"github.com/corestoreio/errors"
 	"github.com/mitchellh/go-ps"
@@ -71,21 +72,21 @@ func TestNewRedis(t *testing.T) {
 
 	t.Run("Failed to parse max_active", func(t *testing.T) {
 		t.Parallel()
-		be, err := backend.NewRedis(backend.NewConfigItem("redis://localHorst/?max_active=∏"))
+		be, err := backend.NewRedis(esitag.NewResourceOptions("redis://localHorst/?max_active=∏"))
 		assert.Nil(t, be)
 		assert.True(t, errors.IsNotValid(err), "%+v", err)
 		assert.Error(t, err)
 	})
 	t.Run("Failed to parse max_idle", func(t *testing.T) {
 		t.Parallel()
-		be, err := backend.NewRedis(backend.NewConfigItem("redis://localHorst/?max_idle=∏"))
+		be, err := backend.NewRedis(esitag.NewResourceOptions("redis://localHorst/?max_idle=∏"))
 		assert.Nil(t, be)
 		assert.True(t, errors.IsNotValid(err), "%+v", err)
 		assert.Error(t, err)
 	})
 	t.Run("Failed to parse idle_timeout", func(t *testing.T) {
 		t.Parallel()
-		be, err := backend.NewRedis(backend.NewConfigItem("redis://localHorst/?idle_timeout=∏"))
+		be, err := backend.NewRedis(esitag.NewResourceOptions("redis://localHorst/?idle_timeout=∏"))
 		assert.Nil(t, be)
 		assert.True(t, errors.IsNotValid(err), "%+v", err)
 		assert.Error(t, err)
@@ -94,7 +95,7 @@ func TestNewRedis(t *testing.T) {
 	t.Run("Ping fail", func(t *testing.T) {
 		t.Parallel()
 
-		be, err := backend.NewResourceHandler(backend.NewConfigItem("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379"))
+		be, err := esitag.NewResourceHandler(esitag.NewResourceOptions("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379"))
 		assert.True(t, errors.IsFatal(err), "%+v", err)
 		assert.Nil(t, be)
 	})
@@ -102,16 +103,18 @@ func TestNewRedis(t *testing.T) {
 	t.Run("Ping does not fail because lazy", func(t *testing.T) {
 		t.Parallel()
 
-		be, err := backend.NewResourceHandler(backend.NewConfigItem("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/?lazy=1"))
+		be, err := esitag.NewResourceHandler(esitag.NewResourceOptions("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379/?lazy=1"))
 		if err != nil {
 			t.Fatalf("There should be no error but got: %s", err)
 		}
 		assert.NotNil(t, be)
-		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
+		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Key:         "product_price_76",
-			Timeout:     time.Second,
-			MaxBodySize: 10,
+			Config: esitag.Config{
+				Key:         "product_price_76",
+				Timeout:     time.Second,
+				MaxBodySize: 10,
+			},
 		})
 		assert.Nil(t, hdr, "header must be nil")
 		assert.Nil(t, content, "content must be nil")
@@ -128,7 +131,7 @@ func TestNewRedis(t *testing.T) {
 		defer mr.Close()
 		mr.RequireAuth("MyPa55w04d")
 
-		be, err := backend.NewResourceHandler(backend.NewConfigItem(fmt.Sprintf("redis://MrMiyagi:%s@%s", "MyPa55w04d", mr.Addr())))
+		be, err := esitag.NewResourceHandler(esitag.NewResourceOptions(fmt.Sprintf("redis://MrMiyagi:%s@%s", "MyPa55w04d", mr.Addr())))
 		if be == nil {
 			t.Fatalf("NewResourceHandler to %q returns nil %+v", mr.Addr(), err)
 		}
@@ -140,11 +143,13 @@ func TestNewRedis(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
+		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Key:         "product_price_4711",
-			Timeout:     time.Second,
-			MaxBodySize: 10,
+			Config: esitag.Config{
+				Key:         "product_price_4711",
+				Timeout:     time.Second,
+				MaxBodySize: 10,
+			},
 		})
 		require.NoError(t, err, "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
@@ -161,7 +166,7 @@ func TestNewRedis(t *testing.T) {
 		defer mr.Close()
 		mr.RequireAuth("MyPasw04d")
 
-		be, err := backend.NewRedis(backend.NewConfigItem(fmt.Sprintf("redis://MrMiyagi:%s@%s", "MyPa55w04d", mr.Addr())))
+		be, err := backend.NewRedis(esitag.NewResourceOptions(fmt.Sprintf("redis://MrMiyagi:%s@%s", "MyPa55w04d", mr.Addr())))
 		if be != nil {
 			t.Fatalf("NewResourceHandler to %q returns not nil", mr.Addr())
 		}
@@ -169,13 +174,13 @@ func TestNewRedis(t *testing.T) {
 	})
 
 	// getMrBee mr == MiniRedis; Bee = Back EEnd ;-)
-	getMrBee := func(t *testing.T, params ...string) (*miniredis.Miniredis, backend.ResourceHandler, func()) {
+	getMrBee := func(t *testing.T, params ...string) (*miniredis.Miniredis, esitag.ResourceHandler, func()) {
 		mr := miniredis.NewMiniRedis()
 		if err := mr.Start(); err != nil {
 			t.Fatal(err)
 		}
 
-		be, err := backend.NewResourceHandler(backend.NewConfigItem(fmt.Sprintf("redis://%s%s", mr.Addr(), strings.Join(params, "&"))))
+		be, err := esitag.NewResourceHandler(esitag.NewResourceOptions(fmt.Sprintf("redis://%s%s", mr.Addr(), strings.Join(params, "&"))))
 		if be == nil {
 			t.Fatalf("NewResourceHandler to %q returns nil %+v", mr.Addr(), err)
 		}
@@ -201,11 +206,13 @@ func TestNewRedis(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
+		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Key:         "product_price_4711",
-			Timeout:     time.Microsecond,
-			MaxBodySize: 10,
+			Config: esitag.Config{
+				Key:         "product_price_4711",
+				Timeout:     time.Microsecond,
+				MaxBodySize: 10,
+			},
 		})
 		require.EqualError(t, errors.Cause(err), context.DeadlineExceeded.Error(), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
@@ -218,11 +225,13 @@ func TestNewRedis(t *testing.T) {
 		_, be, closer := getMrBee(t)
 		defer closer()
 
-		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
+		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Key:         "product_price_4711",
-			Timeout:     time.Second,
-			MaxBodySize: 100,
+			Config: esitag.Config{
+				Key:         "product_price_4711",
+				Timeout:     time.Second,
+				MaxBodySize: 100,
+			},
 		})
 		require.True(t, errors.IsNotFound(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
@@ -235,11 +244,13 @@ func TestNewRedis(t *testing.T) {
 		_, be, closer := getMrBee(t, "?cancellable=1")
 		defer closer()
 
-		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
+		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Key:         "product_price_4711",
-			Timeout:     time.Second,
-			MaxBodySize: 100,
+			Config: esitag.Config{
+				Key:         "product_price_4711",
+				Timeout:     time.Second,
+				MaxBodySize: 100,
+			},
 		})
 		require.True(t, errors.IsNotFound(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
@@ -250,7 +261,7 @@ func TestNewRedis(t *testing.T) {
 		_, be, closer := getMrBee(t)
 		defer closer()
 
-		hdr, content, err := be.DoRequest(&backend.ResourceArgs{})
+		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{})
 		require.True(t, errors.IsEmpty(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Nil(t, content, "Content must be nil")
@@ -260,8 +271,10 @@ func TestNewRedis(t *testing.T) {
 		_, be, closer := getMrBee(t)
 		defer closer()
 
-		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
-			Key: "Hello",
+		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
+			Config: esitag.Config{
+				Key: "Hello",
+			},
 		})
 		require.True(t, errors.IsEmpty(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
@@ -272,8 +285,10 @@ func TestNewRedis(t *testing.T) {
 		_, be, closer := getMrBee(t)
 		defer closer()
 
-		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
-			Key:         "Hello",
+		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
+			Config: esitag.Config{
+				Key: "Hello",
+			},
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
 		})
 		require.True(t, errors.IsEmpty(err), "%+v", err)
@@ -285,10 +300,12 @@ func TestNewRedis(t *testing.T) {
 		_, be, closer := getMrBee(t)
 		defer closer()
 
-		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
-			Key:         "Hello",
+		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Timeout:     time.Second,
+			Config: esitag.Config{
+				Key:     "Hello",
+				Timeout: time.Second,
+			},
 		})
 		require.True(t, errors.IsEmpty(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
@@ -308,16 +325,18 @@ func TestNewRedis(t *testing.T) {
 		tpl, err := template.New("key_tpl").Parse(key)
 		require.NoError(t, err)
 
-		hdr, content, err := be.DoRequest(&backend.ResourceArgs{
+		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
 			ExternalReq: func() *http.Request {
 				req := httptest.NewRequest("GET", "/", nil)
 				req.Header.Set("X-Product-ID", "GopherPlushXXL")
 				return req
 			}(),
-			Key:         key,
-			KeyTemplate: tpl,
-			Timeout:     time.Second,
-			MaxBodySize: 100,
+			Config: esitag.Config{
+				Key:         key,
+				KeyTemplate: tpl,
+				Timeout:     time.Second,
+				MaxBodySize: 100,
+			},
 		})
 		require.NoError(t, err, "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
@@ -329,13 +348,13 @@ func TestRedisNewResourceHandler(t *testing.T) {
 	t.Parallel()
 
 	t.Run("URL Error", func(t *testing.T) {
-		be, err := backend.NewResourceHandler(backend.NewConfigItem("redis//localhost"))
+		be, err := esitag.NewResourceHandler(esitag.NewResourceOptions("redis//localhost"))
 		assert.Nil(t, be)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), `Unknown scheme in URL: "redis//localhost". Does not contain ://`)
 	})
 	t.Run("Scheme Error", func(t *testing.T) {
-		be, err := backend.NewResourceHandler(backend.NewConfigItem("mysql://localhost"))
+		be, err := esitag.NewResourceHandler(esitag.NewResourceOptions("mysql://localhost"))
 		assert.Nil(t, be)
 		assert.True(t, errors.IsNotSupported(err), "%+v", err)
 	})

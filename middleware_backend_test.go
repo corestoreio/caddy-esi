@@ -23,7 +23,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/SchumacherFM/caddyesi/backend"
+	"github.com/SchumacherFM/caddyesi"
 	"github.com/SchumacherFM/caddyesi/esitesting"
 	"github.com/alicebob/miniredis"
 )
@@ -44,8 +44,8 @@ func TestMiddleware_ServeHTTP_Redis(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	esiCfg, clean := esitesting.WriteXMLTempFile(t, backend.ConfigItems{
-		backend.NewConfigItem(`redis://`+mr.Addr()+`/0`, "miniRedis"),
+	esiCfg, clean := esitesting.WriteXMLTempFile(t, caddyesi.ResourceItems{
+		caddyesi.NewResourceItem(`redis://`+mr.Addr()+`/0`, "miniRedis"),
 	})
 	defer clean()
 	t.Run("Query in page04.html successfully", mwTestRunner(
@@ -68,9 +68,9 @@ func TestMiddleware_ServeHTTP_Redis(t *testing.T) {
 	//tmpLogFile, _ := esitesting.Tempfile(t)
 	//t.Log(tmpLogFile)
 	// defer clean()
-	esiCfg, clean = esitesting.WriteXMLTempFile(t, backend.ConfigItems{
-		backend.NewConfigItem(`redis://`+mr.Addr()+`/0`, "miniRedis"),
-		backend.NewConfigItem(`mockTimeout://50s`, "miniRedisTimeout"),
+	esiCfg, clean = esitesting.WriteXMLTempFile(t, caddyesi.ResourceItems{
+		caddyesi.NewResourceItem(`redis://`+mr.Addr()+`/0`, "miniRedis"),
+		caddyesi.NewResourceItem(`mockTimeout://50s`, "miniRedisTimeout"),
 	})
 	defer clean()
 	t.Run("Query in page05.html but timeout in server 2 and fall back to server 1", mwTestRunner(

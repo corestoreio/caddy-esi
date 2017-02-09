@@ -21,16 +21,17 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/corestoreio/errors"
 	ps "github.com/mitchellh/go-ps"
 )
 
 func init() {
-	RegisterResourceHandlerFactory("mockTimeout", func(cfg *ConfigItem) (ResourceHandler, error) {
+	esitag.RegisterResourceHandlerFactory("mockTimeout", func(opt *esitag.ResourceOptions) (esitag.ResourceHandler, error) {
 		return ResourceMock{
-			DoRequestFn: func(*ResourceArgs) (_ http.Header, content []byte, err error) {
+			DoRequestFn: func(*esitag.ResourceArgs) (_ http.Header, content []byte, err error) {
 				// mockTimeout://duration
-				return nil, nil, errors.NewTimeoutf("[backend] Timeout after %q", cfg.URL)
+				return nil, nil, errors.NewTimeoutf("[backend] Timeout after %q", opt.URL)
 			},
 		}, nil
 	})
@@ -40,12 +41,12 @@ const mockRequestMsg = "%s %q Timeout %s MaxBody %s"
 
 // ResourceMock exported for testing
 type ResourceMock struct {
-	DoRequestFn func(args *ResourceArgs) (http.Header, []byte, error)
+	DoRequestFn func(args *esitag.ResourceArgs) (http.Header, []byte, error)
 	CloseFn     func() error
 }
 
 // DoRequest calls DoRequestFn
-func (rm ResourceMock) DoRequest(a *ResourceArgs) (http.Header, []byte, error) {
+func (rm ResourceMock) DoRequest(a *esitag.ResourceArgs) (http.Header, []byte, error) {
 	return rm.DoRequestFn(a)
 }
 
@@ -58,9 +59,9 @@ func (rm ResourceMock) Close() error {
 }
 
 // MockRequestContent for testing purposes only.
-func MockRequestContent(content string) ResourceHandler {
+func MockRequestContent(content string) esitag.ResourceHandler {
 	return ResourceMock{
-		DoRequestFn: func(args *ResourceArgs) (http.Header, []byte, error) {
+		DoRequestFn: func(args *esitag.ResourceArgs) (http.Header, []byte, error) {
 			if args.URL == "" && args.Key == "" {
 				panic(fmt.Sprintf("[esibackend] URL and Key cannot be empty: %#v\n", args))
 			}
@@ -71,9 +72,9 @@ func MockRequestContent(content string) ResourceHandler {
 
 // MockRequestContentCB for testing purposes only. Call back gets executed
 // before the function returns.
-func MockRequestContentCB(content string, callback func() error) ResourceHandler {
+func MockRequestContentCB(content string, callback func() error) esitag.ResourceHandler {
 	return ResourceMock{
-		DoRequestFn: func(args *ResourceArgs) (http.Header, []byte, error) {
+		DoRequestFn: func(args *esitag.ResourceArgs) (http.Header, []byte, error) {
 			if err := callback(); err != nil {
 				return nil, nil, errors.Wrapf(err, "MockRequestContentCB with URL %q", args.URL)
 			}
@@ -83,18 +84,18 @@ func MockRequestContentCB(content string, callback func() error) ResourceHandler
 }
 
 // MockRequestError for testing purposes only.
-func MockRequestError(err error) ResourceHandler {
+func MockRequestError(err error) esitag.ResourceHandler {
 	return ResourceMock{
-		DoRequestFn: func(_ *ResourceArgs) (http.Header, []byte, error) {
+		DoRequestFn: func(_ *esitag.ResourceArgs) (http.Header, []byte, error) {
 			return nil, nil, err
 		},
 	}
 }
 
 // MockRequestPanic just panics
-func MockRequestPanic(msg interface{}) ResourceHandler {
+func MockRequestPanic(msg interface{}) esitag.ResourceHandler {
 	return ResourceMock{
-		DoRequestFn: func(_ *ResourceArgs) (http.Header, []byte, error) {
+		DoRequestFn: func(_ *esitag.ResourceArgs) (http.Header, []byte, error) {
 			panic(msg)
 		},
 	}

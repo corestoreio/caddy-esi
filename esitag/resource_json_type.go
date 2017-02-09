@@ -14,7 +14,7 @@
 
 // +build ignore
 
-package backend
+package esitag
 
 //go:generate easyjson -snake_case -omit_empty resource_json_type.go
 

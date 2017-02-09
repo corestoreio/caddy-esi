@@ -21,8 +21,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esicache"
+	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/SchumacherFM/caddyesi/helper"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
@@ -61,14 +61,14 @@ func PluginSetup(c *caddy.Controller) error {
 	})
 
 	c.OnShutdown(func() error {
-		return errors.Wrap(backend.CloseAllResourceHandler(), "[caddyesi] OnShutdown")
+		return errors.Wrap(esitag.CloseAllResourceHandler(), "[caddyesi] OnShutdown")
 	})
 	c.OnRestart(func() error {
 		// really necessary? investigate later
 		for _, pc := range pcs {
 			pc.purgeESICache()
 		}
-		return errors.Wrap(backend.CloseAllResourceHandler(), "[caddyesi] OnRestart")
+		return errors.Wrap(esitag.CloseAllResourceHandler(), "[caddyesi] OnRestart")
 	})
 
 	return nil
@@ -250,17 +250,17 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 			return errors.NewNotValidf("[caddyesi] resources: %s", c.ArgErr())
 		}
 		// c.Val() contains the file name or raw-content ;-)
-		items, err := backend.ConfigUnmarshal(c.Val())
+		items, err := UnmarshalResourceItems(c.Val())
 		if err != nil {
 			return errors.Wrapf(err, "[caddyesi] Failed to unmarshal resource config %q", c.Val())
 		}
 		for _, item := range items {
-			f, err := backend.NewResourceHandler(item)
+			f, err := esitag.NewResourceHandler(esitag.NewResourceOptions(item.URL, item.Alias, item.Query))
 			if err != nil {
 				// may disclose passwords which are stored in the URL
 				return errors.Wrapf(err, "[caddyesi] esikv Service init failed for URL %q in file %q", item.URL, c.Val())
 			}
-			backend.RegisterResourceHandler(item.Alias, f)
+			esitag.RegisterResourceHandler(item.Alias, f)
 		}
 	default:
 		c.NextArg()

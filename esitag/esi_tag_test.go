@@ -25,8 +25,8 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/SchumacherFM/caddyesi/backend"
 	"github.com/SchumacherFM/caddyesi/esitag"
+	"github.com/SchumacherFM/caddyesi/esitag/backend"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log/logw"
 	"github.com/stretchr/testify/assert"
@@ -34,11 +34,11 @@ import (
 )
 
 type resourceMock struct {
-	DoRequestFn func(args *backend.ResourceArgs) (http.Header, []byte, error)
+	DoRequestFn func(args *esitag.ResourceArgs) (http.Header, []byte, error)
 	CloseFn     func() error
 }
 
-func (rm resourceMock) DoRequest(a *backend.ResourceArgs) (http.Header, []byte, error) {
+func (rm resourceMock) DoRequest(a *esitag.ResourceArgs) (http.Header, []byte, error) {
 	return rm.DoRequestFn(a)
 }
 
@@ -76,8 +76,8 @@ func TestEntity_ParseRaw_Src_Template(t *testing.T) {
 func TestEntity_ParseRaw_Key_Template(t *testing.T) {
 	t.Parallel()
 
-	defer backend.RegisterResourceHandler("redisAWS1", backend.MockRequestContent("Any content")).DeferredDeregister()
-	defer backend.RegisterResourceHandler("redisAWS2", backend.MockRequestContent("Any content")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("redisAWS1", backend.MockRequestContent("Any content")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("redisAWS2", backend.MockRequestContent("Any content")).DeferredDeregister()
 
 	et := &esitag.Entity{
 		RawTag: []byte(`include
@@ -105,9 +105,9 @@ func TestEntity_ParseRaw_Key_Template(t *testing.T) {
 func TestESITag_ParseRaw(t *testing.T) {
 	t.Parallel()
 
-	defer backend.RegisterResourceHandler("awsRedis1", backend.MockRequestContent("Any content")).DeferredDeregister()
-	defer backend.RegisterResourceHandler("awsRedis2", backend.MockRequestContent("Any content")).DeferredDeregister()
-	defer backend.RegisterResourceHandler("awsRedis3", backend.MockRequestContent("Any content")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("awsRedis1", backend.MockRequestContent("Any content")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("awsRedis2", backend.MockRequestContent("Any content")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("awsRedis3", backend.MockRequestContent("Any content")).DeferredDeregister()
 
 	runner := func(rawTag []byte, wantErrBhf errors.BehaviourFunc, wantET *esitag.Entity) func(*testing.T) {
 		return func(t *testing.T) {
@@ -160,12 +160,14 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include src="https://micro.service/checkout/cart" timeout="9ms" onerror="testdata/nocart.html" forwardheaders="Cookie , accept-language, AUTHORIZATION"`),
 		nil,
 		&esitag.Entity{
-			Resources: []*backend.Resource{
-				backend.MustNewResource(0, "https://micro.service/checkout/cart"),
+			Resources: []*esitag.Resource{
+				esitag.MustNewResource(0, "https://micro.service/checkout/cart"),
 			},
-			Timeout:        time.Millisecond * 9,
-			OnError:        []byte("Cart service not available\n"),
-			ForwardHeaders: []string{"Cookie", "Accept-Language", "Authorization"},
+			OnError: []byte("Cart service not available\n"),
+			Config: esitag.Config{
+				Timeout:        time.Millisecond * 9,
+				ForwardHeaders: []string{"Cookie", "Accept-Language", "Authorization"},
+			},
 		},
 	))
 
@@ -173,12 +175,14 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include src="https://micro1.service/checkout/cart" src="https://micro2.service/checkout/cart" ttl="9ms"  returnheaders="cookie , ACCEPT-Language, Authorization"`),
 		nil,
 		&esitag.Entity{
-			Resources: []*backend.Resource{
-				backend.MustNewResource(0, "https://micro1.service/checkout/cart"),
-				backend.MustNewResource(1, "https://micro2.service/checkout/cart"),
+			Resources: []*esitag.Resource{
+				esitag.MustNewResource(0, "https://micro1.service/checkout/cart"),
+				esitag.MustNewResource(1, "https://micro2.service/checkout/cart"),
 			},
-			TTL:           time.Millisecond * 9,
-			ReturnHeaders: []string{"Cookie", "Accept-Language", "Authorization"},
+			Config: esitag.Config{
+				TTL:           time.Millisecond * 9,
+				ReturnHeaders: []string{"Cookie", "Accept-Language", "Authorization"},
+			},
 		},
 	))
 
@@ -192,12 +196,14 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include key="product_234234" returnheaders=" all  " forwardheaders=" all  " src="awsRedis1"`),
 		nil,
 		&esitag.Entity{
-			Resources: []*backend.Resource{
-				backend.MustNewResource(0, "awsRedis1"),
+			Resources: []*esitag.Resource{
+				esitag.MustNewResource(0, "awsRedis1"),
 			},
-			Key:               "product_234234",
-			ReturnHeadersAll:  true,
-			ForwardHeadersAll: true,
+			Config: esitag.Config{
+				Key:               "product_234234",
+				ReturnHeadersAll:  true,
+				ForwardHeadersAll: true,
+			},
 		},
 	))
 
@@ -205,12 +211,14 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include key="product_4711" returnheaders='all' forwardheaders="all	" src="awsRedis3"`),
 		nil,
 		&esitag.Entity{
-			Resources: []*backend.Resource{
-				backend.MustNewResource(0, "awsRedis3"),
+			Resources: []*esitag.Resource{
+				esitag.MustNewResource(0, "awsRedis3"),
 			},
-			Key:               "product_4711",
-			ReturnHeadersAll:  true,
-			ForwardHeadersAll: true,
+			Config: esitag.Config{
+				Key:               "product_4711",
+				ReturnHeadersAll:  true,
+				ForwardHeadersAll: true,
+			},
 		},
 	))
 
@@ -218,13 +226,15 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include key='product_234234_{{ .r.Header.Get "myHeaderKey" }}' src="awsRedis2"  returnheaders=" all  " forwardheaders=" all  "`),
 		nil,
 		&esitag.Entity{
-			Resources: []*backend.Resource{
-				backend.MustNewResource(0, "awsRedis2"),
+			Resources: []*esitag.Resource{
+				esitag.MustNewResource(0, "awsRedis2"),
 			},
-			Key:               `product_234234_{{ .r.Header.Get "myHeaderKey" }}`,
-			KeyTemplate:       template.Must(template.New("key_tpl").Parse("unimportant")),
-			ReturnHeadersAll:  true,
-			ForwardHeadersAll: true,
+			Config: esitag.Config{
+				Key:               `product_234234_{{ .r.Header.Get "myHeaderKey" }}`,
+				KeyTemplate:       template.Must(template.New("key_tpl").Parse("unimportant")),
+				ReturnHeadersAll:  true,
+				ForwardHeadersAll: true,
+			},
 		},
 	))
 
@@ -232,11 +242,13 @@ func TestESITag_ParseRaw(t *testing.T) {
 		[]byte(`include xkey='product_234234_{{ .r.Header.Get "myHeaderKey" }}' src="awsRedis2"  returnheaders=" all  " forwardheaders=" all  "`),
 		nil,
 		&esitag.Entity{
-			Resources: []*backend.Resource{
-				backend.MustNewResource(0, "awsRedis2"),
+			Resources: []*esitag.Resource{
+				esitag.MustNewResource(0, "awsRedis2"),
 			},
-			ReturnHeadersAll:  true,
-			ForwardHeadersAll: true,
+			Config: esitag.Config{
+				ReturnHeadersAll:  true,
+				ForwardHeadersAll: true,
+			},
 		},
 	))
 
@@ -533,8 +545,8 @@ func TestEntity_QueryResources(t *testing.T) {
 		}
 	}
 
-	defer backend.RegisterResourceHandler("testa1", backend.MockRequestContent("Response from micro1.service1")).DeferredDeregister()
-	defer backend.RegisterResourceHandler("testa2", backend.MockRequestError(errors.NewFatalf("should not get called"))).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("testa1", backend.MockRequestContent("Response from micro1.service1")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("testa2", backend.MockRequestError(errors.NewFatalf("should not get called"))).DeferredDeregister()
 	t.Run("1st request to first Micro1", runner(
 		httptest.NewRequest("GET", "http://cyrillschumacher.com/esi/endpoint1", nil),
 		`<html><head></head><body>
@@ -544,8 +556,8 @@ func TestEntity_QueryResources(t *testing.T) {
 		nil,
 	))
 
-	defer backend.RegisterResourceHandler("testb1", backend.MockRequestError(errors.NewTimeoutf("Timed out"))).DeferredDeregister()
-	defer backend.RegisterResourceHandler("testb2", backend.MockRequestContent("Response from micro2.service2")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("testb1", backend.MockRequestError(errors.NewTimeoutf("Timed out"))).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("testb2", backend.MockRequestContent("Response from micro2.service2")).DeferredDeregister()
 	t.Run("2nd request to 2nd Micro2", runner(
 		httptest.NewRequest("GET", "http://cyrillschumacher.com/esi/endpoint1", nil),
 		`<html><head></head><body>
@@ -555,8 +567,8 @@ func TestEntity_QueryResources(t *testing.T) {
 		nil,
 	))
 
-	defer backend.RegisterResourceHandler("testc1", backend.MockRequestError(errors.NewTimeoutf("Timed out"))).DeferredDeregister()
-	defer backend.RegisterResourceHandler("testc2", backend.MockRequestError(errors.NewFatalf("Should not get called because testc1 gets only assigned to type Entity and all other protocoals gets discarded"))).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("testc1", backend.MockRequestError(errors.NewTimeoutf("Timed out"))).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("testc2", backend.MockRequestError(errors.NewFatalf("Should not get called because testc1 gets only assigned to type Entity and all other protocoals gets discarded"))).DeferredDeregister()
 	t.Run("2nd request to 2nd Micro2 with different protocol, fails", runner(
 		httptest.NewRequest("GET", "http://cyrillschumacher.com/esi/endpoint1", nil),
 		`<html><head></head><body>
@@ -569,15 +581,15 @@ func TestEntity_QueryResources(t *testing.T) {
 
 func TestEntity_QueryResources_Multi_Calls(t *testing.T) {
 
-	cbFailOld := backend.CBMaxFailures
-	backend.CBMaxFailures = 2
+	cbFailOld := esitag.CBMaxFailures
+	esitag.CBMaxFailures = 2
 	defer func() {
-		backend.CBMaxFailures = cbFailOld
+		esitag.CBMaxFailures = cbFailOld
 	}()
 
 	var partialSuccess int
-	defer backend.RegisterResourceHandler("testd1", resourceMock{
-		DoRequestFn: func(_ *backend.ResourceArgs) (http.Header, []byte, error) {
+	defer esitag.RegisterResourceHandler("testd1", resourceMock{
+		DoRequestFn: func(_ *esitag.ResourceArgs) (http.Header, []byte, error) {
 			partialSuccess++
 
 			if partialSuccess%2 == 0 {
@@ -647,7 +659,7 @@ func TestEntities_QueryResources(t *testing.T) {
 		assert.Exactly(t, esitag.DataTags{}, tags)
 	})
 
-	defer backend.RegisterResourceHandler("teste1", backend.MockRequestContent("Content")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("teste1", backend.MockRequestContent("Content")).DeferredDeregister()
 
 	t.Run("QueryResources Request context canceled", func(t *testing.T) {
 		entities, err := esitag.Parse(strings.NewReader(`<html><head></head><body>
@@ -675,8 +687,8 @@ func TestEntities_QueryResources(t *testing.T) {
 		assert.Exactly(t, esitag.DataTags{}, tags)
 	})
 
-	defer backend.RegisterResourceHandler("teste2a", backend.MockRequestError(errors.NewAlreadyClosedf("Ups already closed"))).DeferredDeregister()
-	defer backend.RegisterResourceHandler("teste2b", backend.MockRequestContent("Content")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("teste2a", backend.MockRequestError(errors.NewAlreadyClosedf("Ups already closed"))).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("teste2b", backend.MockRequestContent("Content")).DeferredDeregister()
 	t.Run("QueryResources failed on 2 out of 3 services", func(t *testing.T) {
 		entities, err := esitag.Parse(strings.NewReader(`<html><head></head><body>
 			<p><esi:include src="testE2a://micro1.service1"  timeout='2s' maxbodysize='3kb' onerror="failed to load service 1" /></p>
