@@ -38,5 +38,5 @@ script:
   - ./integration.sh
 
 after_script:
-  - golint ./...
+  - golint ./... | grep -v .pb.go
   - go test -tags esiall -run=🤐 -bench=. -count=1 -benchmem ./...
