@@ -20,7 +20,10 @@ option java_outer_classname = "CaddyESIProto";
 
 package esigrpc;
 
-// Interface exported by the server.
+// Interface exported by the server. All types of a "repeated string" returns a
+// balanced slice where i=key and i+1=value, the next key can be accessed via
+// i=i+2. A key can occur multiple times but has different values. This
+// implementation was easier to achieve than the classical map[string][]string.
 service HeaderBodyService {
     rpc GetHeaderBody (ResourceArgs) returns (HeaderBody) {
     }

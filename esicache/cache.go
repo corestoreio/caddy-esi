@@ -88,8 +88,7 @@ func (r *registry) Register(scope, url string) error {
 	return nil
 }
 
-// Aliases returns a sorted list of the available aliases for the loaded
-// services.
+// Len returns number of registered caches.
 func (r *registry) Len(scope string) int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
