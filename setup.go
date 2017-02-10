@@ -23,6 +23,7 @@ import (
 
 	"github.com/SchumacherFM/caddyesi/esicache"
 	"github.com/SchumacherFM/caddyesi/esitag"
+	_ "github.com/SchumacherFM/caddyesi/esitag/backend" // Let them register depending on the build tag
 	"github.com/SchumacherFM/caddyesi/helper"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
