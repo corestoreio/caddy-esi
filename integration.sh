@@ -17,7 +17,7 @@ redis-cli -n 1 SET "checkout_cart" "You have 10 items in your cart"
 go build -tags esiall -race -o caddy.bin $GOPATH/src/github.com/mholt/caddy/caddy/main.go
 # go run $GOPATH/src/github.com/mholt/caddy/caddy/main.go -conf ./Caddyfile
 
-./caddy.bin -conf ./Caddyfile 2>&1 > caddy_stdout.log &
+./caddy.bin -conf ./Caddyfile &> caddy_stdout.log && cat caddy_stdout.log &
 sleep 6
 go run $GOPATH/src/github.com/SchumacherFM/caddyesi/ht/*.go
 echo "catting caddy_stdout.log"
