@@ -24,7 +24,6 @@ import (
 
 	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/SchumacherFM/caddyesi/esitag/backend/esigrpc"
-	"github.com/SchumacherFM/caddyesi/helper"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	"github.com/gavv/monotime"
@@ -51,7 +50,7 @@ type grpcClient struct {
 //		grpc://micro.service.tld:9876
 //		grpc://micro.service.tld:34567?timeout=20s&tls=1&ca_file=path/to/ca.pem
 func NewGRPCClient(opt *esitag.ResourceOptions) (esitag.ResourceHandler, error) {
-	addr, _, params, err := helper.ParseNoSQLURL(opt.URL)
+	addr, _, params, err := opt.ParseNoSQLURL()
 	if err != nil {
 		return nil, errors.NewNotValidf("[esibackend_grpc] Error parsing URL %q => %s", opt.URL, err)
 	}

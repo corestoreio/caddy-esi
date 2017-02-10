@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/SchumacherFM/caddyesi/esitag"
-	"github.com/SchumacherFM/caddyesi/helper"
 	"github.com/corestoreio/errors"
 	"github.com/garyburd/redigo/redis"
 )
@@ -42,7 +41,7 @@ type esiRedis struct {
 
 // NewRedis provides, for now, a basic implementation for simple key fetching.
 func NewRedis(opt *esitag.ResourceOptions) (esitag.ResourceHandler, error) {
-	addr, pw, params, err := helper.ParseNoSQLURL(opt.URL)
+	addr, pw, params, err := opt.ParseNoSQLURL()
 	if err != nil {
 		return nil, errors.NewNotValidf("[backend] Redis error parsing URL %q => %s", opt.URL, err)
 	}

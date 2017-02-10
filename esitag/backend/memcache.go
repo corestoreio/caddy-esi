@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/SchumacherFM/caddyesi/esitag"
-	"github.com/SchumacherFM/caddyesi/helper"
 	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/corestoreio/errors"
 )
@@ -39,7 +38,7 @@ type esiMemCache struct {
 
 // NewMemCache creates a new memcache resource handler supporting n-memcache server.
 func NewMemCache(opt *esitag.ResourceOptions) (esitag.ResourceHandler, error) {
-	addr, _, params, err := helper.ParseNoSQLURL(opt.URL)
+	addr, _, params, err := opt.ParseNoSQLURL()
 	if err != nil {
 		return nil, errors.NewNotValidf("[backend] NewMemCache error parsing URL %q => %s", opt.URL, err)
 	}
