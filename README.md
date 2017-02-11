@@ -443,13 +443,17 @@ backend:
 - http://
 - https://
 - sh://
+- redis://
+- memcache://
 - Name of the aliases as defined in the Caddyfile
 - sql:// a SQL query (TODO)
 - grpc:// a remote procedure call with gRPC
 
-#### http
+#### HTTP / HTTPS
 
 `http|s` allows the usual HTTP requests to a resource.
+
+Always enabled.
 
 #### sh shell
 
@@ -473,7 +477,10 @@ lookup time in the operation systems environment PATH variable will take long.
 In general shell execution is pretty slow no matter which kind of
 program/script you call.
 
-#### sql queries TODO
+Disabled by default and must be enabled with a new compiled Caddy binary and the
+build tag `esishell`.
+
+#### SQL queries TODO
 
 `sql` Uses a prepared statement once the ESI tag has been parsed.
 
@@ -481,7 +488,10 @@ program/script you call.
 <esi:include src="alias_name; r.Header.Get " />
 ```
 
-#### grpc Remote Procedure Calls
+Disabled by default and must be enabled with a new compiled Caddy binary and the
+build tag `esisql`.
+
+#### gRPC Remote Procedure Calls
 
 `grpc` queries another gRPC endpoint. A struct of arguments gets encoded and
 passed over the wire.
@@ -494,6 +504,9 @@ You are responsible for building the gRPC server. The `.proto` file and the
 corresponding Go file have been placed in package `backend/esigrpc`. Your gRPC
 server can run in any programming language you like and is supported by gRPC.
 [https://www.grpc.io](https://www.grpc.io)
+
+Disabled by default and must be enabled with a new compiled Caddy binary and the
+build tag `esigrpc`.
 
 ## Unsupported ESI Tags
 
@@ -509,13 +522,17 @@ replaced by a different package with a different syntax.
 
 # Building
 
-Use build tags to enable the different resource handlers. Supported tags are:
+Use build tags to enable the different backend resource handlers in package
+`esitag/backend`. Supported tags are:
 
-- all: enables all handlers
-- redis: compiles redis handlers
+- esiall: enables all handlers
+- esigrpc: compiles gRPC handler only
+- esiredis: compiles Redis handler only
+- esimemcache: compiles Memcache handler only
+- esishell: compiles shell handler only
 - .... ?
 
-See `.travis.yml` and `integration.sh` for examples.
+See file `integration.sh` for examples.
 
 # Contribute
 

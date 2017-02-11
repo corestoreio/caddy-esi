@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/SchumacherFM/caddyesi/esitag"
-	"github.com/SchumacherFM/caddyesi/esitag/backend"
+	"github.com/SchumacherFM/caddyesi/esitesting"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log/logw"
 	"github.com/stretchr/testify/assert"
@@ -75,8 +75,8 @@ func TestEntity_ParseRaw_Src_Template(t *testing.T) {
 func TestEntity_ParseRaw_Key_Template(t *testing.T) {
 	t.Parallel()
 
-	defer esitag.RegisterResourceHandler("redisAWS1", backend.MockRequestContent("Any content")).DeferredDeregister()
-	defer esitag.RegisterResourceHandler("redisAWS2", backend.MockRequestContent("Any content")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("redisAWS1", esitesting.MockRequestContent("Any content")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("redisAWS2", esitesting.MockRequestContent("Any content")).DeferredDeregister()
 
 	et := &esitag.Entity{
 		RawTag: []byte(`include
@@ -103,9 +103,9 @@ func TestEntity_ParseRaw_Key_Template(t *testing.T) {
 func TestESITag_ParseRaw(t *testing.T) {
 	t.Parallel()
 
-	defer esitag.RegisterResourceHandler("awsRedis1", backend.MockRequestContent("Any content")).DeferredDeregister()
-	defer esitag.RegisterResourceHandler("awsRedis2", backend.MockRequestContent("Any content")).DeferredDeregister()
-	defer esitag.RegisterResourceHandler("awsRedis3", backend.MockRequestContent("Any content")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("awsRedis1", esitesting.MockRequestContent("Any content")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("awsRedis2", esitesting.MockRequestContent("Any content")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("awsRedis3", esitesting.MockRequestContent("Any content")).DeferredDeregister()
 
 	runner := func(rawTag []byte, wantErrBhf errors.BehaviourFunc, wantET *esitag.Entity) func(*testing.T) {
 		return func(t *testing.T) {
@@ -517,8 +517,8 @@ func TestEntity_QueryResources(t *testing.T) {
 		}
 	}
 
-	defer esitag.RegisterResourceHandler("testa1", backend.MockRequestContent("Response from micro1.service1")).DeferredDeregister()
-	defer esitag.RegisterResourceHandler("testa2", backend.MockRequestError(errors.NewFatalf("should not get called"))).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("testa1", esitesting.MockRequestContent("Response from micro1.service1")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("testa2", esitesting.MockRequestError(errors.NewFatalf("should not get called"))).DeferredDeregister()
 	t.Run("1st request to first Micro1", runner(
 		httptest.NewRequest("GET", "http://cyrillschumacher.com/esi/endpoint1", nil),
 		`<html><head></head><body>
@@ -528,8 +528,8 @@ func TestEntity_QueryResources(t *testing.T) {
 		nil,
 	))
 
-	defer esitag.RegisterResourceHandler("testb1", backend.MockRequestError(errors.NewTimeoutf("Timed out"))).DeferredDeregister()
-	defer esitag.RegisterResourceHandler("testb2", backend.MockRequestContent("Response from micro2.service2")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("testb1", esitesting.MockRequestError(errors.NewTimeoutf("Timed out"))).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("testb2", esitesting.MockRequestContent("Response from micro2.service2")).DeferredDeregister()
 	t.Run("2nd request to 2nd Micro2", runner(
 		httptest.NewRequest("GET", "http://cyrillschumacher.com/esi/endpoint1", nil),
 		`<html><head></head><body>
@@ -539,8 +539,8 @@ func TestEntity_QueryResources(t *testing.T) {
 		nil,
 	))
 
-	defer esitag.RegisterResourceHandler("testc1", backend.MockRequestError(errors.NewTimeoutf("Timed out"))).DeferredDeregister()
-	defer esitag.RegisterResourceHandler("testc2", backend.MockRequestError(errors.NewFatalf("Should not get called because testc1 gets only assigned to type Entity and all other protocoals gets discarded"))).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("testc1", esitesting.MockRequestError(errors.NewTimeoutf("Timed out"))).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("testc2", esitesting.MockRequestError(errors.NewFatalf("Should not get called because testc1 gets only assigned to type Entity and all other protocoals gets discarded"))).DeferredDeregister()
 	t.Run("2nd request to 2nd Micro2 with different protocol, fails", runner(
 		httptest.NewRequest("GET", "http://cyrillschumacher.com/esi/endpoint1", nil),
 		`<html><head></head><body>
@@ -631,7 +631,7 @@ func TestEntities_QueryResources(t *testing.T) {
 		assert.Exactly(t, esitag.DataTags{}, tags)
 	})
 
-	defer esitag.RegisterResourceHandler("teste1", backend.MockRequestContent("Content")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("teste1", esitesting.MockRequestContent("Content")).DeferredDeregister()
 
 	t.Run("QueryResources Request context canceled", func(t *testing.T) {
 		entities, err := esitag.Parse(strings.NewReader(`<html><head></head><body>
@@ -659,8 +659,8 @@ func TestEntities_QueryResources(t *testing.T) {
 		assert.Exactly(t, esitag.DataTags{}, tags)
 	})
 
-	defer esitag.RegisterResourceHandler("teste2a", backend.MockRequestError(errors.NewAlreadyClosedf("Ups already closed"))).DeferredDeregister()
-	defer esitag.RegisterResourceHandler("teste2b", backend.MockRequestContent("Content")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("teste2a", esitesting.MockRequestError(errors.NewAlreadyClosedf("Ups already closed"))).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("teste2b", esitesting.MockRequestContent("Content")).DeferredDeregister()
 	t.Run("QueryResources failed on 2 out of 3 services", func(t *testing.T) {
 		entities, err := esitag.Parse(strings.NewReader(`<html><head></head><body>
 			<p><esi:include src="testE2a://micro1.service1"  timeout='2s' maxbodysize='3kb' onerror="failed to load service 1" /></p>

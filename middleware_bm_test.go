@@ -23,7 +23,7 @@ import (
 
 	"github.com/SchumacherFM/caddyesi"
 	"github.com/SchumacherFM/caddyesi/esitag"
-	"github.com/SchumacherFM/caddyesi/esitag/backend"
+	"github.com/SchumacherFM/caddyesi/esitesting"
 	"github.com/corestoreio/errors"
 	"github.com/mholt/caddy"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
@@ -32,7 +32,7 @@ import (
 // BenchmarkMiddleware_ServeHTTP-4   	   20000	     60994 ns/op	   44397 B/op	      52 allocs/op
 func BenchmarkMiddleware_ServeHTTP(b *testing.B) {
 
-	defer esitag.RegisterResourceHandler("bmServe01", backend.MockRequestContent("Hello 2017!")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("bmServe01", esitesting.MockRequestContent("Hello 2017!")).DeferredDeregister()
 
 	const serveFile = `testdata/page03.html`
 	const caddyFile = `esi {

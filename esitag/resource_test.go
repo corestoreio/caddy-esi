@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/SchumacherFM/caddyesi/esitag"
-	"github.com/SchumacherFM/caddyesi/esitag/backend"
+	"github.com/SchumacherFM/caddyesi/esitesting"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	"github.com/mailru/easyjson"
@@ -42,7 +42,7 @@ func TestNewResourceHandler_Mock(t *testing.T) {
 
 	rh, err := esitag.NewResourceHandler(esitag.NewResourceOptions("mockTimeout://4s"))
 	assert.NoError(t, err)
-	_, ok := rh.(backend.ResourceMock)
+	_, ok := rh.(esitesting.ResourceMock)
 	assert.True(t, ok, "It should be type ResourceMock")
 
 	n1, n2, err := rh.DoRequest(nil)

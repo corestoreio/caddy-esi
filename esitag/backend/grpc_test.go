@@ -24,6 +24,7 @@ import (
 
 	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/SchumacherFM/caddyesi/esitag/backend"
+	"github.com/SchumacherFM/caddyesi/esitesting"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	"github.com/stretchr/testify/assert"
@@ -58,13 +59,13 @@ func (lw *grpcLogTestWrap) Println(args ...interface{}) { lw.Lock(); lw.tb.Log(a
 func TestNewGRPCClient(t *testing.T) {
 	t.Parallel()
 
-	cmd := backend.StartProcess("go", "run", "grpc_server_main.go")
+	cmd := esitesting.StartProcess("go", "run", "grpc_server_main.go")
 	go cmd.Wait()            // waits forever until killed
 	defer cmd.Process.Kill() // kills the go process but not the main started server
 	// when subtests which uses grpcInsecureClient run in parallel then you have
 	// to comment this out because you don't know when the sub tests finishes
 	// and the GRPC server gets killed before the tests finishes.
-	defer backend.KillZombieProcess("grpc_server_main")
+	defer esitesting.KillZombieProcess("grpc_server_main")
 
 	grpclog.SetLogger(&grpcLogTestWrap{tb: t})
 
@@ -208,10 +209,10 @@ func BenchmarkNewGRPCClient_Parallel(b *testing.B) {
 
 	// This parent benchmark function runs only once as soon as there is another
 	// sub-benchmark.
-	cmd := backend.StartProcess("go", "run", "grpc_server_main.go")
+	cmd := esitesting.StartProcess("go", "run", "grpc_server_main.go")
 	go cmd.Wait()            // waits forever until killed
 	defer cmd.Process.Kill() // kills the go process but not the main started server
-	defer backend.KillZombieProcess("grpc_server_main")
+	defer esitesting.KillZombieProcess("grpc_server_main")
 
 	grpclog.SetLogger(&grpcLogTestWrap{tb: b})
 

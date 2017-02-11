@@ -24,7 +24,8 @@ import (
 	"testing"
 
 	"github.com/SchumacherFM/caddyesi/esitag"
-	"github.com/SchumacherFM/caddyesi/esitag/backend"
+	_ "github.com/SchumacherFM/caddyesi/esitag/backend" // import registered handlers
+	"github.com/SchumacherFM/caddyesi/esitesting"
 	"github.com/corestoreio/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -211,9 +212,9 @@ func BenchmarkParseESITags(b *testing.B) {
 func TestParseESITags_String(t *testing.T) {
 	t.Parallel()
 
-	defer esitag.RegisterResourceHandler("gopher1", backend.MockRequestContent("Any content")).DeferredDeregister()
-	defer esitag.RegisterResourceHandler("url1", backend.MockRequestContent("Any content")).DeferredDeregister()
-	defer esitag.RegisterResourceHandler("url2", backend.MockRequestContent("Any content")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("gopher1", esitesting.MockRequestContent("Any content")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("url1", esitesting.MockRequestContent("Any content")).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("url2", esitesting.MockRequestContent("Any content")).DeferredDeregister()
 
 	t.Run("Five ESI Tags", testRunner(
 		(`@<esi:include   src="https://micro1.service1/esi/foo"
