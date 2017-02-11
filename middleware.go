@@ -231,7 +231,7 @@ func handleHeaderCommands(pc *PathConfig, w http.ResponseWriter, r *http.Request
 		if err != nil {
 			return errors.Wrap(err, "[caddyesi] handleHeaderCommands.setupLogger")
 		}
-		w.Header().Set(pc.CmdHeaderName, fmt.Sprintf( "log-%s-ok",prevLevel))
+		w.Header().Set(pc.CmdHeaderName, fmt.Sprintf("log-%s-ok", prevLevel))
 	}
 
 	return nil
