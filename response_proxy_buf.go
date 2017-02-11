@@ -59,7 +59,7 @@ type bufferedWriter struct {
 	writeReal bool
 	// addContentLength rewrites the Content-Length header to the correct
 	// returned length. Value can also be negative when the error message in an
-	// ESI tag is shorter than the length of the ESI tag.
+	// Tag tag is shorter than the length of the Tag tag.
 	addContentLength int
 	wroteHeader      bool
 	code             int

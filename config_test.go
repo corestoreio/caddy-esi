@@ -344,7 +344,7 @@ var benchIsResponseAllowed bool
 // BenchmarkIsResponseAllowed/Detect_html-4           	50000000	        37.3 ns/op	       0 B/op	       0 allocs/op
 func BenchmarkIsResponseAllowed(b *testing.B) {
 	mp4 := []byte("\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom<\x06t\xbfmdat")
-	html := []byte(`<!DOCTYPE html>  <html lang="en-US"><head>     <title>Caddy ESI Tag Demo</title> </head><body> <h1> Caddy ESI Tag Demo Page</h1> <table>    <tbody>    <tr>        <th> Name</th>        <th>Output</th>    </tr>    <tr>        <td>Should now a cart from ms_cart_tiny.html</td>        <td>            <esi:include src="http://127.0.0.1:3017/ms_cart_tiny.html"/>        </td>    </tr>    </tbody></table></body></html>`)
+	html := []byte(`<!DOCTYPE html>  <html lang="en-US"><head>     <title>Caddy Tag Tag Demo</title> </head><body> <h1> Caddy Tag Tag Demo Page</h1> <table>    <tbody>    <tr>        <th> Name</th>        <th>Output</th>    </tr>    <tr>        <td>Should now a cart from ms_cart_tiny.html</td>        <td>            <esi:include src="http://127.0.0.1:3017/ms_cart_tiny.html"/>        </td>    </tr>    </tbody></table></body></html>`)
 
 	b.Run("Detect binary", func(b *testing.B) {
 		b.ReportAllocs()

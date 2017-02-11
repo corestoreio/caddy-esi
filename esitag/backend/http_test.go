@@ -34,28 +34,28 @@ import (
 func TestNewFetchHTTP_Serial(t *testing.T) {
 	t.Parallel()
 
-	rfa := &esitag.ResourceArgs{
-		URL: "http://whatever.anydomain/page.html",
-		ExternalReq: func() *http.Request {
+	rfa := esitag.NewResourceArgs(
+		func() *http.Request {
 			req := httptest.NewRequest("GET", "/", nil)
 			req.Header.Set("X-Last-Viewed_Products", "1,2,3")
 			req.Header.Set("X-Cart-ID", "1234567890")
 			req.Header.Set("Cookie", "x-wl-uid=1vnTVF5WyZIe5Fymf2a4H+pFPyJa4wxNmzCKdImj1UqQPV5ecUs1sn46vDbGJUI+sE=")
 			return req
 		}(),
-		Config: esitag.Config{
+		"http://whatever.anydomain/page.html",
+		esitag.Config{
 			Timeout:        time.Second,
 			MaxBodySize:    15,
 			ForwardHeaders: []string{"X-Cart-Id", "Cookie"},
 			ReturnHeaders:  []string{"Set-Cookie"},
 		},
-	}
+	)
 
 	t.Run("Forward and Return Headers", func(t *testing.T) {
 
 		rfa2 := new(esitag.ResourceArgs)
 		*rfa2 = *rfa
-		rfa2.MaxBodySize = 3000
+		rfa2.Tag.MaxBodySize = 3000
 
 		hdr, content, err := backend.NewFetchHTTP(&esitesting.HTTPTrip{
 			GenerateResponse: func(req *http.Request) *http.Response {
@@ -82,7 +82,7 @@ func TestNewFetchHTTP_Serial(t *testing.T) {
 
 		rfa2 := new(esitag.ResourceArgs)
 		*rfa2 = *rfa
-		rfa2.ReturnHeaders = nil
+		rfa2.Tag.ReturnHeaders = nil
 
 		hdr, content, err := backend.NewFetchHTTP(esitesting.NewHTTPTrip(200, "A response longer than 15 bytes", nil)).DoRequest(rfa2)
 		assert.Nil(t, hdr, "Header")
@@ -112,8 +112,8 @@ func TestNewFetchHTTP_Serial(t *testing.T) {
 		rfa2 := new(esitag.ResourceArgs)
 		*rfa2 = *rfa
 
-		rfa2.ReturnHeaders = nil
-		rfa2.MaxBodySize = 300
+		rfa2.Tag.ReturnHeaders = nil
+		rfa2.Tag.MaxBodySize = 300
 		ctx, cancel := context.WithCancel(rfa2.ExternalReq.Context())
 		rfa2.ExternalReq = rfa2.ExternalReq.WithContext(ctx)
 		cancel()
@@ -175,14 +175,14 @@ func TestNewFetchHTTP_Parallel(t *testing.T) {
 		go func(wg *sync.WaitGroup) {
 			defer wg.Done()
 
-			hdr, content, err := fh.DoRequest(&esitag.ResourceArgs{
-				ExternalReq: getExternalReqWithExtendedHeaders(),
-				URL:         srv.URL,
-				Config: esitag.Config{
+			hdr, content, err := fh.DoRequest(esitag.NewResourceArgs(
+				getExternalReqWithExtendedHeaders(),
+				srv.URL,
+				esitag.Config{
 					Timeout:     time.Second,
 					MaxBodySize: 300,
 				},
-			})
+			))
 			if err != nil {
 				t.Fatalf("%+v", err)
 			}

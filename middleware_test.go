@@ -153,6 +153,7 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 	{
 		tmpLogFile, clean := esitesting.Tempfile(t)
 		defer clean()
+		t.Log("tmpLogFile", tmpLogFile)
 		t.Run("Replace a single ESI Tag in page01.html but error in backend request", mwTestRunner(
 			`esi {
 			on_error "my important global error message"
@@ -168,7 +169,10 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Exactly(t, 2, strings.Count(string(logContent), `"error":"`+errMsg+`"`), "Should contain 2 occurrences")
+
+		assert.Exactly(t, 2,
+			strings.Count(string(logContent), `"error":"[esibackend] Resource.Handler.DoRequest: `+errMsg+`"`),
+			"Should contain 2 occurrences")
 		assert.Exactly(t, 2, strings.Count(string(logContent), `"resource_url":"mwTest01://micro.service/esi/foo"`), "Should contain 2 occurrences")
 	}
 

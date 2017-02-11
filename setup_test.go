@@ -51,7 +51,7 @@ func testPluginSetup(config string, wantPC PathConfigs, cacheCount int, requestF
 		handler := mids[0](httpserver.EmptyNext)
 		myHandler, ok := handler.(*Middleware)
 		if !ok {
-			t.Fatalf("Expected handler to be type ESI, got: %#v", handler)
+			t.Fatalf("Expected handler to be type Tag, got: %#v", handler)
 		}
 
 		assert.Exactly(t, len(wantPC), len(myHandler.PathConfigs))

@@ -110,6 +110,10 @@ func (mc *grpcClient) DoRequest(args *esitag.ResourceArgs) (http.Header, []byte,
 	if err := args.Validate(); err != nil {
 		return nil, nil, errors.Wrap(err, "[esibackend] FetchHTTP.args.Validate")
 	}
+	if err := args.ValidateWithKey(); err != nil {
+		return nil, nil, errors.Wrap(err, "[esibackend] FetchHTTP.args.ValidateWithKey")
+	}
+
 	// TODO(CyS) Distinguish between GET and POST like requests to reduce argument
 	// building times and allocs.
 	in := &esigrpc.ResourceArgs{
@@ -130,15 +134,15 @@ func (mc *grpcClient) DoRequest(args *esitag.ResourceArgs) (http.Header, []byte,
 			RequestUri:       args.ExternalReq.RequestURI,
 		},
 		Url:              args.URL,
-		MaxBodySize:      args.MaxBodySize,
-		Key:              args.Key,
-		ReturnHeaders:    args.ReturnHeaders,
-		ReturnHeadersAll: args.ReturnHeadersAll,
+		MaxBodySize:      args.Tag.MaxBodySize,
+		Key:              args.Tag.Key,
+		ReturnHeaders:    args.Tag.ReturnHeaders,
+		ReturnHeadersAll: args.Tag.ReturnHeadersAll,
 	}
 
 	r, err := mc.client.GetHeaderBody(args.ExternalReq.Context(), in)
-	if args.Log.IsDebug() {
-		args.Log.Debug("backend.grpcClient.DoRequest.ResourceArg",
+	if args.Tag.Log.IsDebug() {
+		args.Tag.Log.Debug("backend.grpcClient.DoRequest.ResourceArg",
 			log.Err(err), log.Duration(log.KeyNameDuration, monotime.Since(timeStart)),
 			log.Marshal("resource_args", args), log.Object("grpc_resource_args", in),
 			log.String("grpc_return_body", string(r.GetBody())),
@@ -148,19 +152,9 @@ func (mc *grpcClient) DoRequest(args *esitag.ResourceArgs) (http.Header, []byte,
 		return nil, nil, errors.Wrapf(err, "[esibackend] GetHeaderBody")
 	}
 
-	return nil, r.GetBody(), nil
-}
-
-func (mc *grpcClient) validateArgs(args *esitag.ResourceArgs) (err error) {
-	switch {
-	case args.Key == "":
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %#v the URL value is empty", args)
-	case args.ExternalReq == nil:
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q => %q the ExternalReq value is nil", mc.url, args.Key)
-	case args.Timeout < 1:
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q => %q the timeout value is empty", mc.url, args.Key)
-	case args.MaxBodySize == 0:
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q => %q the maxBodySize value is empty", mc.url, args.Key)
+	bdy := r.GetBody()
+	if mbs := int(args.Tag.MaxBodySize); len(bdy) > mbs && mbs > 0 {
+		bdy = bdy[:mbs]
 	}
-	return
+	return nil, bdy, nil
 }

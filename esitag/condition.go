@@ -20,13 +20,12 @@ import (
 
 // Conditioner does not represent your favorite shampoo but it gives you the
 // possibility to define an expression which gets executed for every request to
-// include the ESI resource or not.
+// include the Tag resource or not.
 type Conditioner interface {
 	OK(r *http.Request) bool
 }
 
 type condition struct {
-	tpl TemplateExecer
 }
 
 func (c condition) OK(r *http.Request) bool {

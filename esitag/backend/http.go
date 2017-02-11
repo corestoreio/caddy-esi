@@ -34,7 +34,7 @@ func init() {
 	esitag.RegisterResourceHandler("https", f)
 }
 
-// DefaultHTTPTransport our own transport for all ESI tag resources instead of
+// DefaultHTTPTransport our own transport for all Tag tag resources instead of
 // relying on net/http.DefaultTransport. This transport gets also mocked for
 // tests. Only used in init(), see above.
 var DefaultHTTPTransport = &http.Transport{
@@ -82,7 +82,7 @@ func (fh *fetchHTTP) DoRequest(args *esitag.ResourceArgs) (http.Header, []byte, 
 
 	// TODO(CyS) external POST requests or GET with query string should forward
 	// this data. So the http.NewRequest should then change to POST if the
-	// configuration for this specific ESI tag allows it.
+	// configuration for this specific Tag tag allows it.
 
 	req, err := http.NewRequest("GET", args.URL, nil)
 	if err != nil {
@@ -95,7 +95,7 @@ func (fh *fetchHTTP) DoRequest(args *esitag.ResourceArgs) (http.Header, []byte, 
 
 	// do we overwrite here the Timeout from args.ExternalReq ? or just adding our
 	// own timeout?
-	ctx, cancel := context.WithTimeout(args.ExternalReq.Context(), args.Timeout)
+	ctx, cancel := context.WithTimeout(args.ExternalReq.Context(), args.Tag.Timeout)
 	defer cancel()
 
 	resp, err := fh.client.Do(req.WithContext(ctx))
@@ -108,8 +108,8 @@ func (fh *fetchHTTP) DoRequest(args *esitag.ResourceArgs) (http.Header, []byte, 
 		select {
 		case <-ctx.Done():
 			if cncl, ok := fh.client.Transport.(requestCanceller); ok {
-				if args.Log.IsInfo() {
-					args.Log.Info("esibackend.FetchHTTP.DoRequest.client.Transport.requestCanceller",
+				if args.Tag.Log.IsInfo() {
+					args.Tag.Log.Info("esibackend.FetchHTTP.DoRequest.client.Transport.requestCanceller",
 						log.String("url", args.URL), loghttp.Request("backend_request", req),
 					)
 				}
@@ -121,20 +121,20 @@ func (fh *fetchHTTP) DoRequest(args *esitag.ResourceArgs) (http.Header, []byte, 
 		return nil, nil, errors.Wrapf(err, "[esibackend] FetchHTTP error for URL %q", args.URL)
 	}
 
-	if resp.StatusCode != http.StatusOK { // this can be made configurable in an ESI tag
+	if resp.StatusCode != http.StatusOK { // this can be made configurable in an Tag tag
 		return nil, nil, errors.NewNotSupportedf("[backend] FetchHTTP: Response Code %q not supported for URL %q", resp.StatusCode, args.URL)
 	}
 
 	// not yet worth to put the resp.Body reader into its own goroutine
 
 	buf := new(bytes.Buffer)
-	mbs := int64(args.MaxBodySize) // overflow of uint into int ?
+	mbs := int64(args.Tag.MaxBodySize) // overflow of uint into int ?
 	n, err := buf.ReadFrom(io.LimitReader(resp.Body, mbs))
 	if err != nil && err != io.EOF {
 		return nil, nil, errors.Wrapf(err, "[esibackend] FetchHTTP.ReadFrom Body for URL %q failed", args.URL)
 	}
-	if n >= mbs && args.Log != nil && args.Log.IsInfo() { // body has been cut off
-		args.Log.Info("esibackend.FetchHTTP.LimitReader",
+	if n >= mbs && args.Tag.Log != nil && args.Tag.Log.IsInfo() { // body has been cut off
+		args.Tag.Log.Info("esibackend.FetchHTTP.LimitReader",
 			log.String("url", args.URL), log.Int64("bytes_read", n), log.Int64("bytes_max_read", mbs),
 		)
 	}

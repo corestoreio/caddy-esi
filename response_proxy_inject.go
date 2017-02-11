@@ -90,7 +90,7 @@ func (b *injectingWriter) WriteHeader(code int) {
 	b.rw.WriteHeader(code)
 }
 
-// Write scans p for occurrences of ESI tags and injects the ESI tag content
+// Write scans p for occurrences of Tag tags and injects the Tag tag content
 // into the http.ResponseWriter. Write will write more data than the returned
 // int states. The returned int is len(p). The reason for that incorrect
 // behaviour can be looked up bytes.Buffer.WriteTo where it will panic once the

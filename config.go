@@ -69,8 +69,8 @@ type PathConfig struct {
 	// Timeout global. Time when a request to a source should be canceled.
 	// Default value from the constant DefaultTimeOut.
 	Timeout time.Duration
-	// TTL global time-to-live in the storage backend for ESI data. Defaults to
-	// zero, caching globally disabled until an ESI tag or this configuration
+	// TTL global time-to-live in the storage backend for Tag data. Defaults to
+	// zero, caching globally disabled until an Tag tag or this configuration
 	// value contains the TTL attribute.
 	TTL time.Duration
 	// CmdHeaderName if set allows to execute certain maintenance functions to
@@ -81,7 +81,7 @@ type PathConfig struct {
 	// PageIDSource defines a slice of possible parameters which gets extracted
 	// from the http.Request object. All these parameters will be used to
 	// extract the values and calculate a unique hash for the current requested
-	// page to identify the already parsed ESI tags in the cache.
+	// page to identify the already parsed Tag tags in the cache.
 	PageIDSource []string
 	// AllowedMethods list of all benchIsResponseAllowed methods, defaults to GET
 	AllowedMethods []string
@@ -96,7 +96,7 @@ type PathConfig struct {
 	LogLevel string
 	// Log gets set up during setup
 	Log log.Logger
-	// esiCache identifies all parsed ESI tags in a page for specific path
+	// esiCache identifies all parsed Tag tags in a page for specific path
 	// prefix. uint64 represents the hash for the current request calculated by
 	// pageID function. Long term "bug": Maybe we need here another algorithm
 	// instead of the map. Due to a higher granularity of the pageID the map
@@ -143,9 +143,9 @@ func (pc *PathConfig) ESITagsByRequest(r *http.Request) (pageID uint64, t esitag
 	return
 }
 
-// UpsertESITags processes each ESI entity to update their default values with
-// the supplied global PathConfig value. Then inserts the ESI entities with its
-// associated page ID in the internal ESI cache. These writes to esitag.Entity
+// UpsertESITags processes each Tag entity to update their default values with
+// the supplied global PathConfig value. Then inserts the Tag entities with its
+// associated page ID in the internal Tag cache. These writes to esitag.Entity
 // happens in a locked environment. So there should be no race condition.
 func (pc *PathConfig) UpsertESITags(pageID uint64, entities esitag.Entities) {
 
@@ -161,7 +161,7 @@ func (pc *PathConfig) UpsertESITags(pageID uint64, entities esitag.Entities) {
 		// create sync.pool of arguments for the resources. Now with all correct
 		// default values.
 		et.InitPoolRFA(&esitag.ResourceArgs{
-			Config: esitag.Config{
+			Tag: esitag.Config{
 				Log:         pc.Log,
 				MaxBodySize: pc.MaxBodySize,
 				Timeout:     pc.Timeout,

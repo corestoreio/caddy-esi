@@ -30,7 +30,7 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-// Middleware implements the ESI tag middleware
+// Middleware implements the Tag tag middleware
 type Middleware struct {
 	Group singleflight.Group
 	// Root the Server root
@@ -40,7 +40,7 @@ type Middleware struct {
 	// Next HTTP handler in the chain
 	Next httpserver.Handler
 
-	// PathConfigs The list of ESI configurations for each path prefix and theirs
+	// PathConfigs The list of Tag configurations for each path prefix and theirs
 	// caches.
 	PathConfigs
 }
@@ -60,18 +60,18 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 		return mw.Next.ServeHTTP(w, r) // go on ...
 	}
 	if err := handleHeaderCommands(cfg, w, r); err != nil {
-		// clears the ESI tags
+		// clears the Tag tags
 		return http.StatusInternalServerError, err
 	}
 
 	pageID, esiEntities := cfg.ESITagsByRequest(r)
 	if esiEntities == nil {
-		// Slow path because ESI cache tag is empty and we need to analyse the buffer.
+		// Slow path because Tag cache tag is empty and we need to analyse the buffer.
 		return mw.serveBuffered(cfg, pageID, w, r)
 	}
 
 	////////////////////////////////////////////////////////////////////////////////
-	// Proceed from map, filled with the parsed ESI tags.
+	// Proceed from map, filled with the parsed Tag tags.
 
 	chanTags := make(chan esitag.DataTags, 1)
 	defer close(chanTags)
@@ -102,7 +102,7 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 }
 
 // serveBuffered creates a http.ResponseWriter buffer, calls the next handler,
-// waits until the buffer has been filled, parses the buffer for ESI tags,
+// waits until the buffer has been filled, parses the buffer for Tag tags,
 // queries the resources and injects the data from the resources into the output
 // towards the http.ResponseWriter.Write.
 func (mw *Middleware) serveBuffered(cfg *PathConfig, pageID uint64, w http.ResponseWriter, r *http.Request) (int, error) {
@@ -129,8 +129,8 @@ func (mw *Middleware) serveBuffered(cfg *PathConfig, pageID uint64, w http.Respo
 
 	bufRdr := bytes.NewReader(buf.Bytes())
 
-	// Parse the buffer to find ESI tags. First buffer Read happens within this
-	// Group.Do block. We make sure with the Group.Do call that ESI tags for a
+	// Parse the buffer to find Tag tags. First buffer Read happens within this
+	// Group.Do block. We make sure with the Group.Do call that Tag tags for a
 	// specific page ID gets only parsed once, even if multiple requests are
 	// coming in to for same page. Therefore you should make sure that your
 	// pageID has been calculated correctly.
@@ -202,7 +202,7 @@ func (mw *Middleware) serveBuffered(cfg *PathConfig, pageID uint64, w http.Respo
 }
 
 // handleHeaderCommands allows to execute certain commands to influence the
-// behaviour of the ESI tag middleware.
+// behaviour of the Tag tag middleware.
 func handleHeaderCommands(pc *PathConfig, w http.ResponseWriter, r *http.Request) (err error) {
 	if pc.CmdHeaderName == "" {
 		return nil
@@ -231,7 +231,7 @@ func handleHeaderCommands(pc *PathConfig, w http.ResponseWriter, r *http.Request
 		if err != nil {
 			return errors.Wrap(err, "[caddyesi] handleHeaderCommands.setupLogger")
 		}
-		w.Header().Set(pc.CmdHeaderName, fmt.Sprintf("log-%s-ok", prevLevel))
+		w.Header().Set(pc.CmdHeaderName, fmt.Sprintf( "log-%s-ok",prevLevel))
 	}
 
 	return nil

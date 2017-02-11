@@ -18,10 +18,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"testing"
-	"text/template"
 	"time"
 
 	"github.com/SchumacherFM/caddyesi/esitag"
@@ -34,7 +32,7 @@ func BenchmarkResourceArgs_PrepareForwardHeaders(b *testing.B) {
 
 	rfa := &esitag.ResourceArgs{
 		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Config: esitag.Config{
+		Tag: esitag.Config{
 			ForwardHeadersAll: true,
 		},
 	}
@@ -51,8 +49,8 @@ func BenchmarkResourceArgs_PrepareForwardHeaders(b *testing.B) {
 	})
 
 	b.Run("Two", func(b *testing.B) {
-		rfa.ForwardHeadersAll = false
-		rfa.ForwardHeaders = []string{"Cookie", "user-agent"}
+		rfa.Tag.ForwardHeadersAll = false
+		rfa.Tag.ForwardHeaders = []string{"Cookie", "user-agent"}
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
@@ -70,7 +68,7 @@ func BenchmarkResourceArgs_PrepareReturnHeaders(b *testing.B) {
 
 	rfa := &esitag.ResourceArgs{
 		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Config: esitag.Config{
+		Tag: esitag.Config{
 			ReturnHeadersAll: true,
 		},
 	}
@@ -87,8 +85,8 @@ func BenchmarkResourceArgs_PrepareReturnHeaders(b *testing.B) {
 	})
 
 	b.Run("Two", func(b *testing.B) {
-		rfa.ReturnHeadersAll = false
-		rfa.ReturnHeaders = []string{"Set-Cookie", "x-sdch-encode"}
+		rfa.Tag.ReturnHeadersAll = false
+		rfa.Tag.ReturnHeaders = []string{"Set-Cookie", "x-sdch-encode"}
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
@@ -100,47 +98,13 @@ func BenchmarkResourceArgs_PrepareReturnHeaders(b *testing.B) {
 	})
 }
 
-func BenchmarkResourceArgs_TemplateToURL(b *testing.B) {
-	const key = `product_{{ .Req.Header.Get "X-Product-ID" }}`
-	const wantKey = `product_GopherPlushXXL`
-	tpl, err := template.New("key_tpl").Parse(key)
-	if err != nil {
-		b.Fatalf("%+v", err)
-	}
-
-	rfa := &esitag.ResourceArgs{
-		ExternalReq: func() *http.Request {
-			req := httptest.NewRequest("GET", "/", nil)
-			req.Header.Set("X-Product-ID", "GopherPlushXXL")
-			return req
-		}(),
-		Config: esitag.Config{
-			Key:         key,
-			KeyTemplate: tpl,
-		},
-	}
-
-	b.ResetTimer()
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		have, err := rfa.TemplateToURL(tpl)
-		if err != nil {
-			b.Fatalf("%+v", err)
-		}
-		if have != wantKey {
-			b.Errorf("Have: %v Want: %v", have, wantKey)
-		}
-
-	}
-}
-
 // BenchmarkResourceArgs_MarshalEasyJSON-4   	  300000	      4844 ns/op	    1922 B/op	       6 allocs/op
 func BenchmarkResourceArgs_MarshalEasyJSON(b *testing.B) {
 
 	rfa := &esitag.ResourceArgs{
 		URL:         "https://corestore.io",
 		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Config: esitag.Config{
+		Tag: esitag.Config{
 			Timeout:        5 * time.Second,
 			MaxBodySize:    50000,
 			Key:            "a_r€dis_ky",
@@ -198,7 +162,7 @@ func BenchmarkNewFetchHTTP_Parallel(b *testing.B) {
 		rfa := &esitag.ResourceArgs{
 			ExternalReq: getExternalReqWithExtendedHeaders(),
 			URL:         backendURL,
-			Config: esitag.Config{
+			Tag: esitag.Config{
 				Timeout:     time.Second,
 				MaxBodySize: 22001,
 			},
@@ -250,7 +214,7 @@ func BenchmarkNewFetchShellExec_Parallel(b *testing.B) {
 	rfa := &esitag.ResourceArgs{
 		ExternalReq: getExternalReqWithExtendedHeaders(),
 		URL:         "sh:///bin/cat testdata/cart_example.html",
-		Config: esitag.Config{
+		Tag: esitag.Config{
 			Timeout:     time.Second,
 			MaxBodySize: 22001,
 		},

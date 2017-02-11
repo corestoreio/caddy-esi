@@ -62,10 +62,10 @@ func (rm ResourceMock) Close() error {
 func MockRequestContent(content string) esitag.ResourceHandler {
 	return ResourceMock{
 		DoRequestFn: func(args *esitag.ResourceArgs) (http.Header, []byte, error) {
-			if args.URL == "" && args.Key == "" {
+			if args.URL == "" && args.Tag.Key == "" {
 				panic(fmt.Sprintf("[esibackend] URL and Key cannot be empty: %#v\n", args))
 			}
-			return nil, []byte(fmt.Sprintf(mockRequestMsg, content, args.URL, args.Timeout, args.MaxBodySizeHumanized())), nil
+			return nil, []byte(fmt.Sprintf(mockRequestMsg, content, args.URL, args.Tag.Timeout, args.MaxBodySizeHumanized())), nil
 		},
 	}
 }
@@ -78,7 +78,7 @@ func MockRequestContentCB(content string, callback func() error) esitag.Resource
 			if err := callback(); err != nil {
 				return nil, nil, errors.Wrapf(err, "MockRequestContentCB with URL %q", args.URL)
 			}
-			return nil, []byte(fmt.Sprintf(mockRequestMsg, content, args.URL, args.Timeout, args.MaxBodySizeHumanized())), nil
+			return nil, []byte(fmt.Sprintf(mockRequestMsg, content, args.URL, args.Tag.Timeout, args.MaxBodySizeHumanized())), nil
 		},
 	}
 }

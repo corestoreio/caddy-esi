@@ -90,44 +90,20 @@ func (mc *esiMemCache) DoRequest(args *esitag.ResourceArgs) (_ http.Header, _ []
 	return mc.doRequest(args)
 }
 
-func (mc *esiMemCache) validateArgs(args *esitag.ResourceArgs) (err error) {
-	switch {
-	case args.Key == "":
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %#v the URL value is empty", args)
-	case args.ExternalReq == nil:
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q => %q the ExternalReq value is nil", mc.url, args.Key)
-	case args.Timeout < 1:
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q => %q the timeout value is empty", mc.url, args.Key)
-	case args.MaxBodySize == 0:
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q => %q the maxBodySize value is empty", mc.url, args.Key)
-	}
-	return
-}
-
 func (mc *esiMemCache) doRequest(args *esitag.ResourceArgs) (_ http.Header, _ []byte, err error) {
-	if err := mc.validateArgs(args); err != nil {
-		return nil, nil, errors.Wrap(err, "[backend] doRequest.validateArgs")
+	if err := args.ValidateWithKey(); err != nil {
+		return nil, nil, errors.Wrap(err, "[backend] doRequest.ValidateWithKey")
 	}
 
-	key := args.Key
-
-	nKey, err := args.TemplateToURL(args.KeyTemplate)
-	if err != nil {
-		return nil, nil, errors.Wrapf(err, "[backend] MemCache.Get.TemplateToURL %q => %q", mc.url, args.Key)
-	}
-	if nKey != "" {
-		key = nKey
-	}
-
-	itm, err := mc.pool.Get(key)
+	itm, err := mc.pool.Get(args.Tag.Key)
 	if err == memcache.ErrCacheMiss {
-		return nil, nil, errors.NewNotFoundf("[backend] URL %q: Key %q not found", mc.url, args.Key)
+		return nil, nil, errors.NewNotFoundf("[backend] URL %q: Key %q not found", mc.url, args.Tag.Key)
 	}
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "[backend] Memcache.Get %q => %q", mc.url, args.Key)
+		return nil, nil, errors.Wrapf(err, "[backend] Memcache.Get %q => %q", mc.url, args.Tag.Key)
 	}
 
-	if mbs := int(args.MaxBodySize); len(itm.Value) > mbs && mbs > 0 {
+	if mbs := int(args.Tag.MaxBodySize); len(itm.Value) > mbs && mbs > 0 {
 		itm.Value = itm.Value[:mbs]
 	}
 	// safe to return the slice header because each memcache query creates a new pointer
@@ -138,41 +114,30 @@ func (mc *esiMemCache) doRequest(args *esitag.ResourceArgs) (_ http.Header, _ []
 // not supported. Request cancellation through a timeout (when the client
 // request gets cancelled) is supported.
 func (mc *esiMemCache) doRequestCancel(args *esitag.ResourceArgs) (_ http.Header, _ []byte, err error) {
-	if err := mc.validateArgs(args); err != nil {
-		return nil, nil, errors.Wrap(err, "[backend] doRequestCancel.validateArgs")
+	if err := args.ValidateWithKey(); err != nil {
+		return nil, nil, errors.Wrap(err, "[backend] doRequestCancel.ValidateWithKey")
 	}
 
-	key := args.Key
-
 	// See git history for a version without context.WithTimeout. A bit faster and less allocs.
-	ctx, cancel := context.WithTimeout(args.ExternalReq.Context(), args.Timeout)
+	ctx, cancel := context.WithTimeout(args.ExternalReq.Context(), args.Tag.Timeout)
 	defer cancel()
 
 	content := make(chan []byte)
 	retErr := make(chan error)
 	go func() {
 
-		nKey, err := args.TemplateToURL(args.KeyTemplate)
-		if err != nil {
-			retErr <- errors.Wrapf(err, "[backend] MemCache.Get.TemplateToURL %q => %q", mc.url, args.Key)
-			return
-		}
-		if nKey != "" {
-			key = nKey
-		}
-
-		itm, err := mc.pool.Get(key)
+		itm, err := mc.pool.Get(args.Tag.Key)
 		if err == memcache.ErrCacheMiss {
-			retErr <- errors.NewNotFoundf("[backend] URL %q: Key %q not found", mc.url, args.Key)
+			retErr <- errors.NewNotFoundf("[backend] URL %q: Key %q not found", mc.url, args.Tag.Key)
 			return
 		}
 
 		if err != nil {
-			retErr <- errors.Wrapf(err, "[backend] MemCache.Get %q => %q", mc.url, args.Key)
+			retErr <- errors.Wrapf(err, "[backend] MemCache.Get %q => %q", mc.url, args.Tag.Key)
 			return
 		}
 
-		if mbs := int(args.MaxBodySize); len(itm.Value) > mbs && mbs > 0 {
+		if mbs := int(args.Tag.MaxBodySize); len(itm.Value) > mbs && mbs > 0 {
 			itm.Value = itm.Value[:mbs]
 		}
 		content <- itm.Value

@@ -24,7 +24,6 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
-	"text/template"
 	"time"
 
 	"github.com/SchumacherFM/caddyesi/esitag"
@@ -90,7 +89,7 @@ func TestNewMemCache(t *testing.T) {
 
 	t.Run("Failed to parse idle_timeout", func(t *testing.T) {
 		t.Parallel()
-		be, err := backend.NewRedis(esitag.NewResourceOptions("redis://localHorst/?idle_timeout=∏"))
+		be, err := backend.NewMemCache(esitag.NewResourceOptions("redis://localHorst/?idle_timeout=∏"))
 		assert.Nil(t, be)
 		assert.True(t, errors.IsNotValid(err), "%+v", err)
 		assert.Error(t, err)
@@ -116,14 +115,15 @@ func TestNewMemCache(t *testing.T) {
 			t.Fatalf("There should be no error but got: %s", err)
 		}
 		assert.NotNil(t, be)
-		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Config: esitag.Config{
+		hdr, content, err := be.DoRequest(esitag.NewResourceArgs(
+			httptest.NewRequest("GET", "/", nil),
+			"",
+			esitag.Config{
 				Key:         "product_price_76",
 				Timeout:     time.Second,
 				MaxBodySize: 10,
 			},
-		})
+		))
 		assert.Nil(t, hdr, "header must be nil")
 		assert.Nil(t, content, "content must be nil")
 		assert.Contains(t, err.Error(), `memcache: no servers configured or available`)
@@ -140,14 +140,15 @@ func TestNewMemCache(t *testing.T) {
 			t.Fatalf("MemCache connection   error: %+v", err)
 		}
 
-		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Config: esitag.Config{
+		hdr, content, err := be.DoRequest(esitag.NewResourceArgs(
+			httptest.NewRequest("GET", "/", nil),
+			"",
+			esitag.Config{
 				Key:         "product_price_4711",
 				Timeout:     time.Second,
 				MaxBodySize: 10,
 			},
-		})
+		))
 		require.NoError(t, err, "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Exactly(t, "123,45 €", string(content))
@@ -177,14 +178,16 @@ func TestNewMemCache(t *testing.T) {
 		be, closer := getMrBee(t, "?cancellable=1")
 		defer closer()
 
-		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Config: esitag.Config{
+		hdr, content, err := be.DoRequest(esitag.NewResourceArgs(
+			httptest.NewRequest("GET", "/", nil),
+			"",
+			esitag.Config{
 				Key:         "product_price_4711",
 				Timeout:     time.Microsecond,
 				MaxBodySize: 10,
 			},
-		})
+		))
+		time.Sleep(5 * time.Microsecond) // mandatory
 		require.EqualError(t, errors.Cause(err), context.DeadlineExceeded.Error(), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Empty(t, string(content), "Content should be empty")
@@ -196,14 +199,15 @@ func TestNewMemCache(t *testing.T) {
 		be, closer := getMrBee(t)
 		defer closer()
 
-		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Config: esitag.Config{
+		hdr, content, err := be.DoRequest(esitag.NewResourceArgs(
+			httptest.NewRequest("GET", "/", nil),
+			"",
+			esitag.Config{
 				Key:         "product_price_4712",
 				Timeout:     time.Second,
 				MaxBodySize: 100,
 			},
-		})
+		))
 		require.True(t, errors.IsNotFound(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Empty(t, content, "Content must be empty")
@@ -215,14 +219,15 @@ func TestNewMemCache(t *testing.T) {
 		be, closer := getMrBee(t, "?cancellable=1")
 		defer closer()
 
-		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Config: esitag.Config{
+		hdr, content, err := be.DoRequest(esitag.NewResourceArgs(
+			httptest.NewRequest("GET", "/", nil),
+			"",
+			esitag.Config{
 				Key:         "product_price_4712",
 				Timeout:     time.Second,
 				MaxBodySize: 100,
 			},
-		})
+		))
 		require.True(t, errors.IsNotFound(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Empty(t, content, "Content must be empty")
@@ -243,7 +248,7 @@ func TestNewMemCache(t *testing.T) {
 		defer closer()
 
 		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			Config: esitag.Config{
+			Tag: esitag.Config{
 				Key: "Hello",
 			},
 		})
@@ -256,12 +261,13 @@ func TestNewMemCache(t *testing.T) {
 		be, closer := getMrBee(t)
 		defer closer()
 
-		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Config: esitag.Config{
+		hdr, content, err := be.DoRequest(esitag.NewResourceArgs(
+			httptest.NewRequest("GET", "/", nil),
+			"",
+			esitag.Config{
 				Key: "Hello",
 			},
-		})
+		))
 		require.True(t, errors.IsEmpty(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Nil(t, content, "Content must be nil")
@@ -271,13 +277,14 @@ func TestNewMemCache(t *testing.T) {
 		be, closer := getMrBee(t)
 		defer closer()
 
-		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Config: esitag.Config{
+		hdr, content, err := be.DoRequest(esitag.NewResourceArgs(
+			httptest.NewRequest("GET", "/", nil),
+			"",
+			esitag.Config{
 				Key:     "Hello",
 				Timeout: time.Second,
 			},
-		})
+		))
 		require.True(t, errors.IsEmpty(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Nil(t, content, "Content must be nil")
@@ -287,24 +294,20 @@ func TestNewMemCache(t *testing.T) {
 		be, closer := getMrBee(t)
 		defer closer()
 
-		const key = `product_{{ .Req.Header.Get "X-Product-ID" }}`
-
-		tpl, err := template.New("key_tpl").Parse(key)
-		require.NoError(t, err)
-
-		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			ExternalReq: func() *http.Request {
-				req := httptest.NewRequest("GET", "/", nil)
-				req.Header.Set("X-Product-ID", "GopherPlushXXL")
-				return req
-			}(),
-			Config: esitag.Config{
+		const key = `product_{HX-Product-ID}`
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("X-Product-ID", "GopherPlushXXL")
+		ra := esitag.NewResourceArgs(
+			req,
+			"",
+			esitag.Config{
 				Key:         key,
-				KeyTemplate: tpl,
 				Timeout:     time.Second,
 				MaxBodySize: 100,
 			},
-		})
+		).ReplaceKeyURLForTesting()
+
+		hdr, content, err := be.DoRequest(ra)
 		require.NoError(t, err, "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Exactly(t, wantContent, string(content), "Content not equal")
@@ -314,24 +317,21 @@ func TestNewMemCache(t *testing.T) {
 		be, closer := getMrBee(t, "?cancellable=1")
 		defer closer()
 
-		const key = `product_{{ .Req.Header.Get "X-Product-ID" }}`
+		const key = `product_{HX-Product-ID}`
 
-		tpl, err := template.New("key_tpl").Parse(key)
-		require.NoError(t, err)
-
-		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			ExternalReq: func() *http.Request {
+		hdr, content, err := be.DoRequest(esitag.NewResourceArgs(
+			func() *http.Request {
 				req := httptest.NewRequest("GET", "/", nil)
 				req.Header.Set("X-Product-ID", "GopherPlushXXL")
 				return req
 			}(),
-			Config: esitag.Config{
+			"",
+			esitag.Config{
 				Key:         key,
-				KeyTemplate: tpl,
 				Timeout:     time.Second,
 				MaxBodySize: 100,
 			},
-		})
+		).ReplaceKeyURLForTesting())
 		require.NoError(t, err, "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Exactly(t, wantContent, string(content), "Content not equal")

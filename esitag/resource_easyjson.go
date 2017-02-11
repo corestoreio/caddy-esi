@@ -48,30 +48,30 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend(in *jlexer.Lexer
 		case "url":
 			out.URL = string(in.String())
 		case "max_body_size":
-			out.MaxBodySize = uint64(in.Uint64())
+			out.Tag.MaxBodySize = uint64(in.Uint64())
 		case "key":
-			out.Key = string(in.String())
+			out.Tag.Key = string(in.String())
 		case "return_headers":
 			if in.IsNull() {
 				in.Skip()
-				out.ReturnHeaders = nil
+				out.Tag.ReturnHeaders = nil
 			} else {
 				in.Delim('[')
 				if !in.IsDelim(']') {
-					out.ReturnHeaders = make([]string, 0, 4)
+					out.Tag.ReturnHeaders = make([]string, 0, 4)
 				} else {
-					out.ReturnHeaders = []string{}
+					out.Tag.ReturnHeaders = []string{}
 				}
 				for !in.IsDelim(']') {
 					var v1 string
 					v1 = string(in.String())
-					out.ReturnHeaders = append(out.ReturnHeaders, v1)
+					out.Tag.ReturnHeaders = append(out.Tag.ReturnHeaders, v1)
 					in.WantComma()
 				}
 				in.Delim(']')
 			}
 		case "return_headers_all":
-			out.ReturnHeadersAll = bool(in.Bool())
+			out.Tag.ReturnHeadersAll = bool(in.Bool())
 		default:
 			in.SkipRecursive()
 		}
@@ -106,33 +106,33 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend(out *jwriter.Wri
 		out.RawString("\"url\":")
 		out.String(string(in.URL))
 	}
-	if in.MaxBodySize != 0 {
+	if in.Tag.MaxBodySize != 0 {
 		if !first {
 			out.RawByte(',')
 		}
 		first = false
 		out.RawString("\"max_body_size\":")
-		out.Uint64(uint64(in.MaxBodySize))
+		out.Uint64(uint64(in.Tag.MaxBodySize))
 	}
-	if in.Key != "" {
+	if in.Tag.Key != "" {
 		if !first {
 			out.RawByte(',')
 		}
 		first = false
 		out.RawString("\"key\":")
-		out.String(string(in.Key))
+		out.String(string(in.Tag.Key))
 	}
-	if len(in.ReturnHeaders) != 0 {
+	if len(in.Tag.ReturnHeaders) != 0 {
 		if !first {
 			out.RawByte(',')
 		}
 		first = false
 		out.RawString("\"return_headers\":")
-		if in.ReturnHeaders == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
+		if in.Tag.ReturnHeaders == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
 			out.RawString("null")
 		} else {
 			out.RawByte('[')
-			for v2, v3 := range in.ReturnHeaders {
+			for v2, v3 := range in.Tag.ReturnHeaders {
 				if v2 > 0 {
 					out.RawByte(',')
 				}
@@ -141,13 +141,13 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend(out *jwriter.Wri
 			out.RawByte(']')
 		}
 	}
-	if in.ReturnHeadersAll {
+	if in.Tag.ReturnHeadersAll {
 		if !first {
 			out.RawByte(',')
 		}
 		//first = false
 		out.RawString("\"return_headers_all\":")
-		out.Bool(in.ReturnHeadersAll)
+		out.Bool(in.Tag.ReturnHeadersAll)
 	}
 	out.RawByte('}')
 }

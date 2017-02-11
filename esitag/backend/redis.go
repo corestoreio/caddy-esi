@@ -122,47 +122,23 @@ func (er *esiRedis) DoRequest(args *esitag.ResourceArgs) (_ http.Header, _ []byt
 	return er.doRequest(args)
 }
 
-func (er *esiRedis) validateArgs(args *esitag.ResourceArgs) (err error) {
-	switch {
-	case args.Key == "":
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %#v the URL value is empty", args)
-	case args.ExternalReq == nil:
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q => %q the ExternalReq value is nil", er.url, args.Key)
-	case args.Timeout < 1:
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q => %q the timeout value is empty", er.url, args.Key)
-	case args.MaxBodySize == 0:
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q => %q the maxBodySize value is empty", er.url, args.Key)
-	}
-	return
-}
-
 func (er *esiRedis) doRequest(args *esitag.ResourceArgs) (_ http.Header, _ []byte, err error) {
-	if err := er.validateArgs(args); err != nil {
-		return nil, nil, errors.Wrap(err, "[backend] doRequest.validateArgs")
+	if err := args.ValidateWithKey(); err != nil {
+		return nil, nil, errors.Wrap(err, "[backend] doRequest.ValidateWithKey")
 	}
-
-	key := args.Key
 
 	conn := er.pool.Get()
 	defer conn.Close()
 
-	nKey, err := args.TemplateToURL(args.KeyTemplate)
-	if err != nil {
-		return nil, nil, errors.Wrapf(err, "[backend] Redis.Get.TemplateToURL %q => %q", er.url, args.Key)
-	}
-	if nKey != "" {
-		key = nKey
-	}
-
-	value, err := redis.Bytes(conn.Do("GET", key))
+	value, err := redis.Bytes(conn.Do("GET", args.Tag.Key))
 	if err == redis.ErrNil {
-		return nil, nil, errors.NewNotFoundf("[backend] URL %q: Key %q not found", er.url, args.Key)
+		return nil, nil, errors.NewNotFoundf("[backend] URL %q: Key %q not found", er.url, args.Tag.Key)
 	}
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "[backend] Redis.Get %q => %q", er.url, args.Key)
+		return nil, nil, errors.Wrapf(err, "[backend] Redis.Get %q => %q", er.url, args.Tag.Key)
 	}
 
-	if mbs := int(args.MaxBodySize); len(value) > mbs && mbs > 0 {
+	if mbs := int(args.Tag.MaxBodySize); len(value) > mbs && mbs > 0 {
 		value = value[:mbs]
 	}
 
@@ -173,14 +149,12 @@ func (er *esiRedis) doRequest(args *esitag.ResourceArgs) (_ http.Header, _ []byt
 // not supported. Request cancellation through a timeout (when the client
 // request gets cancelled) is supported.
 func (er *esiRedis) doRequestCancel(args *esitag.ResourceArgs) (_ http.Header, _ []byte, err error) {
-	if err := er.validateArgs(args); err != nil {
-		return nil, nil, errors.Wrap(err, "[backend] doRequestCancel.validateArgs")
+	if err := args.ValidateWithKey(); err != nil {
+		return nil, nil, errors.Wrap(err, "[backend] doRequest.ValidateWithKey")
 	}
 
-	key := args.Key
-
 	// See git history for a version without context.WithTimeout. A bit faster and less allocs.
-	ctx, cancel := context.WithTimeout(args.ExternalReq.Context(), args.Timeout)
+	ctx, cancel := context.WithTimeout(args.ExternalReq.Context(), args.Tag.Timeout)
 	defer cancel()
 
 	content := make(chan []byte)
@@ -190,26 +164,17 @@ func (er *esiRedis) doRequestCancel(args *esitag.ResourceArgs) (_ http.Header, _
 		conn := er.pool.Get()
 		defer conn.Close()
 
-		nKey, err := args.TemplateToURL(args.KeyTemplate)
-		if err != nil {
-			retErr <- errors.Wrapf(err, "[backend] Redis.Get.TemplateToURL %q => %q", er.url, args.Key)
-			return
-		}
-		if nKey != "" {
-			key = nKey
-		}
-
-		value, err := redis.Bytes(conn.Do("GET", key))
+		value, err := redis.Bytes(conn.Do("GET", args.Tag.Key))
 		if err == redis.ErrNil {
-			retErr <- errors.NewNotFoundf("[backend] URL %q: Key %q not found", er.url, args.Key)
+			retErr <- errors.NewNotFoundf("[backend] URL %q: Key %q not found", er.url, args.Tag.Key)
 			return
 		}
 		if err != nil {
-			retErr <- errors.Wrapf(err, "[backend] Redis.Get %q => %q", er.url, args.Key)
+			retErr <- errors.Wrapf(err, "[backend] Redis.Get %q => %q", er.url, args.Tag.Key)
 			return
 		}
 
-		if mbs := int(args.MaxBodySize); len(value) > mbs && mbs > 0 {
+		if mbs := int(args.Tag.MaxBodySize); len(value) > mbs && mbs > 0 {
 			value = value[:mbs]
 		}
 		content <- value

@@ -22,7 +22,6 @@ import (
 	"sort"
 	"strings"
 	"testing"
-	"text/template"
 	"time"
 
 	"github.com/SchumacherFM/caddyesi/esitag"
@@ -34,7 +33,6 @@ import (
 )
 
 var _ fmt.Stringer = (*esitag.Resource)(nil)
-var _ esitag.TemplateExecer = (*template.Template)(nil)
 var _ easyjson.Marshaler = (*esitag.ResourceArgs)(nil)
 var _ easyjson.Unmarshaler = (*esitag.ResourceArgs)(nil)
 var _ log.Marshaler = (*esitag.ResourceArgs)(nil)
@@ -80,17 +78,11 @@ func TestNewResource(t *testing.T) {
 	})
 
 	t.Run("URL Template", func(t *testing.T) {
-		r, err := esitag.NewResource(0, "http://cart.service?product={{ .r.Header.Get }}")
+		r, err := esitag.NewResource(0, "http://cart.service?product={HX-My-Key}")
 		if err != nil {
 			t.Fatalf("%+v", err)
 		}
-		assert.Exactly(t, "http://cart.service?product={{ .r.Header.Get }} Template: resource_tpl", r.String())
-	})
-
-	t.Run("URL Template throws fatal error", func(t *testing.T) {
-		r, err := esitag.NewResource(0, "http://cart.service?product={{ r.Header.Get }}")
-		assert.Nil(t, r)
-		assert.True(t, errors.IsFatal(err), "%+v", err)
+		assert.Exactly(t, "http://cart.service?product={HX-My-Key}", r.String())
 	})
 }
 
@@ -159,7 +151,7 @@ func TestResourceArgs_Validate(t *testing.T) {
 		rfa := esitag.ResourceArgs{
 			URL:         "http://www",
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Config: esitag.Config{
+			Tag: esitag.Config{
 				Timeout: time.Second,
 			},
 		}
@@ -171,7 +163,7 @@ func TestResourceArgs_Validate(t *testing.T) {
 		rfa := esitag.ResourceArgs{
 			URL:         "http://www",
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Config: esitag.Config{
+			Tag: esitag.Config{
 				Timeout:     time.Second,
 				MaxBodySize: 5,
 			},
@@ -185,7 +177,7 @@ func TestResourceArgs_MaxBodySizeHumanized(t *testing.T) {
 	t.Parallel()
 
 	rfa := esitag.ResourceArgs{
-		Config: esitag.Config{
+		Tag: esitag.Config{
 			MaxBodySize: 123456789,
 		},
 	}
@@ -234,7 +226,7 @@ func TestResourceArgs_PrepareForwardHeaders(t *testing.T) {
 	rfa := &esitag.ResourceArgs{
 		URL:         "http://whatever.anydomain/page.html",
 		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Config: esitag.Config{
+		Tag: esitag.Config{
 			Timeout:     time.Second,
 			MaxBodySize: 15,
 		},
@@ -245,8 +237,8 @@ func TestResourceArgs_PrepareForwardHeaders(t *testing.T) {
 	})
 
 	t.Run("ForwardHeadersAll", func(t *testing.T) {
-		rfa.ForwardHeadersAll = true
-		rfa.ForwardHeaders = []string{"Cookie"} // gets ignored
+		rfa.Tag.ForwardHeadersAll = true
+		rfa.Tag.ForwardHeaders = []string{"Cookie"} // gets ignored
 
 		want := []string{
 			"Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
@@ -274,8 +266,8 @@ func TestResourceArgs_PrepareForwardHeaders(t *testing.T) {
 	})
 
 	t.Run("ForwardHeaders Some", func(t *testing.T) {
-		rfa.ForwardHeadersAll = false
-		rfa.ForwardHeaders = []string{"Cookie", "Pragma"} // Pragma gets dropped
+		rfa.Tag.ForwardHeadersAll = false
+		rfa.Tag.ForwardHeaders = []string{"Cookie", "Pragma"} // Pragma gets dropped
 
 		assert.Exactly(t,
 			[]string{"Cookie", "x-wl-uid=1vnTVF5WyZIe5Fymf2a4H+pFPyJa4wxNmzCKdImj1UqQPV5ecUs2sm46vDbGJUI+sE=", "Cookie", "session-token=AIo5Vf+c/GhoTRWq4V; JSESSIONID=58B7C7A24731R869B75D142E970CEAD4; csm-hit=D5P2DBNF895ZDJTCTEQ7+s-D5P2DBNF895ZDJTCTEQ7|1483297885458; session-id-time=2082754801l"},
@@ -290,7 +282,7 @@ func TestResourceArgs_PrepareForm_GET(t *testing.T) {
 	rfa := &esitag.ResourceArgs{
 		URL:         "http://whatever.anydomain/page.html",
 		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Config: esitag.Config{
+		Tag: esitag.Config{
 			Timeout:     time.Second,
 			MaxBodySize: 15,
 		},
@@ -315,7 +307,7 @@ func TestResourceArgs_PrepareForm_GET_POST(t *testing.T) {
 	rfa := &esitag.ResourceArgs{
 		URL:         "http://whatever.anydomain/page.html",
 		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Config: esitag.Config{
+		Tag: esitag.Config{
 			Timeout:     time.Second,
 			MaxBodySize: 15,
 		},
@@ -326,7 +318,7 @@ func TestResourceArgs_PrepareForm_GET_POST(t *testing.T) {
 	rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
 
 	t.Run("Both", func(t *testing.T) {
-		rfa.ForwardPostData = true
+		rfa.Tag.ForwardPostData = true
 
 		have := rfa.PrepareForm()
 		want := []string{"empty", "", "empty", "not", "z", "post", "both", "y", "both", "x", "prio", "2", "prio", "1", "", "nokey", "q", "foo", "q", "bar", "orphan", "", "orphan", "nope"}
@@ -338,7 +330,7 @@ func TestResourceArgs_PrepareForm_GET_POST(t *testing.T) {
 	})
 
 	t.Run("GET only", func(t *testing.T) {
-		rfa.ForwardPostData = false
+		rfa.Tag.ForwardPostData = false
 
 		have := rfa.PrepareForm()
 		want := []string{"empty", "not", "q", "foo", "q", "bar", "both", "x", "prio", "1", "orphan", "nope"}
@@ -357,7 +349,7 @@ func TestResourceArgs_PrepareForm_POST(t *testing.T) {
 	rfa := &esitag.ResourceArgs{
 		URL:         "http://whatever.anydomain/page.html",
 		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Config: esitag.Config{
+		Tag: esitag.Config{
 			Timeout:     time.Second,
 			MaxBodySize: 15,
 		},
@@ -374,7 +366,7 @@ func TestResourceArgs_PrepareForm_POST(t *testing.T) {
 		assert.Exactly(t, want, have)
 	})
 	t.Run("Forward Post Enabled", func(t *testing.T) {
-		rfa.ForwardPostData = true
+		rfa.Tag.ForwardPostData = true
 		have := rfa.PrepareForm()
 		expectedPostData := []string{"prio", "2", "", "nokey", "orphan", "", "empty", "", "z", "post", "both", "y"}
 
@@ -392,7 +384,7 @@ func TestResourceArgs_PreparePostForm(t *testing.T) {
 	rfa := &esitag.ResourceArgs{
 		URL:         "http://whatever.anydomain/page.html",
 		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Config: esitag.Config{
+		Tag: esitag.Config{
 			Timeout:     time.Second,
 			MaxBodySize: 15,
 		},
@@ -414,7 +406,7 @@ func TestResourceArgs_PreparePostForm(t *testing.T) {
 	})
 
 	t.Run("ignores GET but returns POST", func(t *testing.T) {
-		rfa.Config.ForwardPostData = true
+		rfa.Tag.ForwardPostData = true
 
 		rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm/search?q=foo&q=bar&both=x&prio=1&orphan=nope&empty=not",
 			strings.NewReader("z=post&both=y&prio=2&=nokey&orphan;empty=&"))
@@ -436,7 +428,7 @@ func TestResourceArgs_PrepareReturnHeaders(t *testing.T) {
 	rfa := &esitag.ResourceArgs{
 		URL:         "http://whatever.anydomain/page.html",
 		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Config: esitag.Config{
+		Tag: esitag.Config{
 			Timeout:     time.Second,
 			MaxBodySize: 15,
 		},
@@ -447,8 +439,8 @@ func TestResourceArgs_PrepareReturnHeaders(t *testing.T) {
 	})
 
 	t.Run("ReturnHeadersAll", func(t *testing.T) {
-		rfa.ReturnHeadersAll = true
-		rfa.ReturnHeaders = []string{"Set-Cookie"} // gets ignored
+		rfa.Tag.ReturnHeadersAll = true
+		rfa.Tag.ReturnHeaders = []string{"Set-Cookie"} // gets ignored
 
 		want := http.Header{
 			"Set-Cookie":      []string{"ubid-acbde=253-9771841-6878311; Domain=.example.com; Expires=Sun, 28-Dec-2036 08:58:08 GMT; Path=/"},
@@ -465,25 +457,14 @@ func TestResourceArgs_PrepareReturnHeaders(t *testing.T) {
 	})
 
 	t.Run("ReturnHeaders Some", func(t *testing.T) {
-		rfa.ReturnHeadersAll = false
-		rfa.ReturnHeaders = []string{"Set-Cookie", "Connection"} // Connection gets dropped
+		rfa.Tag.ReturnHeadersAll = false
+		rfa.Tag.ReturnHeaders = []string{"Set-Cookie", "Connection"} // Connection gets dropped
 
 		assert.Exactly(t,
 			http.Header{"Set-Cookie": []string{"ubid-acbde=253-9771841-6878311; Domain=.example.com; Expires=Sun, 28-Dec-2036 08:58:08 GMT; Path=/"}},
 			rfa.PrepareReturnHeaders(resourceRespWithExtendedHeaders),
 		)
 	})
-}
-
-func TestResourceArgs_TemplateToURL(t *testing.T) {
-	t.Parallel()
-
-	rfa := &esitag.ResourceArgs{}
-	tURL, err := rfa.TemplateToURL(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.Exactly(t, ``, tURL, "Should return an empty string")
 }
 
 func TestParseNoSQLURL(t *testing.T) {

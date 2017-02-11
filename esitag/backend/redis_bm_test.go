@@ -56,7 +56,7 @@ func BenchmarkNewRedis_Parallel(b *testing.B) {
 
 			rfa := &esitag.ResourceArgs{
 				ExternalReq: httptest.NewRequest("GET", "/", nil),
-				Config: esitag.Config{
+				Tag: esitag.Config{
 					Key:         "product_price_4711",
 					Timeout:     time.Second,
 					MaxBodySize: 10,

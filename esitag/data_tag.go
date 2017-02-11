@@ -21,7 +21,7 @@ import (
 	"github.com/corestoreio/errors"
 )
 
-// DataTag identifies an ESI tag by its start and end position in the HTML byte
+// DataTag identifies an Tag tag by its start and end position in the HTML byte
 // stream for replacing. If the HTML changes there needs to be a refresh call to
 // re-parse the HTML.
 type DataTag struct {
@@ -47,7 +47,7 @@ func (dts DataTags) InjectContent(r io.Reader, w io.Writer, lastStreamPos int) (
 	// because we're at the beginning of the stream. the next call to
 	// InjectContent and lastStreamPos gets incremented by the length of the
 	// previous data in the Reader. DataTags.InjectContent does not know it gets
-	// called multiple times and hence it can inject the ESI tag data in
+	// called multiple times and hence it can inject the Tag tag data in
 	// subsequent calls. So lastStreamPos protects recurring replacements.
 	// TODO(CyS) implement lastStreamPos
 
@@ -116,11 +116,11 @@ func (dts DataTags) InjectContent(r io.Reader, w io.Writer, lastStreamPos int) (
 // DataLen returns the total length of all data fields in bytes.
 func (dts DataTags) DataLen() (l int) {
 	for _, dt := range dts {
-		// subtract the length of the raw ESI tag (end-start) from the data
+		// subtract the length of the raw Tag tag (end-start) from the data
 		// length to get the correct length of the inserted data for the
 		// Content-Length header. End can never be smaller than Start. The sum
 		// can be negative, means the returned data from the backend resource is
-		// shorter than the ESI tag itself.
+		// shorter than the Tag tag itself.
 		l += len(dt.Data) - (dt.End - dt.Start)
 	}
 	return

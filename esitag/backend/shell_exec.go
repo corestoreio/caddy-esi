@@ -40,7 +40,7 @@ func NewFetchShellExec() esitag.ResourceHandler {
 // DoRequest executes a local program and returns the content or an error.
 // Header is always nil.
 //
-// To trigger shell exec the src attribute in an ESI tag must start with sh://.
+// To trigger shell exec the src attribute in an Tag tag must start with sh://.
 //
 // If the first character is a white space then we cut thru that white space and
 // treat the last characters as arguments.
@@ -83,7 +83,7 @@ func (fs *fetchShellExec) DoRequest(args *esitag.ResourceArgs) (http.Header, []b
 		stdIn := bufpool.Get()
 		defer bufpool.Put(stdIn)
 
-		ctx, cancel := context.WithTimeout(args.ExternalReq.Context(), args.Timeout)
+		ctx, cancel := context.WithTimeout(args.ExternalReq.Context(), args.Tag.Timeout)
 		defer cancel()
 
 		cmd := exec.CommandContext(ctx, cmdName, cmdArgs) // may be use a exec.Cmd pool
@@ -108,9 +108,13 @@ func (fs *fetchShellExec) DoRequest(args *esitag.ResourceArgs) (http.Header, []b
 			retErr = errors.NewFatalf("[esibackend] FetchShellExec Process %q error: %q", args.URL, stdErr)
 			return
 		}
-
-		retContent = make([]byte, stdOut.Len())
-		copy(retContent, stdOut.Bytes())
+		ln := stdOut.Len()
+		if mbs := int(args.Tag.MaxBodySize); ln > mbs && mbs > 0 {
+			ln = mbs
+		}
+		retContent = make([]byte, ln)
+		n := copy(retContent, stdOut.Bytes())
+		retContent = retContent[:n]
 	}()
 	<-done
 	return nil, retContent, errors.Wrap(retErr, "[esibackend] Returned from error")

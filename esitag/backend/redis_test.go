@@ -19,12 +19,10 @@ package backend_test
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"net/http/httptest"
 	"os/exec"
 	"strings"
 	"testing"
-	"text/template"
 	"time"
 
 	"github.com/SchumacherFM/caddyesi/esitag"
@@ -108,14 +106,15 @@ func TestNewRedis(t *testing.T) {
 			t.Fatalf("There should be no error but got: %s", err)
 		}
 		assert.NotNil(t, be)
-		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Config: esitag.Config{
+		hdr, content, err := be.DoRequest(esitag.NewResourceArgs(
+			httptest.NewRequest("GET", "/", nil),
+			"",
+			esitag.Config{
 				Key:         "product_price_76",
 				Timeout:     time.Second,
 				MaxBodySize: 10,
 			},
-		})
+		))
 		assert.Nil(t, hdr, "header must be nil")
 		assert.Nil(t, content, "content must be nil")
 		assert.Contains(t, err.Error(), `dial tcp: lookup`)
@@ -143,14 +142,15 @@ func TestNewRedis(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Config: esitag.Config{
+		hdr, content, err := be.DoRequest(esitag.NewResourceArgs(
+			httptest.NewRequest("GET", "/", nil),
+			"",
+			esitag.Config{
 				Key:         "product_price_4711",
 				Timeout:     time.Second,
 				MaxBodySize: 10,
 			},
-		})
+		))
 		require.NoError(t, err, "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Exactly(t, "123,45 €", string(content))
@@ -206,14 +206,15 @@ func TestNewRedis(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Config: esitag.Config{
+		hdr, content, err := be.DoRequest(esitag.NewResourceArgs(
+			httptest.NewRequest("GET", "/", nil),
+			"",
+			esitag.Config{
 				Key:         "product_price_4711",
 				Timeout:     time.Microsecond,
 				MaxBodySize: 10,
 			},
-		})
+		))
 		require.EqualError(t, errors.Cause(err), context.DeadlineExceeded.Error(), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Empty(t, string(content), "Content should be empty")
@@ -225,14 +226,15 @@ func TestNewRedis(t *testing.T) {
 		_, be, closer := getMrBee(t)
 		defer closer()
 
-		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Config: esitag.Config{
+		hdr, content, err := be.DoRequest(esitag.NewResourceArgs(
+			httptest.NewRequest("GET", "/", nil),
+			"",
+			esitag.Config{
 				Key:         "product_price_4711",
 				Timeout:     time.Second,
 				MaxBodySize: 100,
 			},
-		})
+		))
 		require.True(t, errors.IsNotFound(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Empty(t, content, "Content must be empty")
@@ -244,14 +246,15 @@ func TestNewRedis(t *testing.T) {
 		_, be, closer := getMrBee(t, "?cancellable=1")
 		defer closer()
 
-		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Config: esitag.Config{
+		hdr, content, err := be.DoRequest(esitag.NewResourceArgs(
+			httptest.NewRequest("GET", "/", nil),
+			"",
+			esitag.Config{
 				Key:         "product_price_4711",
 				Timeout:     time.Second,
 				MaxBodySize: 100,
 			},
-		})
+		))
 		require.True(t, errors.IsNotFound(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Empty(t, content, "Content must be empty")
@@ -272,7 +275,7 @@ func TestNewRedis(t *testing.T) {
 		defer closer()
 
 		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			Config: esitag.Config{
+			Tag: esitag.Config{
 				Key: "Hello",
 			},
 		})
@@ -285,12 +288,13 @@ func TestNewRedis(t *testing.T) {
 		_, be, closer := getMrBee(t)
 		defer closer()
 
-		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			Config: esitag.Config{
+		hdr, content, err := be.DoRequest(esitag.NewResourceArgs(
+			httptest.NewRequest("GET", "/", nil),
+			"",
+			esitag.Config{
 				Key: "Hello",
 			},
-			ExternalReq: httptest.NewRequest("GET", "/", nil),
-		})
+		))
 		require.True(t, errors.IsEmpty(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Nil(t, content, "Content must be nil")
@@ -300,13 +304,14 @@ func TestNewRedis(t *testing.T) {
 		_, be, closer := getMrBee(t)
 		defer closer()
 
-		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			ExternalReq: httptest.NewRequest("GET", "/", nil),
-			Config: esitag.Config{
+		hdr, content, err := be.DoRequest(esitag.NewResourceArgs(
+			httptest.NewRequest("GET", "/", nil),
+			"",
+			esitag.Config{
 				Key:     "Hello",
 				Timeout: time.Second,
 			},
-		})
+		))
 		require.True(t, errors.IsEmpty(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Nil(t, content, "Content must be nil")
@@ -316,28 +321,24 @@ func TestNewRedis(t *testing.T) {
 		mr, be, closer := getMrBee(t)
 		defer closer()
 
-		const key = `product_{{ .Req.Header.Get "X-Product-ID" }}`
+		const key = `product_{HX-Product-ID}`
 		const wantContent = `<b>Awesome large Gopher plush toy</b>`
 		if err := mr.Set("product_GopherPlushXXL", wantContent); err != nil {
 			t.Fatal(err)
 		}
 
-		tpl, err := template.New("key_tpl").Parse(key)
-		require.NoError(t, err)
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Set("X-Product-ID", "GopherPlushXXL")
 
-		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{
-			ExternalReq: func() *http.Request {
-				req := httptest.NewRequest("GET", "/", nil)
-				req.Header.Set("X-Product-ID", "GopherPlushXXL")
-				return req
-			}(),
-			Config: esitag.Config{
+		hdr, content, err := be.DoRequest(esitag.NewResourceArgs(
+			req,
+			"",
+			esitag.Config{
 				Key:         key,
-				KeyTemplate: tpl,
 				Timeout:     time.Second,
 				MaxBodySize: 100,
 			},
-		})
+		).ReplaceKeyURLForTesting())
 		require.NoError(t, err, "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Exactly(t, wantContent, string(content), "Content not equal")

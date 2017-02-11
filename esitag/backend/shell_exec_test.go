@@ -35,14 +35,14 @@ func TestFetchShellExec(t *testing.T) {
 	t.Run("Bash script writes arg1 to a file", func(t *testing.T) {
 		defer os.Remove(stdOutFileName)
 
-		rfa := &esitag.ResourceArgs{
-			ExternalReq: getExternalReqWithExtendedHeaders(),
-			URL:         "sh://testdata/stdOutToFile.sh",
-			Config: esitag.Config{
+		rfa := esitag.NewResourceArgs(
+			getExternalReqWithExtendedHeaders(),
+			"sh://testdata/stdOutToFile.sh",
+			esitag.Config{
 				Timeout:     5 * time.Second,
 				MaxBodySize: 333,
 			},
-		}
+		)
 		header, content, err := backend.NewFetchShellExec().DoRequest(rfa)
 		require.NoError(t, err, "%+v", err)
 		assert.Nil(t, header)
@@ -57,14 +57,14 @@ func TestFetchShellExec(t *testing.T) {
 
 	t.Run("Bash script writes to stdErr and triggers a fatal error", func(t *testing.T) {
 
-		rfa := &esitag.ResourceArgs{
-			ExternalReq: getExternalReqWithExtendedHeaders(),
-			URL:         "sh://testdata/stdErr.sh",
-			Config: esitag.Config{
+		rfa := esitag.NewResourceArgs(
+			getExternalReqWithExtendedHeaders(),
+			"sh://testdata/stdErr.sh",
+			esitag.Config{
 				Timeout:     5 * time.Second,
 				MaxBodySize: 333,
 			},
-		}
+		)
 		header, content, err := backend.NewFetchShellExec().DoRequest(rfa)
 		require.Error(t, err, "%+v", err)
 		assert.True(t, errors.IsFatal(err))
@@ -76,14 +76,14 @@ func TestFetchShellExec(t *testing.T) {
 
 	t.Run("Bash script writes to stdOut = happy path", func(t *testing.T) {
 
-		rfa := &esitag.ResourceArgs{
-			ExternalReq: getExternalReqWithExtendedHeaders(),
-			URL:         "sh://testdata/stdOut.sh",
-			Config: esitag.Config{
+		rfa := esitag.NewResourceArgs(
+			getExternalReqWithExtendedHeaders(),
+			"sh://testdata/stdOut.sh",
+			esitag.Config{
 				Timeout:     5 * time.Second,
 				MaxBodySize: 333,
 			},
-		}
+		)
 		header, content, err := backend.NewFetchShellExec().DoRequest(rfa)
 		require.NoError(t, err, "%+v", err)
 		assert.Nil(t, header)

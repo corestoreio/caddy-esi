@@ -28,7 +28,7 @@ import (
 
 // ResourceItem defines a single configuration item.
 type ResourceItem struct {
-	// Alias can have any name which gets used in an ESI tag and refers to the
+	// Alias can have any name which gets used in an Tag tag and refers to the
 	// connection to a resource.
 	Alias string `xml:"alias" json:"alias"`
 	// URL defines the authentication and target to a resource. If an URL

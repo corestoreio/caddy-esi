@@ -34,12 +34,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Entity represents a single fully parsed ESI tag
+// Entity represents a single fully parsed Tag tag
 type Entity struct {
 	RawTag  []byte
 	DataTag DataTag
-	// OnError contains the content which gets injected into an erroneous ESI
-	// tag when all reuqests are failing to its backends. If onError in the ESI
+	// OnError contains the content which gets injected into an erroneous Tag
+	// tag when all reuqests are failing to its backends. If onError in the Tag
 	// tag contains a file name, then that content gets loaded.
 	OnError []byte
 	Config
@@ -52,20 +52,41 @@ type Entity struct {
 	Race bool
 	// Resources contains multiple unique Resource entries, aka backend systems
 	// likes redis instances or other micro services. Resources occur within one
-	// single ESI tag. The resource attribute (src="") can occur multiple times.
+	// single Tag tag. The resource attribute (src="") can occur multiple times.
 	// The first item which successfully returns data gets its content used in
 	// the response. If one item fails and we have multiple resources, the next
 	// resource gets queried. All resources share the same scheme/protocol which
 	// must handle the ResourceHandler.
 	Resources []*Resource // Any 3rd party servers
-	// Conditioner TODO(CyS) depending on a condition an ESI tag gets executed or not.
+	// Conditioner TODO(CyS) depending on a condition an Tag tag gets executed or not.
 	Conditioner
 	// resourceRFAPool for the request arguments
 	// https://twitter.com/_rsc/status/816710229861793795 ;-)
 	resourceRFAPool sync.Pool
 }
 
-// SplitAttributes splits an ESI tag by its attributes. This function avoids regexp.
+// Config provides the configuration of a single Tag tag. This information gets
+// passed on as an argument towards the backend resources and enriches the
+// Entity type.
+type Config struct {
+	Log               log.Logger    // optional
+	ForwardHeaders    []string      // optional, already treated with http.CanonicalHeaderKey
+	ReturnHeaders     []string      // optional, already treated with http.CanonicalHeaderKey
+	ForwardPostData   bool          // optional
+	ForwardHeadersAll bool          // optional
+	ReturnHeadersAll  bool          // optional
+	Timeout           time.Duration // required
+	// TTL retrieved content from a backend can live this time in the middleware
+	// cache.
+	TTL time.Duration // optional
+	// MaxBodySize allowed max body size to read from the backend resource.
+	MaxBodySize uint64 // required
+	// Key also in type esitag.Entity
+	Key string // optional (for KV Service)
+	// Above fields are special aligned to save space, see "aligncheck"
+}
+
+// SplitAttributes splits an Tag tag by its attributes. This function avoids regexp.
 func SplitAttributes(raw string) ([]string, error) {
 	// include src='https://micro.service/checkout/cart={{ .r "x"}}' timeout="9ms" onerror="nocart.html" forwardheaders="Cookie,Accept-Language,Authorization"
 
@@ -132,9 +153,7 @@ func (et *Entity) ParseRaw() error {
 			}
 			srcCounter++
 		case "key":
-			if err := et.parseKey(value); err != nil {
-				return errors.Wrapf(err, "[caddyesi] Failed to parse src %q in tag %q", value, et.RawTag)
-			}
+			et.Key = value
 		case "condition":
 			if err := et.parseCondition(value); err != nil {
 				return errors.Wrapf(err, "[caddyesi] Failed to parse condition %q in tag %q", value, et.RawTag)
@@ -219,11 +238,7 @@ func (et *Entity) parseOnError(val string) (err error) {
 }
 
 func (et *Entity) parseCondition(s string) error {
-	tpl, err := ParseTemplate("condition_tpl", s)
-	if err != nil {
-		return errors.NewFatalf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", s, err, et.RawTag)
-	}
-	et.Conditioner = condition{tpl: tpl}
+	et.Conditioner = condition{}
 	return nil
 }
 
@@ -236,54 +251,45 @@ func (et *Entity) parseResource(idx int, val string) error {
 	return nil
 }
 
-func (et *Entity) parseKey(val string) (err error) {
-	et.Key = val
-	if strings.Contains(val, TemplateIdentifier) {
-		et.KeyTemplate, err = ParseTemplate("key_tpl", val)
-		if err != nil {
-			return errors.NewFatalf("[caddyesi] ESITag.ParseRaw. Failed to parse %q as template with error: %s\nTag: %q", val, err, et.RawTag)
-		}
-	}
-	return nil
-}
-
 // InitPoolRFA used in PathConfig.UpsertESITags and in Entity.ParseRaw to set
 // the pool function. When called in PathConfig.UpsertESITags all default config
 // values have been applied correctly.
 func (et *Entity) InitPoolRFA(defaultRFA *ResourceArgs) {
 
 	if et.Log == nil && defaultRFA != nil {
-		et.Log = defaultRFA.Log
+		et.Log = defaultRFA.Tag.Log
 	}
 	if et.MaxBodySize == 0 && defaultRFA != nil {
-		et.MaxBodySize = defaultRFA.MaxBodySize
+		et.MaxBodySize = defaultRFA.Tag.MaxBodySize
 	}
 	if et.Timeout < 1 && defaultRFA != nil {
-		et.Timeout = defaultRFA.Timeout
+		et.Timeout = defaultRFA.Tag.Timeout
 	}
 	if et.TTL < 1 && defaultRFA != nil {
-		et.TTL = defaultRFA.TTL
+		et.TTL = defaultRFA.Tag.TTL
 	}
 
 	et.resourceRFAPool.New = func() interface{} {
 		return &ResourceArgs{
-			Config: et.Config,
+			Tag: et.Config, // must be copied to prevent races
 		}
 	}
 }
 
 // used in Entity.QueryResources
 func (et *Entity) poolGetRFA(externalReq *http.Request) *ResourceArgs {
-	rfa := et.resourceRFAPool.Get().(*ResourceArgs)
-	rfa.ExternalReq = externalReq
-	return rfa
+	ra := et.resourceRFAPool.Get().(*ResourceArgs)
+	ra.ExternalReq = externalReq
+	ra.repl = MakeReplacer(externalReq, "") // if not found replace with an empty string
+	return ra
 }
 
 // used in Entity.QueryResources
-func (et *Entity) poolPutRFA(rfa *ResourceArgs) {
-	rfa.ExternalReq = nil
-	rfa.URL = ""
-	et.resourceRFAPool.Put(rfa)
+func (et *Entity) poolPutRFA(ra *ResourceArgs) {
+	ra.ExternalReq = nil
+	ra.URL = ""
+	ra.repl = nil
+	et.resourceRFAPool.Put(ra)
 }
 
 // QueryResources iterates sequentially over the resources and executes requests
@@ -365,7 +371,7 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 	return nil, errors.NewTemporaryf("[esitag] Requests to all resources have temporarily failed: %s", mErr)
 }
 
-// Entities represents a list of ESI tags found in one HTML page.
+// Entities represents a list of Tag tags found in one HTML page.
 type Entities []*Entity
 
 // ApplyLogger sets a logger to each entity.
@@ -375,7 +381,7 @@ func (et Entities) ApplyLogger(l log.Logger) {
 	}
 }
 
-// ParseRaw parses all ESI tags
+// ParseRaw parses all Tag tags
 func (et Entities) ParseRaw() error {
 	for i := range et {
 		if err := et[i].ParseRaw(); err != nil {

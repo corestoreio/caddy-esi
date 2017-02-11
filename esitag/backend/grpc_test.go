@@ -151,16 +151,16 @@ func TestNewGRPCClient(t *testing.T) {
 			go func(wg *sync.WaitGroup) { // food for the race detector
 				defer wg.Done()
 
-				rfa := &esitag.ResourceArgs{
-					ExternalReq: getExternalReqWithExtendedHeaders(),
-					URL:         "grpcShoppingCart1",
-					Config: esitag.Config{
+				rfa := esitag.NewResourceArgs(
+					getExternalReqWithExtendedHeaders(),
+					"grpcShoppingCart1",
+					esitag.Config{
 						Timeout:     5 * time.Second,
 						MaxBodySize: 3333,
 						Key:         key,
 						Log:         log.BlackHole{},
 					},
-				}
+				)
 
 				hdr, content, err := grpcInsecureClient.DoRequest(rfa)
 				if err != nil {
@@ -181,16 +181,16 @@ func TestNewGRPCClient(t *testing.T) {
 
 	t.Run("Connect insecure and retrieve error from server", func(t *testing.T) {
 
-		rfa := &esitag.ResourceArgs{
-			ExternalReq: getExternalReqWithExtendedHeaders(),
-			URL:         "grpcShoppingCart2",
-			Config: esitag.Config{
+		rfa := esitag.NewResourceArgs(
+			getExternalReqWithExtendedHeaders(),
+			"grpcShoppingCart2",
+			esitag.Config{
 				Timeout:     5 * time.Second,
 				MaxBodySize: 3333,
 				Key:         "word error in the key triggers an error on the server",
 				Log:         log.BlackHole{},
 			},
-		}
+		)
 
 		hdr, content, err := grpcInsecureClient.DoRequest(rfa)
 		if hdr != nil {
@@ -231,16 +231,16 @@ func BenchmarkNewGRPCClient_Parallel(b *testing.B) {
 			b.Fatalf("Whooops: %+v", err)
 		}
 
-		rfa := &esitag.ResourceArgs{
-			ExternalReq: getExternalReqWithExtendedHeaders(),
-			URL:         "http://totally-uninteresting.what",
-			Config: esitag.Config{
+		rfa := esitag.NewResourceArgs(
+			getExternalReqWithExtendedHeaders(),
+			"http://totally-uninteresting.what",
+			esitag.Config{
 				Key:         `cart_example.html`,
 				Timeout:     time.Second,
 				MaxBodySize: 22001,
 				Log:         log.BlackHole{},
 			},
-		}
+		)
 
 		b.ResetTimer()
 		b.ReportAllocs()

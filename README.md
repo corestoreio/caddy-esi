@@ -158,7 +158,7 @@ Implemented:
 - [ ] Forward QUERY STRING and/or POST form data
 - [x] Multiple sources
 - [ ] Multiple sources with `race="true"`
-- [x] Dynamic sources
+- [x] Dynamic sources/keys (string replacement)
 - [ ] Conditional tag loading
 - [x] Redis access
 - [x] Memcache access
@@ -231,7 +231,7 @@ nothing. The attribute `timeout` overwrites the default `esi.timeout`.
 
 100% Support with http/s requests to backend services.
 
-### With ttl (optional)
+### With ttl (optional) (TODO)
 
 The basic tag with the attribute `ttl` stores the returned data from the `src`
 in the specified `esi.backend`. The attribute `ttl` overwrites the default
@@ -270,7 +270,7 @@ Available size identifiers: [https://github.com/dustin/go-humanize/blob/master/b
 <esi:include src="https://micro.service/esi/foo" maxbodysize="3MB"/>
 ```
 
-### Flip src to AJAX call after timeout (optional)
+### Flip src to AJAX call after timeout (optional) (TODO)
 
 The basic tag with the attribute `timeout` waits for the src until the timeout
 occurs. After the timeout, the ESI processor converts the URI in the `src` attribute
@@ -309,7 +309,7 @@ additionally defined.
 <esi:include src="https://micro.service/esi/foo" forwardheaders="Cookie,Accept-Language,Authorization"/>
 ```
 
-### Return all headers (optional)
+### Return all headers (optional) (TODO)
 
 The basic tag with the attribute `returnheaders` returns all `src` headers to
 the final response. Other attributes can be additionally defined. If duplicate
@@ -319,7 +319,7 @@ headers from multiple sources occurs, they are getting appended to the response.
 <esi:include src="https://micro.service/esi/foo" returnheaders="all"/>
 ```
 
-### Return some headers (optional)
+### Return some headers (optional) (TODO)
 
 The basic tag with the attribute `returnheaders` returns the listed headers of
 the `src` to the final response. Other attributes can be additionally defined. If
@@ -330,7 +330,7 @@ response.
 <esi:include src="https://micro.service/esi/foo" returnheaders="Set-Cookie"/>
 ```
 
-### Coalesce multiple requests into one backend request (optional)
+### Coalesce multiple requests into one backend request (optional) (TODO)
 
 The basic tag with the attribute `coalesce="true"` takes care that for multiple
 incoming requests only one backend request gets fired. Other attributes can be
@@ -356,27 +356,62 @@ is the fastest gets served and the others dropped.
     timeout="time.Duration" />
 ```
 
-### Dynamic sources
+### Dynamic sources and keys (string replacement)
 
-The basic ESI tag can extend all `src` URLs with additional parameters from the
-`http.Request` object. The Go `text/template` parser will be used once the ESI
-processor detects curly brackets in the `src`.
+The basic ESI tag can extend all `src` URLs and `key` attributes with additional
+parameters from the `http.Request` object. A replacement string must be one of the 
+listed below and must consists of the pattern: `{[^\}]+}`.
 
 ```
-<esi:include src="http://micro.service/search?query={{ .Req.Form.Encode }}"/>
-<esi:include src="https://micro.service/catalog/product/?id={{ .Req.Form.Get productID }}"/>
+<esi:include src="http://micro.service/search?query={Fsearch_term}"/>
+<esi:include src="https://micro.service/catalog/product/?id={HMy-Header-Key}"/>
 ```
 
-### Conditional tag loading
+The following string replacements are possible:
+
+- {method}
+- {scheme}
+- {hostname}
+- {host} (incl. port)
+- {hostonly} (excl. port)
+- {path} (header Caddy-Rewrite-Original-URI supported)
+- {path_escaped} (header Caddy-Rewrite-Original-URI supported)
+- {rewrite_path} (header Caddy-Rewrite-Original-URI NOT supported)
+- {rewrite_path_escaped} (header Caddy-Rewrite-Original-URI NOT supported)
+- {query}
+- {query_escaped}
+- {fragment}
+- {proto}
+- {remote} IP address, might not be the real IP address
+- {port}
+- {uri} the RequestURI
+- {uri_escaped} the RequestURI
+- {when}
+- {when_iso}
+- {file}
+- {dir}
+
+To access any value in the header, cookie, GET form or POST form you can write a
+special crafted replacement string.
+
+- {HMy-Header-Key-Name} must start with `H` followed by the header key name
+(case in-sensitive), in this case: `My-Header-Key-Name`.
+- {CMy-Cookie-Name} must start with `C` followed by the cookie name (case
+sensitive), in this case: `My-Cookie-Name`.
+- {FMy-Input-Name} must start with `F` followed by the name of the field (case
+sensitive), in this case: `My-Input-Name`.
+
+Replacement strings can occur anywhere and n-times in the `src` or `key`
+attribute.
+
+### Conditional tag loading (TODO)
 
 The basic ESI tag can contain the attribute `condition`. A `condition` must
-return the string `true` to trigger the loading of the `src`. The `condition`
-attribute uses Go `text/template` logic. For now only the `http.Request` object
-can be used for comparison. TODO: rethink this to optimize condition execution.
+evaluate an expression to `true` to trigger the loading of the `src`.
 
 ```
 <esi:include src="http://micro.service/search?query={{ .Req.Form.Encode }}"
-    condition="{{ if .Req.Host eq 'customer.micro.service' }}true{{end}}"/>
+    condition="{hostname} eq 'customer.micro.service'"/>
 ```
 
 ### NoSQL access

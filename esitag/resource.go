@@ -15,17 +15,14 @@
 package esitag
 
 import (
-	"io"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
-	"text/template"
 	"time"
 
-	"github.com/SchumacherFM/mailout/bufpool"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	loghttp "github.com/corestoreio/log/http"
@@ -35,65 +32,41 @@ import (
 // DefaultTimeOut defines the default timeout to a backend resource.
 const DefaultTimeOut = 20 * time.Second
 
-// TemplateIdentifier if some strings contain these characters then a
-// template.Template will be created. For now a resource key or an URL is
-// supported.
-const TemplateIdentifier = "{{"
-
-// TemplateExecer implemented by text/template or other packages. Mocked out in
-// an interface because we might want to replace the template engine with a
-// faster one.
-type TemplateExecer interface {
-	// Execute applies a parsed template to the specified data object, and
-	// writes the output to wr. If an error occurs executing the template or
-	// writing its output, execution stops, but partial results may already have
-	// been written to the output writer. A template may be executed safely in
-	// parallel.
-	// If data is a reflect.Value, the template applies to the concrete value
-	// that the reflect.Value holds, as in fmt.Print.
-	Execute(wr io.Writer, data interface{}) error
-	// Name returns the name of the template.
-	Name() string
-}
-
-// TODO(CyS) remove text.template and create the same as the Caddy replacer
-
-// ParseTemplate parses text as a template body for t. To implement a new
-// template engine just change the function body. We cannot return a pointer to
-// a struct because other functions use nil checks to the interface and a nil
-// pointer on an interface returns false if it should be nil. Hence we return
-// here an interface.
-func ParseTemplate(name, text string) (TemplateExecer, error) {
-	return template.New(name).Parse(text)
-}
-
-// Config provides the configuration of a single ESI tag. This information gets
-// passed on as an argument towards the backend resources and enriches the
-// Entity type.
-type Config struct {
-	Log     log.Logger    // optional
-	Timeout time.Duration // required
-	// MaxBodySize allowed max body size to read from the backend resource.
-	MaxBodySize uint64 // required
-	// Key also in type esitag.Entity
-	Key string // optional (for KV Service)
-	// KeyTemplate also in type esitag.Entity
-	KeyTemplate TemplateExecer // optional (for KV Service)
-	// TTL retrieved content from a backend can live this time in the middleware
-	// cache.
-	TTL               time.Duration // optional
-	ForwardPostData   bool          // optional
-	ForwardHeaders    []string      // optional, already treated with http.CanonicalHeaderKey
-	ForwardHeadersAll bool          // optional
-	ReturnHeaders     []string      // optional, already treated with http.CanonicalHeaderKey
-	ReturnHeadersAll  bool          // optional
-}
-
-// ResourceArgs arguments to ResourceHandler.DoRequest. Might get extended.
+// ResourceArgs arguments to ResourceHandler.DoRequest. This type lives in a
+// sync.Pool and the fields ExternalReq, repl and URL gets reset when putting it
+// back into the pool.
 type ResourceArgs struct {
-	ExternalReq *http.Request // required
-	URL         string        // required
-	Config
+	// ExternalReq external request object from the evil internet.
+	ExternalReq *http.Request
+	// repl replaces the template variables of URL and Tag.Key with values form
+	// field ExternalReq.
+	repl Replacer
+	// URL defines the target URL to call or an alias name. This field gets set
+	// from type Resource.url in the function Resource.DoRequest. Before passing
+	// to DoRequest of the underlying implementation URL gets treated with
+	// Replacer.
+	URL string
+	// Tag the configuration of a single ESI tag.
+	Tag Config
+}
+
+// NewResourceArgs creates a new argument and initializes the internal string
+// replacer.
+func NewResourceArgs(r *http.Request, url string, esi Config) *ResourceArgs {
+	return &ResourceArgs{
+		ExternalReq: r,
+		URL:         url,
+		Tag:         esi,
+		repl:        MakeReplacer(r, ""),
+	}
+}
+
+// ReplaceKeyURLForTesting only used for integration tests in the backend
+// package.
+func (a *ResourceArgs) ReplaceKeyURLForTesting() *ResourceArgs {
+	a.Tag.Key = a.repl.Replace(a.Tag.Key)
+	a.URL = a.repl.Replace(a.URL)
+	return a
 }
 
 // Validate checks if required arguments have been set
@@ -103,17 +76,31 @@ func (a *ResourceArgs) Validate() (err error) {
 		err = errors.NewEmptyf("[esibackend] For ResourceArgs %#v the URL value is empty", a)
 	case a.ExternalReq == nil:
 		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the ExternalReq value is nil", a.URL)
-	case a.Timeout < 1:
+	case a.Tag.Timeout < 1:
 		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the timeout value is empty", a.URL)
-	case a.MaxBodySize == 0:
+	case a.Tag.MaxBodySize == 0:
 		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the maxBodySize value is empty", a.URL)
+	}
+	return
+}
+
+func (a *ResourceArgs) ValidateWithKey() (err error) {
+	switch {
+	case a.Tag.Key == "":
+		err = errors.NewEmptyf("[esibackend] For ResourceArgs %#v the Key value is empty", a)
+	case a.ExternalReq == nil:
+		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the ExternalReq value is nil", a.Tag.Key)
+	case a.Tag.Timeout < 1:
+		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the timeout value is empty", a.Tag.Key)
+	case a.Tag.MaxBodySize == 0:
+		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the maxBodySize value is empty", a.Tag.Key)
 	}
 	return
 }
 
 // MaxBodySizeHumanized converts the bytes into a human readable format
 func (a *ResourceArgs) MaxBodySizeHumanized() string {
-	return humanize.Bytes(a.MaxBodySize)
+	return humanize.Bytes(a.Tag.MaxBodySize)
 }
 
 // DropHeadersForward a list of headers which should never be forwarded to the
@@ -155,18 +142,18 @@ var DropHeadersReturn = map[string]bool{
 // on Info level.
 func (a *ResourceArgs) PrepareForm() []string {
 	if err := a.ExternalReq.ParseForm(); err != nil {
-		a.Log.Info("backend.ResourceArgs.PrepareForm.ExternalReq.ParseForm",
+		a.Tag.Log.Info("backend.ResourceArgs.PrepareForm.ExternalReq.ParseForm",
 			log.Err(err), loghttp.Request("request", a.ExternalReq), log.Marshal("resource_args", a))
 	}
 
 	form := a.ExternalReq.Form
 
-	if !a.ForwardPostData && a.ExternalReq.URL != nil {
+	if !a.Tag.ForwardPostData && a.ExternalReq.URL != nil {
 		// if disabled then parse only GET parameters
 		var err error
 		form, err = url.ParseQuery(a.ExternalReq.URL.RawQuery)
 		if err != nil {
-			a.Log.Info("backend.ResourceArgs.PrepareForm.ExternalReq.ParseQuery",
+			a.Tag.Log.Info("backend.ResourceArgs.PrepareForm.ExternalReq.ParseQuery",
 				log.Err(err), loghttp.Request("request", a.ExternalReq), log.Marshal("resource_args", a))
 			return nil
 		}
@@ -189,12 +176,12 @@ func (a *ResourceArgs) PrepareForm() []string {
 // form gets logged on Info level and will return nil. Does not consider GET
 // params.
 func (a *ResourceArgs) PreparePostForm() []string {
-	if !a.ForwardPostData {
+	if !a.Tag.ForwardPostData {
 		return nil
 	}
 
 	if err := a.ExternalReq.ParseForm(); err != nil {
-		a.Log.Info("backend.ResourceArgs.PreparePostForm.ExternalReq.ParseForm",
+		a.Tag.Log.Info("backend.ResourceArgs.PreparePostForm.ExternalReq.ParseForm",
 			log.Err(err), loghttp.Request("request", a.ExternalReq), log.Marshal("resource_args", a))
 		return nil
 	}
@@ -216,10 +203,10 @@ func (a *ResourceArgs) PreparePostForm() []string {
 // backend resource. Returns a non-nil slice when no headers should be
 // forwarded. Slice is balanced: i == key and i+1 == value
 func (a *ResourceArgs) PrepareForwardHeaders() []string {
-	if !a.ForwardHeadersAll && len(a.ForwardHeaders) == 0 {
+	if !a.Tag.ForwardHeadersAll && len(a.Tag.ForwardHeaders) == 0 {
 		return []string{}
 	}
-	if a.ForwardHeadersAll {
+	if a.Tag.ForwardHeadersAll {
 		ret := make([]string, 0, len(a.ExternalReq.Header))
 		for hn, hvs := range a.ExternalReq.Header {
 			if !DropHeadersForward[hn] {
@@ -231,8 +218,8 @@ func (a *ResourceArgs) PrepareForwardHeaders() []string {
 		return ret
 	}
 
-	ret := make([]string, 0, len(a.ForwardHeaders))
-	for _, hn := range a.ForwardHeaders {
+	ret := make([]string, 0, len(a.Tag.ForwardHeaders))
+	for _, hn := range a.Tag.ForwardHeaders {
 		if hvs, ok := a.ExternalReq.Header[hn]; ok && !DropHeadersForward[hn] {
 			for _, hv := range hvs {
 				ret = append(ret, hn, hv)
@@ -246,12 +233,12 @@ func (a *ResourceArgs) PrepareForwardHeaders() []string {
 // struct fields ReturnHeaders*. fromBE means: From Back End. These are the
 // headers from the queried backend resource. Might return a nil map.
 func (a *ResourceArgs) PrepareReturnHeaders(fromBE http.Header) http.Header {
-	if !a.ReturnHeadersAll && len(a.ReturnHeaders) == 0 {
+	if !a.Tag.ReturnHeadersAll && len(a.Tag.ReturnHeaders) == 0 {
 		return nil
 	}
 
-	ret := make(http.Header) // using len(fromBE) as 2nd args makes the benchmark slower!
-	if a.ReturnHeadersAll {
+	ret := make(http.Header) // using len(fromBE) as 2nd a makes the benchmark slower!
+	if a.Tag.ReturnHeadersAll {
 		for hn, hvs := range fromBE {
 			if !DropHeadersReturn[hn] {
 				for _, hv := range hvs {
@@ -262,7 +249,7 @@ func (a *ResourceArgs) PrepareReturnHeaders(fromBE http.Header) http.Header {
 		return ret
 	}
 
-	for _, hn := range a.ReturnHeaders {
+	for _, hn := range a.Tag.ReturnHeaders {
 		if hvs, ok := fromBE[hn]; ok && !DropHeadersReturn[hn] {
 			for _, hv := range hvs {
 				ret.Set(hn, hv)
@@ -272,49 +259,19 @@ func (a *ResourceArgs) PrepareReturnHeaders(fromBE http.Header) http.Header {
 	return ret
 }
 
-// TemplateVariables are used in ResourceArgs.TemplateToURL to be passed to
-// the internal Execute() function. Exported for documentation purposes.
-type TemplateVariables struct {
-	Req    *http.Request
-	URL    *url.URL
-	Header http.Header
-	// Cookie []*http.Cookie TODO add better cookie handling
-}
-
-// TemplateToURL renders a template into a string. A nil te returns an empty
-// string.
-func (a *ResourceArgs) TemplateToURL(te TemplateExecer) (string, error) {
-
-	if te == nil {
-		return "", nil
-	}
-
-	buf := bufpool.Get()
-	defer bufpool.Put(buf)
-
-	if err := te.Execute(buf, TemplateVariables{
-		Req:    a.ExternalReq,
-		URL:    a.ExternalReq.URL,
-		Header: a.ExternalReq.Header,
-	}); err != nil {
-		return "", errors.NewTemporaryf("[esitag] Resource URL %q, Key %q: Template error: %s\nContent: %s", a.URL, a.Key, err, buf)
-	}
-	return buf.String(), nil
-}
-
 // MarshalLog special crafted log format, does not log the external request
 func (a *ResourceArgs) MarshalLog(kv log.KeyValuer) error {
 	kv.AddString("ra_url", a.URL)
-	kv.AddInt64("ra_timeout", a.Timeout.Nanoseconds())
-	kv.AddUint64("ra_max_body_size", a.MaxBodySize)
+	kv.AddInt64("ra_timeout", a.Tag.Timeout.Nanoseconds())
+	kv.AddUint64("ra_max_body_size", a.Tag.MaxBodySize)
 	kv.AddString("ra_max_body_size_h", a.MaxBodySizeHumanized())
-	kv.AddString("ra_key", a.Key)
-	kv.AddInt64("ra_ttl", a.TTL.Nanoseconds())
-	kv.AddBool("ra_forward_post_data", a.ForwardPostData)
-	kv.AddString("ra_forward_headers", strings.Join(a.ForwardHeaders, "|"))
-	kv.AddBool("ra_forward_headers_all", a.ForwardHeadersAll)
-	kv.AddString("ra_return_headers", strings.Join(a.ReturnHeaders, "|"))
-	kv.AddBool("ra_return_headers_all", a.ReturnHeadersAll)
+	kv.AddString("ra_key", a.Tag.Key)
+	kv.AddInt64("ra_ttl", a.Tag.TTL.Nanoseconds())
+	kv.AddBool("ra_forward_post_data", a.Tag.ForwardPostData)
+	kv.AddString("ra_forward_headers", strings.Join(a.Tag.ForwardHeaders, "|"))
+	kv.AddBool("ra_forward_headers_all", a.Tag.ForwardHeadersAll)
+	kv.AddString("ra_return_headers", strings.Join(a.Tag.ReturnHeaders, "|"))
+	kv.AddBool("ra_return_headers_all", a.Tag.ReturnHeadersAll)
 	return nil
 }
 
@@ -383,7 +340,7 @@ var factoryResourceHandlers = &struct {
 // single configuration item for creating a new backend resource, especially in
 // ResourceHandlerFactoryFunc.
 type ResourceOptions struct {
-	// Alias ,optional, can have any name which gets used in an ESI tag and
+	// Alias ,optional, can have any name which gets used in an Tag tag and
 	// refers to the connection to a resource.
 	Alias string
 	// URL, required, defines the authentication and target to a resource. If an
@@ -539,19 +496,17 @@ func NewResourceHandler(opt *ResourceOptions) (ResourceHandler, error) {
 	return rh, nil
 }
 
-// Resource specifies the location to a 3rd party remote system within an ESI
+// Resource specifies the location to a 3rd party remote system within an Tag
 // tag. A resource attribute (src="") can occur n-times.
 type Resource struct {
 	// Index specifies the number of occurrence within the include tag to
 	// allowing sorting and hence having a priority list.
 	Index int
 	// URL to a remote 3rd party service which gets used by http.Client OR the
-	// URL contains an alias to a connection to a KeyValue server (defined in
-	// the Caddyfile) to fetch a value via the field "Key" or "KeyTemplate".
+	// URL contains an alias to a connection to a KeyValue/gRPC server (defined
+	// in the Caddyfile) to fetch a value via the field "Key" or "KeyTemplate".
+	// This field gets copied to ResourceArgs.URL.
 	url string
-	// URLTemplate gets created when the URL contains the template identifier. Then
-	// the URL field would be empty.
-	urlTemplate TemplateExecer
 
 	// reqFunc performs a request to a backend service via a specific
 	// protocol.
@@ -580,14 +535,6 @@ func NewResource(idx int, url string) (*Resource, error) {
 		cbLastFailureTime: new(uint64),
 	}
 
-	if strings.Contains(url, "://") && strings.Contains(r.url, TemplateIdentifier) {
-		var err error
-		r.urlTemplate, err = ParseTemplate("resource_tpl", r.url)
-		if err != nil {
-			return nil, errors.NewFatalf("[esibackend] NewResource. Failed to parse (Index %d) %q as URL template with error: %s", idx, r.url, err)
-		}
-	}
-
 	schemeAlias := r.url
 	if pos := strings.Index(r.url, "://"); pos > 1 {
 		schemeAlias = strings.ToLower(r.url[:pos])
@@ -605,28 +552,21 @@ func NewResource(idx int, url string) (*Resource, error) {
 // String returns a resource identifier, most likely the underlying URL and the
 // template name, if defined.
 func (r *Resource) String() string {
-	tplName := ""
-	if r.urlTemplate != nil {
-		tplName = " Template: " + r.urlTemplate.Name()
-	}
-	return r.url + tplName
+	return r.url
 }
 
 // DoRequest performs the request to the backend resource. It generates the URL
 // and then fires the request. DoRequest has the same signature as ResourceHandler
 func (r *Resource) DoRequest(args *ResourceArgs) (http.Header, []byte, error) {
 
-	tURL, err := args.TemplateToURL(r.urlTemplate)
+	args.URL = args.repl.Replace(r.url)
+	args.Tag.Key = args.repl.Replace(args.Tag.Key)
+
+	h, b, err := r.handler.DoRequest(args)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "[esibackend] TemplateToURL rendering failed")
+		err = errors.Wrap(err, "[esibackend] Resource.Handler.DoRequest")
 	}
-
-	args.URL = r.url
-	if tURL != "" {
-		args.URL = tURL
-	}
-
-	return r.handler.DoRequest(args)
+	return h, b, err
 }
 
 // CBState declares the different states for the circuit breaker (CB)
