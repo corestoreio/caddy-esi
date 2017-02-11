@@ -16,9 +16,7 @@ package esitag
 
 import (
 	"bufio"
-	"bytes"
 	"io"
-	"sync"
 
 	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/corestoreio/errors"
@@ -39,8 +37,7 @@ func Parse(r io.Reader) (Entities, error) {
 	defer bufpool.Put(buf)
 	sc.Buffer(buf.Bytes(), cap(buf.Bytes())+2)
 
-	fdr := finderPoolGet()
-	defer finderPoolPut(fdr)
+	fdr := newFinder()
 	sc.Split(fdr.split)
 
 	var tagIndex int
@@ -68,23 +65,6 @@ func Parse(r io.Reader) (Entities, error) {
 	return ret, nil
 }
 
-var finderPool = &sync.Pool{
-	New: func() interface{} {
-		return newFinder(MaxSizeESITag)
-	},
-}
-
-func finderPoolGet() *finder {
-	return finderPool.Get().(*finder)
-}
-
-func finderPoolPut(tf *finder) {
-	tf.buf.Reset()
-	tf.tagState = stateStart
-	tf.n = 0
-	finderPool.Put(tf)
-}
-
 type tagState int
 
 const (
@@ -104,13 +84,14 @@ type finder struct {
 	tagState
 	n          int
 	begin, end int
-	buf        *bytes.Buffer
+	buf        []byte
 }
 
-func newFinder(bufCap int) *finder {
+func newFinder() *finder {
+	var buf [MaxSizeESITag]byte
 	return &finder{
 		tagState: stateStart,
-		buf:      bytes.NewBuffer(make([]byte, 0, bufCap)), // for now max size of one esi tag
+		buf:      buf[:0], // for now max size of one esi tag
 	}
 }
 
@@ -161,10 +142,10 @@ func (e *finder) scan(b byte) (bool, error) {
 		e.tagState = stateStart
 		if b == ':' {
 			e.tagState = stateData
-			e.buf.Reset()
+			e.buf = e.buf[:0]
 		}
 	case stateData:
-		e.buf.WriteByte(b)
+		e.buf = append(e.buf, b)
 		if b == '/' {
 			e.tagState = stateSlash
 		}
@@ -174,7 +155,7 @@ func (e *finder) scan(b byte) (bool, error) {
 			e.end = e.n + 1 // to also exclude the >.
 			return true, nil
 		}
-		e.buf.WriteByte(b)
+		e.buf = append(e.buf, b)
 		e.tagState = stateData
 	default:
 		return false, errors.NewNotImplementedf("[esitag] Parser detected an unknown state in machine: %d with Byte: %q", e.tagState, rune(b))
@@ -190,9 +171,8 @@ func (e *finder) data() []byte {
 	if e.tagState != stateFound {
 		return nil
 	}
-	data := e.buf.Bytes()
 
-	ret := make([]byte, len(data)-1)
-	copy(ret, data[:len(data)-1]) // trim last /
+	ret := make([]byte, len(e.buf)-1)
+	copy(ret, e.buf[:len(e.buf)-1]) // trim last /
 	return ret
 }
