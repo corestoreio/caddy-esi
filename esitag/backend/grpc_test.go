@@ -57,7 +57,7 @@ func (lw *grpcLogTestWrap) Printf(format string, args ...interface{}) {
 func (lw *grpcLogTestWrap) Println(args ...interface{}) { lw.Lock(); lw.tb.Log(args...); lw.Unlock() }
 
 func TestNewGRPCClient(t *testing.T) {
-	t.Parallel()
+	// t.Parallel() not possible because of grpclog.SetLogger
 
 	cmd := esitesting.StartProcess("go", "run", "grpc_server_main.go")
 	go cmd.Wait()            // waits forever until killed
