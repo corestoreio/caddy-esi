@@ -512,8 +512,8 @@ type Resource struct {
 	// protocol.
 	handler ResourceHandler
 	// circuit breaker http://martinfowler.com/bliki/CircuitBreaker.html
-	cbFailures        *uint64
-	cbLastFailureTime *uint64 //  in UnixNano
+	cbFailures        uint64
+	cbLastFailureTime uint64 //  in UnixNano
 }
 
 // MustNewResource same as NewResource but panics on error.
@@ -529,10 +529,8 @@ func MustNewResource(idx int, url string) *Resource {
 // contains a template and parses that template.
 func NewResource(idx int, url string) (*Resource, error) {
 	r := &Resource{
-		Index:             idx,
-		url:               url,
-		cbFailures:        new(uint64),
-		cbLastFailureTime: new(uint64),
+		Index: idx,
+		url:   url,
 	}
 
 	schemeAlias := r.url
@@ -588,7 +586,7 @@ var CBThresholdCalc = func(failures uint64) time.Duration {
 
 // CBFailures number of failures. Thread safe.
 func (r *Resource) CBFailures() uint64 {
-	return atomic.LoadUint64(r.cbFailures)
+	return atomic.LoadUint64(&r.cbFailures)
 }
 
 // CBState returns the current state of the circuit breaker and the last failure
@@ -596,8 +594,8 @@ func (r *Resource) CBFailures() uint64 {
 func (r *Resource) CBState() (state int, lastFailure time.Time) {
 	var thresholdPassed bool
 
-	failures := atomic.LoadUint64(r.cbFailures)
-	lastFailed := int64(atomic.LoadUint64(r.cbLastFailureTime))
+	failures := atomic.LoadUint64(&r.cbFailures)
+	lastFailed := int64(atomic.LoadUint64(&r.cbLastFailureTime))
 	// increment the lastFailed with an exponential time out
 	lastFailed += CBThresholdCalc(failures).Nanoseconds()
 
@@ -623,16 +621,16 @@ func (r *Resource) CBState() (state int, lastFailure time.Time) {
 
 // CBReset resets the circuit breaker. Thread safe.
 func (r *Resource) CBReset() {
-	atomic.StoreUint64(r.cbLastFailureTime, 0)
-	atomic.StoreUint64(r.cbFailures, 0)
+	atomic.StoreUint64(&r.cbLastFailureTime, 0)
+	atomic.StoreUint64(&r.cbFailures, 0)
 }
 
 // CBRecordFailure records a failure and increases the internal counter. Returns
 // the last failed time. Thread safe.
 func (r *Resource) CBRecordFailure() (failedUnixNano int64) {
-	atomic.AddUint64(r.cbFailures, 1)
+	atomic.AddUint64(&r.cbFailures, 1)
 	// TODO(CyS) think about to switch to monotime.Now() for the whole CB
 	failedUnixNano = time.Now().UnixNano()
-	atomic.StoreUint64(r.cbLastFailureTime, uint64(failedUnixNano))
+	atomic.StoreUint64(&r.cbLastFailureTime, uint64(failedUnixNano))
 	return failedUnixNano
 }
