@@ -14,21 +14,83 @@ import (
 )
 
 func BenchmarkReplacer_Replace(b *testing.B) {
-	const key = `product_{HX-Product-ID}`
-	const wantKey = `product_GopherPlushXXL`
-
-	req := httptest.NewRequest("GET", "/", nil)
+	var have string
+	req := httptest.NewRequest("GET", "http://www.corestore.io/checkout/cart/add?pid=12367142142&qty=1", nil)
 	req.Header.Set("X-Product-ID", "GopherPlushXXL")
+	req.Header.Set("Cookie", `CP=H2; GeoIP=CH:AG:Village:47.47:8.16:v4; enwikiGeoFeaturesUser2=cb43d77a2d161d4e; enwikimwuser-sessionId=4813ab7b29183ed1; WMF-Last-Access=11-Feb-2017`)
+
 	rpl := MakeReplacer(req, "")
 
-	b.ResetTimer()
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		have := rpl.Replace(key)
-		if have != wantKey {
-			b.Errorf("Have: %v Want: %v", have, wantKey)
+	b.Run("One header", func(b *testing.B) {
+		const key = `product_{HX-Product-ID}`
+		const wantKey = `product_GopherPlushXXL`
+
+		b.ResetTimer()
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			have = rpl.Replace(key)
+			if have != wantKey {
+				b.Errorf("Have: %v Want: %v", have, wantKey)
+			}
 		}
-	}
+	})
+
+	b.Run("One GET form", func(b *testing.B) {
+		const key = `product_{Fpid}`
+		const wantKey = `product_12367142142`
+
+		b.ResetTimer()
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			have = rpl.Replace(key)
+			if have != wantKey {
+				b.Errorf("Have: %v Want: %v", have, wantKey)
+			}
+		}
+	})
+
+	b.Run("One Cookie", func(b *testing.B) {
+		const key = `product_{CGeoIP}`
+		const wantKey = `product_CH:AG:Village:47.47:8.16:v4`
+
+		b.ResetTimer()
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			have = rpl.Replace(key)
+			if have != wantKey {
+				b.Errorf("Have: %v Want: %v", have, wantKey)
+			}
+		}
+	})
+
+	b.Run("GET Host Escaped", func(b *testing.B) {
+		const key = `product_{Fpid}_{hostonly}_{query_escaped}`
+		const wantKey = `product_12367142142_www.corestore.io_pid%3D12367142142%26qty%3D1`
+
+		b.ResetTimer()
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			have = rpl.Replace(key)
+			if have != wantKey {
+				b.Errorf("Have: %v Want: %v", have, wantKey)
+			}
+		}
+	})
+
+	b.Run("Header Cookie Form", func(b *testing.B) {
+		const key = `product_{Fpid}_{CGeoIP}_{HX-Product-ID}`
+		const wantKey = `product_12367142142_CH:AG:Village:47.47:8.16:v4_GopherPlushXXL`
+
+		b.ResetTimer()
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			have = rpl.Replace(key)
+			if have != wantKey {
+				b.Errorf("Have: %v Want: %v", have, wantKey)
+			}
+		}
+	})
+
 }
 func TestNewReplacer(t *testing.T) {
 	t.Parallel()
