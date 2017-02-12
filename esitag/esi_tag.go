@@ -421,7 +421,7 @@ func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 	}
 	go func() {
 		g.Wait()
-		close(cTag) // why not defer close(cTag)
+		close(cTag)
 	}()
 
 	for t := range cTag {
