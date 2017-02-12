@@ -1,62 +1,112 @@
-BenchmarkParseESITags-4                    	   30000	     40996 ns/op	 112.33 MB/s	    2418 B/op	      22 allocs/op
-BenchmarkParseESITags-4                    	   50000	     40649 ns/op	 113.29 MB/s	    2417 B/op	      22 allocs/op
-BenchmarkParseESITags-4                    	   30000	     40053 ns/op	 114.97 MB/s	    2417 B/op	      22 allocs/op
-BenchmarkParseESITags-4                    	   30000	     40170 ns/op	 114.64 MB/s	    2417 B/op	      22 allocs/op
-BenchmarkParseESITags-4                    	   30000	     41661 ns/op	 110.53 MB/s	    2417 B/op	      22 allocs/op
-BenchmarkParseESITags-4                    	   30000	     40983 ns/op	 112.36 MB/s	    2417 B/op	      22 allocs/op
-BenchmarkParseESITags-4                    	   30000	     40183 ns/op	 114.60 MB/s	    2418 B/op	      22 allocs/op
-BenchmarkParseESITags-4                    	   50000	     40588 ns/op	 113.46 MB/s	    2417 B/op	      22 allocs/op
-BenchmarkParseESITags-4                    	   30000	     40088 ns/op	 114.87 MB/s	    2418 B/op	      22 allocs/op
-BenchmarkParseESITags-4                    	   50000	     40528 ns/op	 113.62 MB/s	    2417 B/op	      22 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7925 ns/op	     896 B/op	      17 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7893 ns/op	     896 B/op	      17 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7843 ns/op	     896 B/op	      17 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      8020 ns/op	     896 B/op	      17 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7824 ns/op	     896 B/op	      17 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7952 ns/op	     896 B/op	      17 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7945 ns/op	     896 B/op	      17 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7963 ns/op	     896 B/op	      17 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      8038 ns/op	     896 B/op	      17 allocs/op
-BenchmarkESITag_ParseRaw_MicroServicse-4   	  200000	      7769 ns/op	     896 B/op	      17 allocs/op
-BenchmarkDataTags_InjectContent/Page1-4    	   50000	     38964 ns/op	  163041 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page1-4    	   50000	     37013 ns/op	  163101 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page1-4    	   50000	     37828 ns/op	  163092 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page1-4    	   50000	     37595 ns/op	  163115 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page1-4    	   50000	     37937 ns/op	  163081 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page1-4    	   50000	     36981 ns/op	  163122 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page1-4    	   50000	     37785 ns/op	  163161 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page1-4    	   50000	     37265 ns/op	  163098 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page1-4    	   50000	     37394 ns/op	  163092 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page1-4    	   50000	     36913 ns/op	  163126 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page2-4    	   10000	    196213 ns/op	  853623 B/op	       8 allocs/op
-BenchmarkDataTags_InjectContent/Page2-4    	   10000	    194698 ns/op	  853622 B/op	       8 allocs/op
-BenchmarkDataTags_InjectContent/Page2-4    	   10000	    198074 ns/op	  853565 B/op	       8 allocs/op
-BenchmarkDataTags_InjectContent/Page2-4    	   10000	    193869 ns/op	  853618 B/op	       8 allocs/op
-BenchmarkDataTags_InjectContent/Page2-4    	   10000	    199925 ns/op	  853632 B/op	       8 allocs/op
-BenchmarkDataTags_InjectContent/Page2-4    	   10000	    195097 ns/op	  853597 B/op	       8 allocs/op
-BenchmarkDataTags_InjectContent/Page2-4    	   10000	    194357 ns/op	  853615 B/op	       8 allocs/op
-BenchmarkDataTags_InjectContent/Page2-4    	   10000	    193328 ns/op	  853660 B/op	       8 allocs/op
-BenchmarkDataTags_InjectContent/Page2-4    	   10000	    194715 ns/op	  853633 B/op	       8 allocs/op
-BenchmarkDataTags_InjectContent/Page2-4    	   10000	    192059 ns/op	  853657 B/op	       8 allocs/op
-BenchmarkDataTags_InjectContent/Page3-4    	  100000	     12196 ns/op	   15678 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page3-4    	  100000	     12183 ns/op	   15696 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page3-4    	  100000	     12410 ns/op	   15693 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page3-4    	  200000	     12104 ns/op	   15687 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page3-4    	  100000	     12244 ns/op	   15678 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page3-4    	  100000	     12615 ns/op	   15676 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page3-4    	  100000	     12852 ns/op	   15677 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page3-4    	  100000	     12172 ns/op	   15682 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page3-4    	  200000	     12261 ns/op	   15679 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page3-4    	  100000	     12454 ns/op	   15683 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page4-4    	  200000	     12112 ns/op	    2027 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page4-4    	  200000	     11742 ns/op	    2028 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page4-4    	  200000	     11859 ns/op	    2027 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page4-4    	  200000	     12523 ns/op	    2027 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page4-4    	  100000	     11650 ns/op	    2027 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page4-4    	  200000	     11774 ns/op	    2028 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page4-4    	  200000	     11724 ns/op	    2028 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page4-4    	  200000	     11647 ns/op	    2028 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page4-4    	  200000	     11633 ns/op	    2027 B/op	       3 allocs/op
-BenchmarkDataTags_InjectContent/Page4-4    	  200000	     12010 ns/op	    2028 B/op	       3 allocs/op
+BenchmarkReplacer_Replace/One_header-4     	 5000000	       284 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_header-4     	 5000000	       282 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_header-4     	 5000000	       279 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_header-4     	 5000000	       279 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_header-4     	 5000000	       283 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_header-4     	 5000000	       280 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_header-4     	 5000000	       280 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_header-4     	 5000000	       282 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_header-4     	 5000000	       282 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_header-4     	 5000000	       288 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_GET_form-4   	10000000	       175 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_GET_form-4   	10000000	       171 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_GET_form-4   	10000000	       175 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_GET_form-4   	10000000	       172 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_GET_form-4   	10000000	       181 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_GET_form-4   	10000000	       201 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_GET_form-4   	10000000	       191 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_GET_form-4   	10000000	       172 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_GET_form-4   	10000000	       173 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_GET_form-4   	10000000	       173 ns/op	      32 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_Cookie-4     	10000000	       173 ns/op	      48 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_Cookie-4     	10000000	       172 ns/op	      48 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_Cookie-4     	10000000	       174 ns/op	      48 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_Cookie-4     	10000000	       171 ns/op	      48 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_Cookie-4     	10000000	       172 ns/op	      48 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_Cookie-4     	10000000	       170 ns/op	      48 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_Cookie-4     	10000000	       170 ns/op	      48 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_Cookie-4     	10000000	       170 ns/op	      48 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_Cookie-4     	10000000	       171 ns/op	      48 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/One_Cookie-4     	10000000	       171 ns/op	      48 B/op	       1 allocs/op
+BenchmarkReplacer_Replace/GET_Host_Escaped-4         	 2000000	       846 ns/op	     240 B/op	       6 allocs/op
+BenchmarkReplacer_Replace/GET_Host_Escaped-4         	 2000000	       847 ns/op	     240 B/op	       6 allocs/op
+BenchmarkReplacer_Replace/GET_Host_Escaped-4         	 2000000	       847 ns/op	     240 B/op	       6 allocs/op
+BenchmarkReplacer_Replace/GET_Host_Escaped-4         	 2000000	       843 ns/op	     240 B/op	       6 allocs/op
+BenchmarkReplacer_Replace/GET_Host_Escaped-4         	 2000000	       853 ns/op	     240 B/op	       6 allocs/op
+BenchmarkReplacer_Replace/GET_Host_Escaped-4         	 2000000	       846 ns/op	     240 B/op	       6 allocs/op
+BenchmarkReplacer_Replace/GET_Host_Escaped-4         	 2000000	       855 ns/op	     240 B/op	       6 allocs/op
+BenchmarkReplacer_Replace/GET_Host_Escaped-4         	 2000000	       853 ns/op	     240 B/op	       6 allocs/op
+BenchmarkReplacer_Replace/GET_Host_Escaped-4         	 2000000	       855 ns/op	     240 B/op	       6 allocs/op
+BenchmarkReplacer_Replace/GET_Host_Escaped-4         	 2000000	       845 ns/op	     240 B/op	       6 allocs/op
+BenchmarkReplacer_Replace/Header_Cookie_Form-4       	 3000000	       535 ns/op	     144 B/op	       3 allocs/op
+BenchmarkReplacer_Replace/Header_Cookie_Form-4       	 3000000	       526 ns/op	     144 B/op	       3 allocs/op
+BenchmarkReplacer_Replace/Header_Cookie_Form-4       	 3000000	       535 ns/op	     144 B/op	       3 allocs/op
+BenchmarkReplacer_Replace/Header_Cookie_Form-4       	 3000000	       531 ns/op	     144 B/op	       3 allocs/op
+BenchmarkReplacer_Replace/Header_Cookie_Form-4       	 3000000	       532 ns/op	     144 B/op	       3 allocs/op
+BenchmarkReplacer_Replace/Header_Cookie_Form-4       	 3000000	       530 ns/op	     144 B/op	       3 allocs/op
+BenchmarkReplacer_Replace/Header_Cookie_Form-4       	 3000000	       535 ns/op	     144 B/op	       3 allocs/op
+BenchmarkReplacer_Replace/Header_Cookie_Form-4       	 3000000	       532 ns/op	     144 B/op	       3 allocs/op
+BenchmarkReplacer_Replace/Header_Cookie_Form-4       	 3000000	       535 ns/op	     144 B/op	       3 allocs/op
+BenchmarkReplacer_Replace/Header_Cookie_Form-4       	 3000000	       534 ns/op	     144 B/op	       3 allocs/op
+BenchmarkParseESITags-4                              	   30000	     49308 ns/op	  93.51 MB/s	    7521 B/op	      34 allocs/op
+BenchmarkParseESITags-4                              	   30000	     50006 ns/op	  92.21 MB/s	    7520 B/op	      34 allocs/op
+BenchmarkParseESITags-4                              	   30000	     49803 ns/op	  92.58 MB/s	    7521 B/op	      34 allocs/op
+BenchmarkParseESITags-4                              	   30000	     49084 ns/op	  93.94 MB/s	    7521 B/op	      34 allocs/op
+BenchmarkParseESITags-4                              	   30000	     49898 ns/op	  92.41 MB/s	    7521 B/op	      34 allocs/op
+BenchmarkParseESITags-4                              	   30000	     49763 ns/op	  92.66 MB/s	    7521 B/op	      34 allocs/op
+BenchmarkParseESITags-4                              	   30000	     50154 ns/op	  91.94 MB/s	    7522 B/op	      34 allocs/op
+BenchmarkParseESITags-4                              	   30000	     49689 ns/op	  92.80 MB/s	    7521 B/op	      34 allocs/op
+BenchmarkParseESITags-4                              	   30000	     49372 ns/op	  93.39 MB/s	    7522 B/op	      34 allocs/op
+BenchmarkParseESITags-4                              	   30000	     49286 ns/op	  93.55 MB/s	    7520 B/op	      34 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4             	  200000	      8858 ns/op	     896 B/op	      18 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4             	  200000	      8782 ns/op	     896 B/op	      18 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4             	  200000	      8736 ns/op	     896 B/op	      18 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4             	  200000	      8812 ns/op	     896 B/op	      18 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4             	  200000	      8871 ns/op	     896 B/op	      18 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4             	  200000	      8769 ns/op	     896 B/op	      18 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4             	  200000	      8794 ns/op	     896 B/op	      18 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4             	  200000	      8849 ns/op	     896 B/op	      18 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4             	  200000	      8771 ns/op	     896 B/op	      18 allocs/op
+BenchmarkESITag_ParseRaw_MicroServicse-4             	  200000	      8794 ns/op	     896 B/op	      18 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4              	   30000	     56139 ns/op	  188069 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4              	   30000	     56665 ns/op	  188097 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4              	   30000	     57615 ns/op	  188075 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4              	   30000	     59227 ns/op	  188107 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4              	   30000	     57629 ns/op	  188014 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4              	   30000	     57609 ns/op	  188070 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4              	   30000	     58148 ns/op	  188047 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4              	   30000	     58216 ns/op	  188054 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4              	   30000	     56154 ns/op	  188003 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page1-4              	   30000	     59777 ns/op	  188080 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4              	    5000	    254658 ns/op	  636538 B/op	       7 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4              	    5000	    251131 ns/op	  636689 B/op	       7 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4              	    5000	    253895 ns/op	  636530 B/op	       7 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4              	    5000	    255749 ns/op	  636550 B/op	       7 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4              	    5000	    255674 ns/op	  636641 B/op	       7 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4              	    5000	    255354 ns/op	  636640 B/op	       7 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4              	   10000	    252611 ns/op	  636769 B/op	       7 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4              	    5000	    253566 ns/op	  636646 B/op	       7 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4              	    5000	    256375 ns/op	  636597 B/op	       7 allocs/op
+BenchmarkDataTags_InjectContent/Page2-4              	    5000	    255841 ns/op	  636517 B/op	       7 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4              	  100000	     12463 ns/op	   15700 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4              	  100000	     12448 ns/op	   15700 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4              	  100000	     12435 ns/op	   15699 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4              	  100000	     12489 ns/op	   15700 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4              	  100000	     12450 ns/op	   15700 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4              	  100000	     12611 ns/op	   15700 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4              	  100000	     12479 ns/op	   15700 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4              	  100000	     12429 ns/op	   15700 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4              	  100000	     12502 ns/op	   15700 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page3-4              	  100000	     12448 ns/op	   15700 B/op	       3 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4              	  200000	     11486 ns/op	     618 B/op	       2 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4              	  200000	     11555 ns/op	     617 B/op	       2 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4              	  200000	     11581 ns/op	     618 B/op	       2 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4              	  200000	     11571 ns/op	     618 B/op	       2 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4              	  200000	     11630 ns/op	     617 B/op	       2 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4              	  200000	     11648 ns/op	     617 B/op	       2 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4              	  200000	     11520 ns/op	     617 B/op	       2 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4              	  200000	     11616 ns/op	     616 B/op	       2 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4              	  200000	     11582 ns/op	     616 B/op	       2 allocs/op
+BenchmarkDataTags_InjectContent/Page4-4              	  200000	     11590 ns/op	     617 B/op	       2 allocs/op
 PASS
-ok  	github.com/SchumacherFM/caddyesi/esitag	369.061s
+ok  	github.com/SchumacherFM/caddyesi/esitag	428.651s
