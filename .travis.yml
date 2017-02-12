@@ -40,3 +40,4 @@ script:
 after_script:
   - golint ./... | grep -v .pb.go
   - go test -tags esiall -run=🤐 -bench=. -count=1 -benchmem ./...
+  - tail -n +1 cdy_test_*
