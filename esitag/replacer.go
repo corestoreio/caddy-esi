@@ -25,7 +25,8 @@ type Replacer interface {
 
 // replacer implements Replacer.
 type replacer struct {
-	request    *http.Request
+	request *http.Request
+	// cookies lazily initialized
 	cookies    []*http.Cookie
 	emptyValue string
 }
@@ -37,16 +38,15 @@ type replacer struct {
 func MakeReplacer(r *http.Request, emptyValue string) Replacer {
 	// TODO(CyS) maybe add user agent parsing https://github.com/mssola/user_agent
 	// TODO(CyS) add geo location detection based on the IP address.
-	return replacer{
+	return &replacer{
 		emptyValue: emptyValue,
 		request:    r,
-		cookies:    r.Cookies(), // pre parse cookies
 	}
 }
 
 // Replace performs a replacement of values on s and returns the string with the
 // replaced values. Placeholders must be all lower case.
-func (r replacer) Replace(s string) string {
+func (r *replacer) Replace(s string) string {
 	// Do not attempt replacements if no placeholder is found.
 	if !strings.ContainsAny(s, "{}") {
 		return s
@@ -94,6 +94,9 @@ func (r *replacer) getSubstitution(key string) string {
 			}
 		}
 	case 'C': // search request cookies {CMy-Cookie-Key} then
+		if r.cookies == nil {
+			r.cookies = r.request.Cookies() // pre parse cookies
+		}
 		want := key[2 : len(key)-1]
 		for _, c := range r.cookies {
 			// cookie placeholders (case-sensitive)
@@ -179,6 +182,7 @@ func (r *replacer) getSubstitution(key string) string {
 		return now().Format(timeFormat)
 	case "{when_iso}":
 		return now().UTC().Format(timeFormatISOUTC)
+		// more date functions can be implemented ...
 	case "{file}":
 		_, file := path.Split(r.request.URL.Path)
 		return file

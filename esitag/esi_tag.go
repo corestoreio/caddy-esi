@@ -21,7 +21,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 	"unicode"
 
@@ -60,9 +59,6 @@ type Entity struct {
 	Resources []*Resource // Any 3rd party servers
 	// Conditioner TODO(CyS) depending on a condition an Tag tag gets executed or not.
 	Conditioner
-	// resourceRFAPool for the request arguments
-	// https://twitter.com/_rsc/status/816710229861793795 ;-)
-	resourceRFAPool sync.Pool
 }
 
 // Config provides the configuration of a single Tag tag. This information gets
@@ -213,8 +209,6 @@ func (et *Entity) ParseRaw() error {
 		return errors.NewEmptyf("[caddyesi] ESITag.ParseRaw. src (Items: %d/Src: %d) cannot be empty in Tag which requires at least one resource: %q", len(et.Resources), srcCounter, et.RawTag)
 	}
 
-	et.InitPoolRFA(nil)
-
 	return nil
 }
 
@@ -251,45 +245,23 @@ func (et *Entity) parseResource(idx int, val string) error {
 	return nil
 }
 
-// InitPoolRFA used in PathConfig.UpsertESITags and in Entity.ParseRaw to set
+// SetDefaultConfig used in PathConfig.UpsertESITags and in Entity.ParseRaw to set
 // the pool function. When called in PathConfig.UpsertESITags all default config
 // values have been applied correctly.
-func (et *Entity) InitPoolRFA(defaultRFA *ResourceArgs) {
+func (et *Entity) SetDefaultConfig(tag Config) {
 
-	if et.Log == nil && defaultRFA != nil {
-		et.Log = defaultRFA.Tag.Log
+	if et.Config.Log == nil && tag.Log != nil {
+		et.Config.Log = tag.Log
 	}
-	if et.MaxBodySize == 0 && defaultRFA != nil {
-		et.MaxBodySize = defaultRFA.Tag.MaxBodySize
+	if et.Config.MaxBodySize == 0 && tag.MaxBodySize > 0 {
+		et.Config.MaxBodySize = tag.MaxBodySize
 	}
-	if et.Timeout < 1 && defaultRFA != nil {
-		et.Timeout = defaultRFA.Tag.Timeout
+	if et.Config.Timeout < 1 && tag.Timeout > 0 {
+		et.Config.Timeout = tag.Timeout
 	}
-	if et.TTL < 1 && defaultRFA != nil {
-		et.TTL = defaultRFA.Tag.TTL
+	if et.Config.TTL < 1 && tag.TTL > 0 {
+		et.Config.TTL = tag.TTL
 	}
-
-	et.resourceRFAPool.New = func() interface{} {
-		return &ResourceArgs{
-			Tag: et.Config, // must be copied to prevent races
-		}
-	}
-}
-
-// used in Entity.QueryResources
-func (et *Entity) poolGetRFA(externalReq *http.Request) *ResourceArgs {
-	ra := et.resourceRFAPool.Get().(*ResourceArgs)
-	ra.ExternalReq = externalReq
-	ra.repl = MakeReplacer(externalReq, "") // if not found replace with an empty string
-	return ra
-}
-
-// used in Entity.QueryResources
-func (et *Entity) poolPutRFA(ra *ResourceArgs) {
-	ra.ExternalReq = nil
-	ra.URL = ""
-	ra.repl = nil
-	et.resourceRFAPool.Put(ra)
 }
 
 // QueryResources iterates sequentially over the resources and executes requests
@@ -303,21 +275,20 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 	// mErr: just for collecting errors for informational purposes at the
 	// Temporary error at the end.
 	var mErr *errors.MultiErr
-	rfa := et.poolGetRFA(externalReq)
-	defer et.poolPutRFA(rfa)
+	ra := NewResourceArgs(externalReq, "", et.Config)
 
 	for i, r := range et.Resources {
 
 		var lFields log.Fields
 		if et.Log.IsDebug() {
-			lFields = log.Fields{log.Int("resource_index", r.Index), log.String("resource_url", r.String()), log.Marshal("resource_arguments", rfa)}
+			lFields = log.Fields{log.Int("resource_index", r.Index), log.String("resource_url", r.String()), log.Marshal("resource_arguments", ra)}
 		}
 
 		switch state, lastFailure := r.CBState(); state {
 
 		case CBStateHalfOpen, CBStateClosed:
 			// TODO(CyS) add ReturnHeader
-			_, data, err := r.DoRequest(rfa)
+			_, data, err := r.DoRequest(ra)
 
 			if err != nil {
 
@@ -354,7 +325,7 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 					log.Uint64("failure_count", r.CBFailures()), log.Stringer("last_failure", lastFailure),
 					lFields, log.String("content", string(data)))
 			}
-			// TODO(CyS): Log header, create special function to log header; LOG rfa with special format
+			// TODO(CyS): Log header, create special function to log header; LOG ra with special format
 			return data, nil
 
 		case CBStateOpen:

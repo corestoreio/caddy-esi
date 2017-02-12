@@ -100,7 +100,7 @@ func TestNewReplacer(t *testing.T) {
 	rep := MakeReplacer(request, "")
 
 	switch v := rep.(type) {
-	case replacer:
+	case *replacer:
 		if v.getSubstitution("{host}") != "localhost" {
 			t.Error("Expected host to be localhost")
 		}

@@ -30,6 +30,8 @@ import (
 )
 
 // BenchmarkMiddleware_ServeHTTP-4   	   20000	     60994 ns/op	   44397 B/op	      52 allocs/op
+// BenchmarkMiddleware_ServeHTTP-4     	   20000	     85158 ns/op	   49099 B/op	      99 allocs/op
+// BenchmarkMiddleware_ServeHTTP-4   	   20000	     74384 ns/op	   46020 B/op	      66 allocs/op
 func BenchmarkMiddleware_ServeHTTP(b *testing.B) {
 
 	defer esitag.RegisterResourceHandler("bmServe01", esitesting.MockRequestContent("Hello 2017!")).DeferredDeregister()

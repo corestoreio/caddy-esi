@@ -160,13 +160,11 @@ func (pc *PathConfig) UpsertESITags(pageID uint64, entities esitag.Entities) {
 
 		// create sync.pool of arguments for the resources. Now with all correct
 		// default values.
-		et.InitPoolRFA(&esitag.ResourceArgs{
-			Tag: esitag.Config{
-				Log:         pc.Log,
-				MaxBodySize: pc.MaxBodySize,
-				Timeout:     pc.Timeout,
-				TTL:         pc.TTL,
-			},
+		et.SetDefaultConfig(esitag.Config{
+			Log:         pc.Log,
+			MaxBodySize: pc.MaxBodySize,
+			Timeout:     pc.Timeout,
+			TTL:         pc.TTL,
 		})
 	}
 
