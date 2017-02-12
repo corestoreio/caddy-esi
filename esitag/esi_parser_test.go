@@ -170,31 +170,24 @@ func TestParseESITags_File(t *testing.T) {
 
 var benchmarkParseESITags esitag.Entities
 
-// BenchmarkParseESITags-4   	   50000	     32894 ns/op	 139.99 MB/s	    9392 B/op	      12 allocs/op
-// BenchmarkParseESITags-4   	   50000	     31768 ns/op	 144.95 MB/s	    5137 B/op	       9 allocs/op <= sync.Pool Finder
-// BenchmarkParseESITags-4   	   50000	     30989 ns/op	 148.60 MB/s	    1041 B/op	       8 allocs/op <= additional sync.Pool Scanner
-// new features ...
-// BenchmarkParseESITags-4         30000	     52291 ns/op	  88.06 MB/s	    3794 B/op	      44 allocs/op <= regex
-// BenchmarkParseESITags-4         30000	     44564 ns/op	 103.33 MB/s	    2417 B/op	      22 allocs/op <= strings.FieldFunc
-// BenchmarkParseESITags-4   	   30000	     53211 ns/op	  86.65 MB/s	    3504 B/op	      35 allocs/op
+// BenchmarkParseESITags-4         30000	     49898 ns/op	  92.41 MB/s	    7521 B/op	      34 allocs/op
+// BenchmarkParseESITags-4   	   30000	     47541 ns/op	  96.99 MB/s	    7570 B/op	      35 allocs/op <= disk access
+// BenchmarkParseESITags-4   	   50000	     39206 ns/op	 117.86 MB/s	    6695 B/op	      31 allocs/op <= no disk access
 func BenchmarkParseESITags(b *testing.B) {
-	f := mustOpenFile("testdata/page3.html")
-	defer f.Close()
+	// The ESI tags in page3 contains an entry that onerror reads from disk
 
-	fi, err := f.Stat()
+	pg3, err := ioutil.ReadFile("testdata/page3.html") // use page3a.html for no disk access
 	if err != nil {
 		b.Fatal(err)
 	}
 
-	b.SetBytes(fi.Size())
+	b.SetBytes(int64(len(pg3)))
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if _, err := f.Seek(0, 0); err != nil {
-			b.Fatal(err)
-		}
+
 		var err error
-		benchmarkParseESITags, err = esitag.Parse(f)
+		benchmarkParseESITags, err = esitag.Parse(bytes.NewReader(pg3))
 		if err != nil {
 			b.Fatal(err)
 		}
