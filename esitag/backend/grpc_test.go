@@ -36,28 +36,23 @@ const (
 	serverListenAddr = "grpc://127.0.0.1:50049"
 )
 
-type grpcLogTestWrap struct {
-	sync.Mutex // because runs in parallel in a goroutine, otherwise it would be racy.
-	tb         testing.TB
-}
+// useTestLogging if false creates a noop logger for grpc and if true uses the
+// testing.T logging but triggers a race but only then when you run the test with -count=>1
+const useTestLogging = false
 
-func (lw *grpcLogTestWrap) Fatal(args ...interface{}) { lw.Lock(); lw.tb.Fatal(args...); lw.Unlock() }
-func (lw *grpcLogTestWrap) Fatalf(format string, args ...interface{}) {
-	lw.Lock()
-	lw.tb.Fatalf(format, args...)
-	lw.Unlock()
+func init() {
+	if !useTestLogging {
+		grpclog.SetLogger(grpcLogTestWrap{})
+	}
 }
-func (lw *grpcLogTestWrap) Fatalln(args ...interface{}) { lw.Lock(); lw.tb.Fatal(args...); lw.Unlock() }
-func (lw *grpcLogTestWrap) Print(args ...interface{})   { lw.Lock(); lw.tb.Log(args...); lw.Unlock() }
-func (lw *grpcLogTestWrap) Printf(format string, args ...interface{}) {
-	lw.Lock()
-	lw.tb.Logf(format, args...)
-	lw.Unlock()
-}
-func (lw *grpcLogTestWrap) Println(args ...interface{}) { lw.Lock(); lw.tb.Log(args...); lw.Unlock() }
 
 func TestNewGRPCClient(t *testing.T) {
-	// t.Parallel() not possible because of grpclog.SetLogger
+	t.Parallel()
+	// enable only for debugging the tests because this global package logger
+	// triggers a race :-(. Bad architecture in the gRPC package ...
+	if useTestLogging {
+		grpclog.SetLogger(grpcLogTestWrap{tb: t})
+	}
 
 	cmd := esitesting.StartProcess("go", "run", "grpc_server_main.go")
 	go cmd.Wait()            // waits forever until killed
@@ -66,8 +61,6 @@ func TestNewGRPCClient(t *testing.T) {
 	// to comment this out because you don't know when the sub tests finishes
 	// and the GRPC server gets killed before the tests finishes.
 	defer esitesting.KillZombieProcess("grpc_server_main")
-
-	grpclog.SetLogger(&grpcLogTestWrap{tb: t})
 
 	t.Run("Error in ParseNoSQLURL", func(t *testing.T) {
 		t.Parallel()
@@ -214,8 +207,9 @@ func BenchmarkNewGRPCClient_Parallel(b *testing.B) {
 	defer cmd.Process.Kill() // kills the go process but not the main started server
 	defer esitesting.KillZombieProcess("grpc_server_main")
 
-	grpclog.SetLogger(&grpcLogTestWrap{tb: b})
-
+	if useTestLogging {
+		grpclog.SetLogger(grpcLogTestWrap{tb: b})
+	}
 	// Full integration benchmark test which starts a GRPC server and uses TCP
 	// to query it on the localhost.
 
@@ -264,4 +258,42 @@ func BenchmarkNewGRPCClient_Parallel(b *testing.B) {
 			}
 		})
 	})
+}
+
+type grpcLogTestWrap struct {
+	// tb, if nil we have a noop logger which is needed to avoid race conditions
+	// and disable output logging to stdout in package grpclog. This global
+	// package logger shows a sub-optimal architecture.
+	tb testing.TB
+}
+
+func (lw grpcLogTestWrap) Fatal(args ...interface{}) {
+	if lw.tb != nil {
+		lw.tb.Fatal(args...)
+	}
+}
+func (lw grpcLogTestWrap) Fatalf(format string, args ...interface{}) {
+	if lw.tb != nil {
+		lw.tb.Fatalf(format, args...)
+	}
+}
+func (lw grpcLogTestWrap) Fatalln(args ...interface{}) {
+	if lw.tb != nil {
+		lw.tb.Fatal(args...)
+	}
+}
+func (lw grpcLogTestWrap) Print(args ...interface{}) {
+	if lw.tb != nil {
+		lw.tb.Log(args...)
+	}
+}
+func (lw grpcLogTestWrap) Printf(format string, args ...interface{}) {
+	if lw.tb != nil {
+		lw.tb.Logf(format, args...)
+	}
+}
+func (lw grpcLogTestWrap) Println(args ...interface{}) {
+	if lw.tb != nil {
+		lw.tb.Log(args...)
+	}
 }
