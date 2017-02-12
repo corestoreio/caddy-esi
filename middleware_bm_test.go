@@ -32,7 +32,7 @@ import (
 // BenchmarkMiddleware_ServeHTTP-4   	   20000	     60994 ns/op	   44397 B/op	      52 allocs/op
 // BenchmarkMiddleware_ServeHTTP-4     	   20000	     85158 ns/op	   49099 B/op	      99 allocs/op
 // BenchmarkMiddleware_ServeHTTP-4   	   20000	     74384 ns/op	   46020 B/op	      66 allocs/op
-func BenchmarkMiddleware_ServeHTTP(b *testing.B) {
+func BenchmarkMiddleware(b *testing.B) {
 
 	defer esitag.RegisterResourceHandler("bmServe01", esitesting.MockRequestContent("Hello 2017!")).DeferredDeregister()
 
@@ -95,17 +95,34 @@ func BenchmarkMiddleware_ServeHTTP(b *testing.B) {
 		"Cookie":                    []string{"x-wl-uid=1vnTVF5WyZIe5Fymf2a4H+pFPyJa4wxNmzCKdImj1UqQPV5ecUs2sm46vDbGJUI+sE=", "session-token=AIo5Vf+c/GhoTRWq4V; JSESSIONID=58B7C7A24731R869B75D142E970CEAD4; csm-hit=D5P2DBNF895ZDJTCTEQ7+s-D5P2DBNF895ZDJTCTEQ7|1483297885458; session-id-time=2082754801l"},
 	}
 
-	b.ResetTimer()
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-
-		rec := httptest.NewRecorder() // 3 allocs
-		code, err := stack.ServeHTTP(rec, req)
-		if err != nil {
-			b.Fatalf("%+v", err)
+	b.Run("ServeHTTP_Serial", func(b *testing.B) {
+		b.ResetTimer()
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			rec := httptest.NewRecorder() // 3 allocs
+			code, err := stack.ServeHTTP(rec, req)
+			if err != nil {
+				b.Fatalf("%+v", err)
+			}
+			if code != http.StatusOK {
+				b.Fatalf("Code must be StatusOK but got %d", code)
+			}
 		}
-		if code != http.StatusOK {
-			b.Fatalf("Code must be StatusOK but got %d", code)
-		}
-	}
+	})
+	b.Run("ServeHTTP_Parallel", func(b *testing.B) {
+		b.ResetTimer()
+		b.ReportAllocs()
+		b.RunParallel(func(pb *testing.PB) {
+			for pb.Next() {
+				rec := httptest.NewRecorder() // 3 allocs
+				code, err := stack.ServeHTTP(rec, req)
+				if err != nil {
+					b.Fatalf("%+v", err)
+				}
+				if code != http.StatusOK {
+					b.Fatalf("Code must be StatusOK but got %d", code)
+				}
+			}
+		})
+	})
 }
