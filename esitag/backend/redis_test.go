@@ -215,6 +215,7 @@ func TestNewRedis(t *testing.T) {
 				MaxBodySize: 10,
 			},
 		))
+		time.Sleep(5 * time.Microsecond)
 		require.EqualError(t, errors.Cause(err), context.DeadlineExceeded.Error(), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Empty(t, string(content), "Content should be empty")
