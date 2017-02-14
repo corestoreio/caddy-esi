@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -42,9 +43,6 @@ type Entity struct {
 	// tag contains a file name, then that content gets loaded.
 	OnError []byte
 	Config
-	// Coalesce TODO(CyS) multiple external requests which triggers a backend
-	// resource request gets merged into one backend request
-	Coalesce bool
 	// Race TODO(CyS) From the README: Add the attribute `race="true"` to fire
 	// all resource requests at once and the one which is the fastest gets
 	// served and the others dropped.
@@ -79,6 +77,9 @@ type Config struct {
 	MaxBodySize uint64 // required
 	// Key also in type esitag.Entity
 	Key string // optional (for KV Service)
+	// Coalesce TODO(CyS) multiple external requests which triggers a backend
+	// resource request gets merged into one backend request
+	Coalesce bool
 	// Above fields are special aligned to save space, see "aligncheck"
 }
 
@@ -150,6 +151,12 @@ func (et *Entity) ParseRaw() error {
 			srcCounter++
 		case "key":
 			et.Key = value
+		case "coalesce":
+			b, err := strconv.ParseBool(value)
+			if err != nil {
+				return errors.NewNotValidf("[caddyesi] Failed to parse coalesce %q into bool value in tag %q with error %s", value, et.RawTag, err)
+			}
+			et.Coalesce = b
 		case "condition":
 			if err := et.parseCondition(value); err != nil {
 				return errors.Wrapf(err, "[caddyesi] Failed to parse condition %q in tag %q", value, et.RawTag)
@@ -374,6 +381,29 @@ func (et Entities) String() string {
 		_, _ = fmt.Fprintf(buf, "%d: RawTag: %q\n\n", i, raw)
 	}
 	return buf.String()
+}
+
+// FilterCoalesce creates a new slice whose entries are equal to the argument
+// "enabled".
+func (et Entities) FilterCoalesce(enabled bool) Entities {
+	ret := make(Entities, 0, 2)
+	for _, e := range et {
+		if e.Coalesce == enabled {
+			ret = append(ret, e)
+		}
+	}
+	return ret
+}
+
+// HasCoalesce returns true if there is at least one tag with enabled coalesce
+// feature.
+func (et Entities) HasCoalesce() bool {
+	for _, e := range et {
+		if e.Coalesce {
+			return true
+		}
+	}
+	return false
 }
 
 // QueryResources runs in parallel to query all available backend services /

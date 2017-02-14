@@ -243,6 +243,25 @@ func TestESITag_ParseRaw(t *testing.T) {
 		},
 	))
 
+	t.Run("enable coalesce", runner(
+		[]byte(`include  src="awsRedis3" coalesce="true"`),
+		nil,
+		&esitag.Entity{
+			Resources: []*esitag.Resource{
+				esitag.MustNewResource(0, "awsRedis3"),
+			},
+			Config: esitag.Config{
+				Coalesce: true,
+			},
+		},
+	))
+
+	t.Run("error in coalesce", runner(
+		[]byte(`include key='product_234234_{HmyHeaderKey}' src="awsRedis3" coalesce="Yo!"`),
+		errors.IsNotValid,
+		nil,
+	))
+
 	t.Run("show not supported unknown attribute", runner(
 		[]byte(`include ykey='product_234234_{HmyHeaderKey}' src="awsRedis2"  returnheaders=" all  " forwardheaders=" all  "`),
 		errors.IsNotSupported,
@@ -705,5 +724,29 @@ func TestEntities_QueryResources(t *testing.T) {
 			{Data: []byte(`Content "testE1://micro3.service3" Timeout 2s MaxBody 5.0 kB`), Start: 210, End: 288},
 		}, tags)
 	})
+}
 
+func TestEntities_Coalesce(t *testing.T) {
+	t.Run("HasCoalesce", func(t *testing.T) {
+		et := esitag.Entities{
+			&esitag.Entity{Config: esitag.Config{Coalesce: false}},
+			&esitag.Entity{Config: esitag.Config{Coalesce: true}},
+		}
+		assert.True(t, et.HasCoalesce(), "should have one coalesce entry")
+
+		et = esitag.Entities{
+			&esitag.Entity{Config: esitag.Config{Coalesce: false}},
+			&esitag.Entity{Config: esitag.Config{Coalesce: false}},
+		}
+		assert.False(t, et.HasCoalesce(), "should have no coalesce entry")
+	})
+	t.Run("FilterCoalesce", func(t *testing.T) {
+		et := esitag.Entities{
+			&esitag.Entity{Config: esitag.Config{Coalesce: false}},
+			&esitag.Entity{Config: esitag.Config{Coalesce: true}},
+			&esitag.Entity{Config: esitag.Config{Coalesce: true}},
+		}
+		assert.Len(t, et.FilterCoalesce(true), 2, "Should have two coalesce entries")
+		assert.Len(t, et.FilterCoalesce(false), 1, "Should have one coalesce entries")
+	})
 }
