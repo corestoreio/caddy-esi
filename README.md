@@ -1,13 +1,14 @@
 # ESI Tags for Caddy Server (Beta)
 
-This plugin implements partial ESI [Edge Side Includes](https://en.wikipedia.org/wiki/Edge_Side_Includes) support
-for the [Caddy Webserver](https://caddyserver.com).
+This plugin implements partial ESI [Edge Side Includes](https://en.wikipedia.org/wiki/Edge_Side_Includes) 
+support for the [Caddy Webserver](https://caddyserver.com) to allow data
+retrieving from heterogeneous backends aka. micro services.
 
 [![Build Status](https://travis-ci.org/SchumacherFM/caddyesi.svg?branch=master)](https://travis-ci.org/SchumacherFM/caddyesi)
 
 #### Some features:
 
-- No full ESI support
+- Query data from HTTP, HTTPS, gRPC, Redis, Memcache and soon SQL.
 - Multiple incoming requests trigger only one single parsing of the ESI tags per
 page
 - Querying multiple backend server parallel and concurrent.
@@ -21,6 +22,7 @@ discard other responses
 - Variables support based on Cookie or Request parameters
 - Error handling and fail over. Either display a text from a string or a static
 file content when a backend server is unavailable.
+- No full ESI support
 - Supports Go >= 1.8
 
 ## High level overview
@@ -60,6 +62,7 @@ different value in a single ESI tag.
 
 | Config Name |  Default | Support in ESI tag | Description |
 | ----------- |  ------- | ----------- |  ----------- |
+| `[path]`   | `/`    | n/a | Under this path all pages gets parsed for ESI tags. Default path sets to slash. |
 | `timeout`   | 20s    | Yes | Time when a request to a resource should be canceled. [time.Duration](https://golang.org/pkg/time/#Duration) |
 | `ttl`      | disabled  | Yes | Time-to-live value in the NoSQL cache for data returned from the backend resources. |
 | `max_body_size` | 5MB       | Yes |  Limits the size of the returned body from a backend resource. |
@@ -133,7 +136,8 @@ services. An example on how the XML or JSON must be coded:
 ```
 
 Please be aware that this file must be stored securely on the hard drive and
-that the owner of the Caddy process can read it.
+that the owner of the Caddy process can read it. Other resource credential
+loading options might be added in the future.
 
 The further usage of configuration gets explained in the ESI tag documentation.
 
@@ -196,24 +200,29 @@ Quick overview which options are available for two different kinds of ESI tags.
     onerror="text or path to file" timeout="time.Duration" />
 ```
 
+`key` or `src` can contain variables which gets replaced to their corresponding
+values. See section "Dynamic sources and keys".
 
 ### Basic tag
 
 The basic tag waits on the `src` until `esi.timeout` cancels the loading. If src
 contains an invalid URL or has not been specified at all, nothing happens.
 
-An unreachable `src` gets marked as "failed" in the internal cache with an
-exponential back-off strategy: 2ms, 4ms, 8ms, 16ms, 32ms ... or as defined in
-the `esi.timeout` or tag based `timeout` attribute.
+An unreachable `src` gets marked as "failed" in the internal cache by a circuit
+breaker with an exponential back-off strategy: 2ms, 4ms, 8ms, 16ms, 32ms ... or
+as defined in the `esi.timeout` or tag based `timeout` attribute.
 
 ESI tags are getting internally cached after they have been parsed. Changes to
-ESI tags during development must some how trigger a cache clearance.
+ESI tags during development must trigger a cache clearance via restarting or
+sending the correct `cmd_header_name` header key.
 
-A Request URI defines the internal cache key for a set of ESI tags listed in an
-HTML page. For each incoming request the ESI processor knows beforehand which
-ESI tags to load and to process instead of parsing the HTML page sequentially.
-From this follows that all ESI `src` will be loaded parallel and immediately
-after that the page output starts.
+A page ID defines the internal cache key for a set of ESI tags listed in an HTML
+page. For each incoming request the ESI processor knows beforehand which ESI
+tags to load and to process instead of parsing the HTML page sequentially. All
+ESI `src` will be loaded parallel before the page output starts. Once the
+content has been received the Content-Length header gets calculated and the
+output starts. 
+TODO: Chunked transfer implementation with an immediately starting output.
 
 ```
 <esi:include src="https://micro.service/esi/foo" />
@@ -273,8 +282,9 @@ Available size identifiers: [https://github.com/dustin/go-humanize/blob/master/b
 ### Flip src to AJAX call after timeout (optional) (TODO)
 
 The basic tag with the attribute `timeout` waits for the src until the timeout
-occurs. After the timeout, the ESI processor converts the URI in the `src` attribute
-to an AJAX call in the frontend. TODO: JS code of the template ...
+occurs. After the timeout, the ESI processor converts the URI in the `src`
+attribute to an AJAX call in the frontend. The attribute `onerror="ajax"` must
+exists or feature is disabled. TODO: JS code of the template ...
 
 ```
 <esi:include src="https://micro.service/esi/foo" timeout="time.Duration" onerror="ajax"/>
@@ -283,8 +293,9 @@ to an AJAX call in the frontend. TODO: JS code of the template ...
 ### Forward POST, PATCH or PUT data (optional)
 
 The basic tag with the attribute `forwardpostdata` forwards all incoming request
-POST, PATCH, PUT data to the `src`. Other attributes can be additionally defined.
-Default value `false` which does not forward anything.
+POST, PATCH, PUT data to the `src`. Other attributes can be additionally
+defined. Default value `false` which does not forward anything. POST data gets
+only forwarded to those backend resources which can handle the data.
 
 ```
 <esi:include src="https://micro.service/esi/foo" forwardpostdata="true"/>
@@ -293,7 +304,8 @@ Default value `false` which does not forward anything.
 ### Forward all headers (optional)
 
 The basic tag with the attribute `forwardheaders` forwards all incoming request
-headers to the `src`. Other attributes can be additionally defined.
+headers to the `src`. Other attributes can be additionally defined. POST data
+gets only forwarded to those backend resources which can handle the data.
 
 ```
 <esi:include src="https://micro.service/esi/foo" forwardheaders="all"/>
@@ -303,7 +315,8 @@ headers to the `src`. Other attributes can be additionally defined.
 
 The basic tag with the attribute `forwardheaders` forwards only the specified
 headers of the incoming request to the `src`. Other attributes can be
-additionally defined.
+additionally defined. POST data gets only forwarded to those backend resources
+which can handle the data.
 
 ```
 <esi:include src="https://micro.service/esi/foo" forwardheaders="Cookie,Accept-Language,Authorization"/>
@@ -333,8 +346,11 @@ response.
 ### Coalesce multiple requests into one backend request (optional) (TODO)
 
 The basic tag with the attribute `coalesce="true"` takes care that for multiple
-incoming requests only one backend request gets fired. Other attributes can be
-additionally defined.
+incoming requests only one backend request gets fired. Other incoming requests
+waits until the backend returns from the initializing request. Any returned data
+from a backend resource gets shared with an unknown number of external requests.
+This feature limits the pressure onto a backend resource. Other attributes can
+be additionally defined.
 
 ```
 <esi:include src="https://micro.service/esi/foo" coalesce="true"/>
@@ -345,7 +361,7 @@ additionally defined.
 The basic ESI tag can contain multiple sources. The ESI processor tries to load
 `src` attributes in its specified order. The next `src` gets called after the
 `esi.timeout` or `timeout` occurs. Other attributes can be additionally defined.
-Add the attribute `race="true"` to fire all requests at once and the one which
+Add the attribute `race="true"` (TODO) to fire all requests at once and the one which
 is the fastest gets served and the others dropped.
 
 ```
@@ -353,18 +369,20 @@ is the fastest gets served and the others dropped.
     src="https://micro1.service/esi/foo" 
     src="http://micro2.service/esi/foo"
     src="https://micro3.service/esi/foo" 
-    timeout="time.Duration" />
+    timeout="time.Duration" 
+    race="true|false" />
 ```
 
 ### Dynamic sources and keys (string replacement)
 
 The basic ESI tag can extend all `src` URLs and `key` attributes with additional
-parameters from the `http.Request` object. A replacement string must be one of the 
-listed below and must consists of the pattern: `{[^\}]+}`.
+parameters from the `http.Request` object. A replacement string must be one of
+the listed below and must consists of the pattern: `{[^\}]+}`. Replacement
+strings can occur anywhere and n-times in the `src` or `key` attribute.
 
 ```
 <esi:include src="http://micro.service/search?query={Fsearch_term}"/>
-<esi:include src="https://micro.service/catalog/product/?id={HMy-Header-Key}"/>
+<esi:include src="https://micro.service/{dir}/{file}/?id={HMy-Header-Key}"/>
 ```
 
 The following string replacements are possible:
@@ -374,10 +392,10 @@ The following string replacements are possible:
 - {hostname}
 - {host} (incl. port)
 - {hostonly} (excl. port)
-- {path} (header Caddy-Rewrite-Original-URI supported)
+- {path}         (header Caddy-Rewrite-Original-URI supported)
 - {path_escaped} (header Caddy-Rewrite-Original-URI supported)
-- {rewrite_path} (header Caddy-Rewrite-Original-URI NOT supported)
-- {rewrite_path_escaped} (header Caddy-Rewrite-Original-URI NOT supported)
+- {rewrite_path}
+- {rewrite_path_escaped}
 - {query}
 - {query_escaped}
 - {fragment}
@@ -401,9 +419,6 @@ sensitive), in this case: `My-Cookie-Name`.
 - {FMy-Input-Name} must start with `F` followed by the name of the field (case
 sensitive), in this case: `My-Input-Name`.
 
-Replacement strings can occur anywhere and n-times in the `src` or `key`
-attribute.
-
 ### Conditional tag loading (TODO)
 
 The basic ESI tag can contain the attribute `condition`. A `condition` must
@@ -414,38 +429,40 @@ evaluate an expression to `true` to trigger the loading of the `src`.
     condition="{hostname} eq 'customer.micro.service'"/>
 ```
 
-### NoSQL access
+### Access via src aliases
 
-The ESI processor can access NoSQL resources which are specified in the Caddy
-resources configuration file. The `src` attribute must contain the valid alias
-name as defined in resources file. The ESI tag must contain a `key` attribute
-which accesses the value in the NoSQL server. The returned value will be
+The ESI processor can access NoSQL, gRPC and SQL resources which are specified
+in the Caddy resources configuration file. The `src` attribute must contain the
+valid alias name as defined in resources file. The ESI tag must contain a `key`
+attribute which accesses the value in the NoSQL server or forwards that value to
+gRPC or uses it in the SELECT query for a database. The returned value will be
 rendered unmodified into the HTML page output. You are responsible for secure
 escaping of your data. If multiple `src` tags are defined the next `src` gets
 used once the key cannot be found in the previous source or the `timeout`
-applies. Return and forward headers are not supported.
-
-If the `key` attribute contains 2x curly brackets, the Go `text/template` logic
-gets created.
+applies. Return and forward headers might not be supported.
 
 ```
 <esi:include src="redisAWS1" src="redisLocal1" key="my_redis_key_x" timeout="time.Duration" />
 <esi:include src="redisAWS1" key="my_redis_key_x" onerror="myLocalFile.html" timeout="time.Duration" />
-<esi:include src="redis1" key="prefix_{{ .Req.Host }}_{{ .Header.Get "X-Whatever" }}" timeout="time.Duration" />
+<esi:include src="redis1" key="prefix_{host}_{HX-Whatever}" timeout="time.Duration" />
 ```
 
 ### Registered schemes or aliases in the src attribute
 
-The `src` attribute can contain or refer to the following prefixes or aliases
-(defined in the resource configuration file) to fetch content from a resource
-backend:
+The `src` attribute can contain or refer to the following aliases (defined in
+the resource configuration file) to fetch content from a resource backend:
 
 - http://
 - https://
 - sh://
+- Name of the aliases as defined in the resources file
+
+To access the next resources you must specify them as an alias in the resources
+`xml|json` file. Because those connection lives the whole Caddy process and
+might never get closed.
+
 - redis://
 - memcache://
-- Name of the aliases as defined in the Caddyfile
 - sql:// a SQL query (TODO)
 - grpc:// a remote procedure call with gRPC
 
@@ -485,8 +502,10 @@ build tag `esishell`.
 `sql` Uses a prepared statement once the ESI tag has been parsed.
 
 ```html
-<esi:include src="alias_name; r.Header.Get " />
+<esi:include src="alias_name" key="{FMyFormInputName}" />
 ```
+
+`key` will be used as parameter in the WHERE query part.
 
 Disabled by default and must be enabled with a new compiled Caddy binary and the
 build tag `esisql`.
@@ -513,12 +532,6 @@ build tag `esigrpc`.
 All other tags, as defined in
 [https://www.w3.org/TR/esi-lang](https://www.w3.org/TR/esi-lang), won't be
 supported. You should switch to a server side scripting language ;-).
-
-## Future backwards compatibility breaks
-
-1. Due to performance reasons the template engine text/template might get
-replaced by a different package with a different syntax.
-2. That's it for now.
 
 # Building
 
