@@ -750,3 +750,40 @@ func TestEntities_Coalesce(t *testing.T) {
 		assert.Len(t, et.FilterCoalesce(false), 1, "Should have one coalesce entries")
 	})
 }
+
+func TestEntities_UniqueID(t *testing.T) {
+	et := esitag.Entities{
+		&esitag.Entity{
+			RawTag: []byte(`include src="testD1://micro1.service1" src="testD1://micro2.service2" timeout="5s" maxbodysize="10kb"`),
+		},
+		&esitag.Entity{
+			RawTag: []byte(`include src="testD2://micro1.service2" src="testD1://micro2.service20" timeout="1s" maxbodysize="12kb"`),
+		},
+		&esitag.Entity{
+			RawTag: []byte(`include src="testF2://micro1.service3" src="testD1://micro2.service30" timeout="6s" maxbodysize="13kb"`),
+		},
+	}
+	assert.Exactly(t, uint64(0x19ee2c8639ba9f25), et.UniqueID(), "should have one coalesce entry")
+}
+
+var benchmarkEntities_UniqueID uint64
+
+// BenchmarkEntities_UniqueID-4   	 5000000	       287 ns/op	      96 B/op	       1 allocs/op
+func BenchmarkEntities_UniqueID(b *testing.B) {
+	et := esitag.Entities{
+		&esitag.Entity{
+			RawTag: []byte(`include src="testD1://micro1.service1" src="testD1://micro2.service2" timeout="5s" maxbodysize="10kb"`),
+		},
+		&esitag.Entity{
+			RawTag: []byte(`include src="testD2://micro1.service2" src="testD1://micro2.service20" timeout="1s" maxbodysize="12kb"`),
+		},
+		&esitag.Entity{
+			RawTag: []byte(`include src="testF2://micro1.service3" src="testD1://micro2.service30" timeout="6s" maxbodysize="13kb"`),
+		},
+	}
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		benchmarkEntities_UniqueID = et.UniqueID()
+	}
+}

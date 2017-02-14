@@ -31,6 +31,7 @@ import (
 	"github.com/corestoreio/log"
 	"github.com/dustin/go-humanize"
 	"github.com/gavv/monotime"
+	"github.com/pierrec/xxHash/xxHash64"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -404,6 +405,15 @@ func (et Entities) HasCoalesce() bool {
 		}
 	}
 	return false
+}
+
+// UniqueID calculates a unique ID for all tags in the slice.
+func (et Entities) UniqueID() uint64 {
+	h := xxHash64.New(235711131719) // for now this seed
+	for _, e := range et {
+		_, _ = h.Write(e.RawTag)
+	}
+	return h.Sum64()
 }
 
 // QueryResources runs in parallel to query all available backend services /
