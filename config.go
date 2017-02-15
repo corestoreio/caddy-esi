@@ -60,7 +60,7 @@ func (pc PathConfigs) ConfigForPath(r *http.Request) *PathConfig {
 
 // PathConfig per path prefix
 type PathConfig struct {
-	// Base path to match used as path prefix
+	// Scope sets the base path to match used as path prefix
 	Scope string
 
 	// MaxBodySize defaults to 5MB and limits the size of the returned body from a
@@ -102,7 +102,7 @@ type PathConfig struct {
 	// instead of the map. Due to a higher granularity of the pageID the map
 	// gets filled fast without dropping old entries. This will blow up the
 	// memory.
-	esiCache map[uint64]esitag.Entities
+	esiCache map[uint64]esitag.Entities // TODO after refacotring other stuff replace with EntitiesMap but run before benchmarks and after ;-)
 }
 
 // NewPathConfig creates a configuration for a unique path prefix and
