@@ -740,14 +740,15 @@ func TestEntities_Coalesce(t *testing.T) {
 		}
 		assert.False(t, et.HasCoalesce(), "should have no coalesce entry")
 	})
-	t.Run("FilterCoalesce", func(t *testing.T) {
+	t.Run("SplitCoalesce", func(t *testing.T) {
 		et := esitag.Entities{
 			&esitag.Entity{Config: esitag.Config{Coalesce: false}},
 			&esitag.Entity{Config: esitag.Config{Coalesce: true}},
 			&esitag.Entity{Config: esitag.Config{Coalesce: true}},
 		}
-		assert.Len(t, et.FilterCoalesce(true), 2, "Should have two coalesce entries")
-		assert.Len(t, et.FilterCoalesce(false), 1, "Should have one coalesce entries")
+		c, nc := et.SplitCoalesce()
+		assert.Len(t, c, 2, "Should have two coalesce entries")
+		assert.Len(t, nc, 1, "Should have one coalesce entries")
 	})
 }
 
@@ -768,7 +769,6 @@ func TestEntities_UniqueID(t *testing.T) {
 
 var benchmarkEntities_UniqueID uint64
 
-// BenchmarkEntities_UniqueID-4   	 5000000	       287 ns/op	      96 B/op	       1 allocs/op
 func BenchmarkEntities_UniqueID(b *testing.B) {
 	et := esitag.Entities{
 		&esitag.Entity{

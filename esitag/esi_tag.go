@@ -384,16 +384,19 @@ func (et Entities) String() string {
 	return buf.String()
 }
 
-// FilterCoalesce creates a new slice whose entries are equal to the argument
-// "enabled".
-func (et Entities) FilterCoalesce(enabled bool) Entities {
-	ret := make(Entities, 0, 2)
+// SplitCoalesce creates two new slices whose entries contain either coalesce or
+// non coalesce ESI tags. Returns always non-nil slices.
+func (et Entities) SplitCoalesce() (coalesce Entities, nonCoalesce Entities) {
+	coalesce = make(Entities, 0, len(et))
+	nonCoalesce = make(Entities, 0, len(et))
 	for _, e := range et {
-		if e.Coalesce == enabled {
-			ret = append(ret, e)
+		if e.Coalesce {
+			coalesce = append(coalesce, e)
+		} else {
+			nonCoalesce = append(nonCoalesce, e)
 		}
 	}
-	return ret
+	return coalesce, nonCoalesce
 }
 
 // HasCoalesce returns true if there is at least one tag with enabled coalesce
@@ -409,7 +412,8 @@ func (et Entities) HasCoalesce() bool {
 
 // UniqueID calculates a unique ID for all tags in the slice.
 func (et Entities) UniqueID() uint64 {
-	h := xxHash64.New(235711131719) // for now this seed
+	// can be put into a hash pool ;-)
+	h := xxHash64.New(235711131719) // for now this seed will be used, found under the kitchen table.
 	for _, e := range et {
 		_, _ = h.Write(e.RawTag)
 	}
@@ -427,7 +431,6 @@ func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 		return DataTags{}, nil
 	}
 
-	tags := make(DataTags, 0, len(et))
 	g, ctx := errgroup.WithContext(r.Context())
 	cTag := make(chan DataTag)
 	for _, e := range et {
@@ -464,6 +467,7 @@ func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 		close(cTag)
 	}()
 
+	tags := make(DataTags, 0, len(et))
 	for t := range cTag {
 		tags = append(tags, t)
 	}
@@ -475,7 +479,8 @@ func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 		return DataTags{}, errors.Wrap(err, "[esitag] Entities.QueryResources ErrGroup.Error")
 	}
 
-	sort.Stable(tags)
+	// restore original order as the tags occur on the HTML page
+	sort.Sort(tags)
 
 	return tags, nil
 }
