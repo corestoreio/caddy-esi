@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en-US">
+<head>
+    <title>Coalesce requests into one backend request</title>
+    <base href="//cyrillschumacher.com/">
+</head>
+<body>
+<div>
+<p><esi:include src="mwTest08A://microService1" timeout="5ms" maxbodysize="11kb" /></p>
+<p><esi:include src="mwTest08B://microService2Coalesce" timeout="1200ms" coalesce="true" maxbodysize="22kb"/></p>
+<p><esi:include src="mwTest08C://microService3" timeout="7ms" maxbodysize="33kb"/></p>
+
+    <h1>Hello World</h1>
+</div>
+</body>
+</html>

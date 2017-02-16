@@ -149,6 +149,14 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 		nil,
 	))
 
+	t.Run("Middleware inactive due to GET request on another path", mwTestRunner(
+		`esi /catalog/categories {
+		}`,
+		httptest.NewRequest("GET", "/page01.html", nil),
+		"<esi:include   src=\"mwTest01://micro.service/esi/foo\"",
+		nil,
+	))
+
 	{
 		tmpLogFile, clean := esitesting.Tempfile(t)
 		defer clean()
@@ -233,6 +241,9 @@ func TestMiddleware_ServeHTTP_Parallel(t *testing.T) {
 
 	hpu := esitesting.NewHTTPParallelUsers(20, 10, 900, time.Millisecond)
 	hpu.AssertResponse = func(rec *httptest.ResponseRecorder, code int, err error) {
+		assert.Exactly(t, http.StatusOK, code, "Status code should be 200")
+		assert.NoError(t, err, "%+v", err)
+
 		assert.Contains(t, rec.Body.String(), `<p>Micro1Service11 "mwTest02A://microService1" Timeout 5ms MaxBody 10 kB</p>`)
 		assert.Contains(t, rec.Body.String(), `<p>Micro2Service22 "mwTest02B://microService2" Timeout 6ms MaxBody 20 kB</p>`)
 		assert.Contains(t, rec.Body.String(), `<p>Micro3Service33 "mwTest02C://microService3" Timeout 7ms MaxBody 30 kB</p>`)
@@ -302,4 +313,73 @@ func TestMiddleware_HandleHeaderCommands(t *testing.T) {
 	}
 	assert.Contains(t, string(logContent), `caddyesi.PathConfig.purgeESICache","path_scope":"/page01"`)
 	assert.Exactly(t, 2, strings.Count(string(logContent), `caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse","error":"<nil>"`))
+}
+
+func TestMiddleware_ServeHTTP_Coalesce(t *testing.T) {
+	// t.Parallel() not possible due to the global map in backend
+
+	// This test delivers food for the race detector.
+	// This tests creates 10 requests for each of the 20 users. All 200 requests
+	// occur in 900ms. We have three backend micro services in the HTML page.
+	// Each micro service receives 200 requests. In total this produces 600
+	// requests to backend services.
+	// Despite we have 200 incoming requests, the HTML page gets only parsed
+	// once.
+
+	const rampUpPeriod = 900
+	var reqCount2a = new(uint64)
+	var reqCount2b = new(uint64)
+	var reqCount2c = new(uint64)
+
+	defer esitag.RegisterResourceHandler("mwtest08a", esitesting.MockRequestContentCB("Micro1Service11", func() error {
+		atomic.AddUint64(reqCount2a, 1)
+		return nil
+	})).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("mwtest08b", esitesting.MockRequestContentCB("Micro2Service22", func() error {
+		// coalesce Service sleeps the whole time and a bit longer
+		time.Sleep((rampUpPeriod) * time.Millisecond)
+		atomic.AddUint64(reqCount2b, 1)
+		return nil
+	})).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("mwtest08c", esitesting.MockRequestContentCB("Micro3Service33", func() error {
+		atomic.AddUint64(reqCount2c, 1)
+		return nil
+	})).DeferredDeregister()
+
+	hpu := esitesting.NewHTTPParallelUsers(20, 10, rampUpPeriod, time.Millisecond)
+	hpu.AssertResponse = func(rec *httptest.ResponseRecorder, code int, err error) {
+		assert.Exactly(t, http.StatusOK, code, "Status code should be 200")
+		assert.NoError(t, err, "%+v", err)
+
+		assert.Contains(t, rec.Body.String(), `<p>Micro1Service11 "mwTest08A://microService1" Timeout 5ms MaxBody 11 kB</p>`)
+		assert.Contains(t, rec.Body.String(), `<p>Micro2Service22 "mwTest08B://microService2Coalesce" Timeout 1.2s MaxBody 22 kB</p>`)
+		assert.Contains(t, rec.Body.String(), `<p>Micro3Service33 "mwTest08C://microService3" Timeout 7ms MaxBody 33 kB</p>`)
+	}
+
+	tmpLogFile, clean := esitesting.Tempfile(t)
+	//_ = clean
+	defer clean()
+	t.Log(tmpLogFile)
+
+	hpu.ServeHTTPNewRequest(func() *http.Request {
+		return httptest.NewRequest("GET", "/page08-coalesce.html", nil)
+	}, mwTestHandler(t, `esi {
+			on_error "my important global error message"
+			allowed_methods GET
+			log_file `+tmpLogFile+`
+			log_level debug
+	}`))
+
+	// 200 == 20 * 10 @see NewHTTPParallelUsers
+	assert.Exactly(t, 200, int(*reqCount2a), "Calls to Micro Service 1")
+	assert.Exactly(t, 11, int(*reqCount2b), "Calls to Micro Service 2")
+	assert.Exactly(t, 200, int(*reqCount2c), "Calls to Micro Service 3")
+
+	logContent, err := ioutil.ReadFile(tmpLogFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Exactly(t, 1, strings.Count(string(logContent), `caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse","error":"<nil>"`), `caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse error: "<nil>" MUST only occur once!!!`)
+	assert.Exactly(t, 10, strings.Count(string(logContent), `caddyesi.Middleware.ServeHTTP.coaEnt.QueryResources.Once`))
+	assert.Exactly(t, 411, strings.Count(string(logContent), `esitag.Entity.QueryResources.ResourceHandler.CBStateClosed`))
 }

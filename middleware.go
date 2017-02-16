@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/SchumacherFM/caddyesi/bufpool"
@@ -43,6 +44,9 @@ type Middleware struct {
 	// PathConfigs The list of Tag configurations for each path prefix and theirs
 	// caches.
 	PathConfigs
+	// coalesce guarantees the execution of one backend request when n-external
+	// incoming requests occur. Pointer type not needed.
+	coalesce singleflight.Group
 }
 
 // ServeHTTP implements the http.Handler interface.
@@ -64,39 +68,74 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 		return http.StatusInternalServerError, err
 	}
 
-	pageID, esiEntities := cfg.ESITagsByRequest(r)
-	if esiEntities == nil {
-		// Slow path because Tag cache tag is empty and we need to analyse the buffer.
+	pageID, entities := cfg.ESITagsByRequest(r)
+	if entities == nil || len(entities) == 0 {
+		// Slow path because Tag cache tag is empty and we need to analyse the
+		// buffer.
 		return mw.serveBuffered(cfg, pageID, w, r)
 	}
 
 	////////////////////////////////////////////////////////////////////////////////
 	// Proceed from map, filled with the parsed Tag tags.
 
-	chanTags := make(chan esitag.DataTags, 1)
-	defer close(chanTags)
+	chanTags := make(chan esitag.DataTags)
+	go func() {
+		defer close(chanTags)
+		// TODO: remove 3x sorting
+		var coaChanTags chan esitag.DataTags
+		if entities.HasCoalesce() {
+			coaChanTags = make(chan esitag.DataTags)
+			var coaEnt esitag.Entities
+			coaEnt, entities = entities.SplitCoalesce()
+			// variable entities will be reused after go func() to query the
+			// non-coalesce resources.
 
-	if len(esiEntities) > 0 {
-		go func() {
-			// TODO(CyS) Coalesce requests
-			// trigger the DoRequests and query all backend resources in
-			// parallel. Errors do are mostly of cancelled client requests which
-			// the context propagates.
-			tags, err := esiEntities.QueryResources(r)
-			if err != nil {
-				if cfg.Log.IsInfo() {
-					cfg.Log.Info("caddyesi.Middleware.ServeHTTP.esiEntities.QueryResources.Error",
-						log.Err(err), loghttp.Request("request", r), log.Stringer("config", cfg),
-						log.Uint64("page_id", pageID),
-					)
-				}
+			go func() {
+				coaID := coaEnt.UniqueID()
+				coaRes, _, _ := mw.coalesce.Do(strconv.FormatUint(coaID, 10), func() (interface{}, error) {
+					cTags, err := coaEnt.QueryResources(r)
+					if err != nil {
+						if cfg.Log.IsInfo() {
+							cfg.Log.Info("caddyesi.Middleware.ServeHTTP.coaEnt.QueryResources.Error",
+								log.Err(err), loghttp.Request("request", r), log.Stringer("config", cfg),
+								log.Uint64("page_id", pageID), log.Uint64("entities_coalesce_id", coaID),
+							)
+						}
+					}
+					if cfg.Log.IsDebug() {
+						cfg.Log.Info("caddyesi.Middleware.ServeHTTP.coaEnt.QueryResources.Once",
+							log.Uint64("page_id", pageID), log.Uint64("entities_coalesce_id", coaID),
+							log.Stringer("coalesce_entities", coaEnt), log.Stringer("non_coalesce_entities", entities),
+							loghttp.Request("request", r),
+						)
+					}
+					return cTags, nil
+				})
+				coaChanTags <- coaRes.(esitag.DataTags)
+				close(coaChanTags)
+			}()
+		}
+
+		// trigger the DoRequests and query all backend resources in
+		// parallel. Errors are mostly of cancelled client requests which
+		// the context propagates.
+		tags, err := entities.QueryResources(r)
+		if err != nil {
+			if cfg.Log.IsInfo() {
+				cfg.Log.Info("caddyesi.Middleware.ServeHTTP.entities.QueryResources.Error",
+					log.Err(err), loghttp.Request("request", r), log.Stringer("config", cfg),
+					log.Uint64("page_id", pageID),
+				)
 			}
-			chanTags <- tags
-		}()
-	} else {
-		// We're not running in a goroutine so the channel must be buffered
-		chanTags <- esitag.DataTags{}
-	}
+		}
+		if coaChanTags != nil {
+			ct := <-coaChanTags
+			tags = append(tags, ct...)
+			// restore original order as the tags occur on the HTML page
+			sort.Sort(tags)
+		}
+		chanTags <- tags
+	}()
 
 	return mw.Next.ServeHTTP(responseWrapInjector(chanTags, w), r)
 }

@@ -56,27 +56,25 @@ func TestConfigUnmarshal(t *testing.T) {
 	t.Run("Load XML and JSON which must be equal", func(t *testing.T) {
 
 		var want = caddyesi.ResourceItems{
-			&caddyesi.ResourceItem{
-				Alias: "redis01",
-				URL:   "redis://127.0.0.1:6379/?db=0&max_active=10&max_idle=4",
-				Query: "",
-			},
-			&caddyesi.ResourceItem{
-				Alias: "grpc01",
-				URL:   "grpc://127.0.0.1:53044/?pem=../path/to/root.pem",
-				Query: "",
-			},
+			caddyesi.NewResourceItem(
+				"redis://127.0.0.1:6379/?db=0&max_active=10&max_idle=4",
+				"redis01",
+			),
+			caddyesi.NewResourceItem(
+				"grpc://127.0.0.1:53044/?pem=../path/to/root.pem",
+				"grpc01",
+			),
 			&caddyesi.ResourceItem{
 				Alias: "mysql01",
 				URL:   "user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&tls=skip-verify",
 				Query: "SELECT `value` FROM tableX WHERE key='?'",
 			},
-			&caddyesi.ResourceItem{
-				Alias: "mysql02",
-				// the alias mysql-1 got resolved to the correct URL data
-				URL:   "user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&tls=skip-verify",
-				Query: "SELECT `value` FROM tableY WHERE another_key=?",
-			},
+			caddyesi.NewResourceItem(
+				// the alias mysql01 got resolved to the correct URL data
+				"user:password@tcp(localhost:5555)/dbname?charset=utf8mb4,utf8&tls=skip-verify",
+				"mysql02",
+				"SELECT `value` FROM tableY WHERE another_key=?",
+			),
 		}
 
 		xmlI, err := caddyesi.UnmarshalResourceItems("./testdata/config_01.xml")

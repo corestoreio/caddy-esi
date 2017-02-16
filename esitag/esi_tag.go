@@ -376,10 +376,7 @@ func (et Entities) String() string {
 	defer bufpool.Put(buf)
 
 	for i, e := range et {
-		raw := e.RawTag
-		e.RawTag = nil
-		_, _ = fmt.Fprintf(buf, "%d: %#v\n", i, e)
-		_, _ = fmt.Fprintf(buf, "%d: RawTag: %q\n\n", i, raw)
+		_, _ = fmt.Fprintf(buf, "%d: RawTag: %q\n", i, e.RawTag)
 	}
 	return buf.String()
 }
