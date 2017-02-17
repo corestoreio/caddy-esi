@@ -31,7 +31,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/mholt/caddy"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
-	"github.com/uber-go/zap"
+	"go.uber.org/zap"
 )
 
 func init() {
