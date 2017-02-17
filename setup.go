@@ -32,6 +32,7 @@ import (
 	"github.com/mholt/caddy"
 	"github.com/mholt/caddy/caddyhttp/httpserver"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 func init() {
@@ -123,8 +124,9 @@ var osStdOut io.Writer = os.Stdout
 
 func setupLogger(pc *PathConfig) error {
 	pc.Log = log.BlackHole{}
+	const loggingDisabled zapcore.Level = -50
 
-	var lvl zap.Level = -5000
+	var lvl zapcore.Level = loggingDisabled
 	switch pc.LogLevel {
 	case "debug":
 		lvl = zap.DebugLevel
@@ -134,7 +136,7 @@ func setupLogger(pc *PathConfig) error {
 		lvl = zap.FatalLevel
 	}
 
-	if lvl == -5000 {
+	if lvl == loggingDisabled {
 		// logging disabled
 		return nil
 	}
@@ -160,11 +162,22 @@ func setupLogger(pc *PathConfig) error {
 	pc.Log = zapw.Wrap{
 		Level: lvl,
 		Zap: zap.New(
-			zap.NewJSONEncoder(zap.TimeFormatter(func(t time.Time) zap.Field {
-				return zap.String("ts", t.Format(time.RFC3339Nano))
-			})),
-			zap.Output(zap.AddSync(w)),
-			lvl,
+			zapcore.NewCore(
+				zapcore.NewJSONEncoder(
+					zapcore.EncoderConfig{
+						MessageKey:     "msg",
+						LevelKey:       "level",
+						TimeKey:        "ts",
+						NameKey:        "name",
+						CallerKey:      "caller",
+						StacktraceKey:  "stacktrace",
+						EncodeLevel:    zapcore.LowercaseLevelEncoder,
+						EncodeTime:     zapcore.ISO8601TimeEncoder,
+						EncodeDuration: zapcore.NanosDurationEncoder,
+					}),
+				zapcore.AddSync(w),
+				lvl,
+			),
 		),
 	}
 
