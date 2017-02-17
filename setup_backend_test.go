@@ -54,12 +54,13 @@ func TestPluginSetup_Backends(t *testing.T) {
 		nil,
 	))
 
-	t.Run("With timeout, ttl and 2x Cacher", testPluginSetup(
+	t.Run("With timeout, ttl and 3x Cacher", testPluginSetup(
 		`esi {
 			timeout 5ms
 			ttl 10ms
 			cache redis://`+mr.Addr()+`/0
 			cache redis://`+mr.Addr()+`/1
+			cache redis://`+mr.Addr()+`/3
 		}`,
 		PathConfigs{
 			&PathConfig{
@@ -68,7 +69,7 @@ func TestPluginSetup_Backends(t *testing.T) {
 				TTL:     time.Millisecond * 10,
 			},
 		},
-		2,   // cache length
+		3,   // cache length
 		nil, // kv services []string
 		nil,
 	))
