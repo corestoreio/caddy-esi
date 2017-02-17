@@ -80,8 +80,6 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 
 	chanTags := make(chan esitag.DataTags)
 	go func() {
-		defer close(chanTags)
-		// TODO: remove 3x sorting
 		var coaChanTags chan esitag.DataTags
 		if entities.HasCoalesce() {
 			coaChanTags = make(chan esitag.DataTags)
@@ -131,10 +129,9 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 		if coaChanTags != nil {
 			ct := <-coaChanTags
 			tags = append(tags, ct...)
-			// restore original order as the tags occur on the HTML page
-			sort.Sort(tags)
 		}
 		chanTags <- tags
+		close(chanTags)
 	}()
 
 	return mw.Next.ServeHTTP(responseWrapInjector(chanTags, w), r)
@@ -227,6 +224,9 @@ func (mw *Middleware) serveBuffered(cfg *PathConfig, pageID uint64, w http.Respo
 	// Calculates the correct Content-Length and enables now the real writing to the
 	// client.
 	bufResW.TriggerRealWrite(tags.DataLen())
+
+	// restore original order as occurred in the HTML document.
+	sort.Sort(tags)
 
 	if _, err := bufRdr.Seek(0, 0); err != nil { // Reset io.Reader
 		return http.StatusInternalServerError, err

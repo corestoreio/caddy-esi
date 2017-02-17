@@ -19,7 +19,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -421,7 +420,8 @@ func (et Entities) UniqueID() uint64 {
 // resources which are available in the current page. The returned DataTags
 // slice is guaranteed to be sorted after Start positions and non-nil. If the
 // request gets canceled via its context then all resource requests gets
-// cancelled too.
+// cancelled too. This function does not sort the DataTags to restore the
+// original order as the occur in an HTML page.
 func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 
 	if len(et) == 0 {
@@ -475,9 +475,6 @@ func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 	if err := g.Wait(); err != nil {
 		return DataTags{}, errors.Wrap(err, "[esitag] Entities.QueryResources ErrGroup.Error")
 	}
-
-	// restore original order as the tags occur on the HTML page
-	sort.Sort(tags)
 
 	return tags, nil
 }

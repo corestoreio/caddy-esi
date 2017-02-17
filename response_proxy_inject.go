@@ -19,6 +19,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/SchumacherFM/caddyesi/esitag"
@@ -58,10 +59,12 @@ type injectingWriter struct {
 }
 
 // initLazyTags reads only once from the chanTags and blocks until data is
-// available.
+// available and then sorts them all to maintain the order as which they occur
+// in the HTML page.
 func (b *injectingWriter) initLazyTags() {
 	if b.lazyTags == nil {
 		b.lazyTags = <-b.chanTags
+		sort.Sort(b.lazyTags)
 	}
 }
 
