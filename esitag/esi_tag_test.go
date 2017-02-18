@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -695,6 +696,7 @@ func TestEntities_QueryResources(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%+v", err)
 		}
+		sort.Sort(tags)
 		assert.Exactly(t, esitag.DataTags{
 			{Data: []byte(`failed to load service 1`), Start: 32, End: 146},
 			{Data: []byte(`Content "testE2b://micro2.service2" Timeout 2s MaxBody 3.0 kB`), Start: 157, End: 237},
@@ -718,6 +720,7 @@ func TestEntities_QueryResources(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%+v", err)
 		}
+		sort.Sort(tags)
 		assert.Exactly(t, esitag.DataTags{
 			{Data: []byte(`Content "testE1://micro1.service1" Timeout 2s MaxBody 3.0 kB`), Start: 32, End: 110},
 			{Data: []byte(`Content "testE1://micro2.service2" Timeout 2s MaxBody 4.0 kB`), Start: 121, End: 199},
