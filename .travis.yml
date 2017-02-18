@@ -11,12 +11,13 @@ services:
   - memcached
 
 matrix:
-  # failure is not an option
-  # allow_failures:
-  #  - go: tip
+  allow_failures:
+    - go: tip
   fast_finish: true
 
 before_install:
+  # default ulimit set to 256
+  - ulimit -n 1024
   - if [ "$TRAVIS_OS_NAME" = osx ]; then brew update; fi
   - if [ "$TRAVIS_OS_NAME" = osx ]; then brew install memcached; fi
   - if [ "$TRAVIS_OS_NAME" = osx ]; then /usr/local/opt/memcached/bin/memcached -l 127.0.0.1:11211 -d; fi
