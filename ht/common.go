@@ -25,13 +25,16 @@ import (
 )
 
 var (
-	testCollection []*ht.Test
+	testCollection = map[int]*ht.Test{}
 	afterTests     []*ht.Test
 )
 
 // RegisterTest adds a set of tests to the collection
-func RegisterTest(tests ...*ht.Test) {
-	testCollection = append(testCollection, tests...)
+func RegisterTest(position int, test *ht.Test) {
+	if _, ok := testCollection[position]; ok {
+		panic(fmt.Sprintf("Position %d already exists with test: %#v", position, test))
+	}
+	testCollection[position] = test
 }
 
 // RegisterAfterTest register a test to run after the main concurrent test loop.
@@ -73,7 +76,7 @@ func makeChecklist200(checks ...ht.Check) (cl ht.CheckList) {
 		&ht.Header{
 			Header: "Etag",
 			Condition: ht.Condition{
-				Min: 14, Max: 18}},
+				Min: 8, Max: 18}},
 		&ht.Header{
 			Header: "Accept-Ranges",
 			Condition: ht.Condition{

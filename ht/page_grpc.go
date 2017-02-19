@@ -16,7 +16,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/vdobler/ht/ht"
 )
@@ -26,7 +25,8 @@ func init() {
 	// single test cannot be shared between goroutines. This is a limitation
 	// which can maybe fixed by a special handling of the Request and Jar field
 	// in ht. This change might complicate things ...
-	RegisterTest(pageGRPC(), pageGRPC2())
+	RegisterTest(1000, pageGRPC())
+	RegisterTest(1010, pageGRPC2())
 }
 
 var grpcCommonChecks = ht.CheckList{
@@ -72,9 +72,6 @@ func pageGRPC() (t *ht.Test) {
 func pageGRPC2() (t *ht.Test) {
 	tcGRPC++
 	t = &ht.Test{
-		Execution: ht.Execution{
-			PreSleep: 30 * time.Second,
-		},
 		Name:        fmt.Sprintf("Page GRPC Check Latency Iteration %d", tcGRPC),
 		Description: `Request loads page_grpc.html and checks if coalesce requests are much lower than non-coalesce requests`,
 		Request:     makeRequestGET("page_grpc.html"),

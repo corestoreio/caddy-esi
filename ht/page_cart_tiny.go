@@ -25,7 +25,9 @@ func init() {
 	// single test cannot be shared between goroutines. This is a limitation
 	// which can maybe fixed by a special handling of the Request and Jar field
 	// in ht. This change might complicate things ...
-	RegisterTest(page01(), page01(), page01())
+	RegisterTest(10, page01())
+	RegisterTest(11, page01())
+	RegisterTest(12, page01())
 }
 
 var tc01 int // tc = test counter

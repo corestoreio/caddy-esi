@@ -21,7 +21,8 @@ import (
 )
 
 func init() {
-	RegisterTest(pageRedis(), pageRedis())
+	RegisterTest(30, pageRedis())
+	RegisterTest(31, pageRedis())
 }
 
 var tc03 int // tc = test counter

@@ -20,6 +20,7 @@ import (
 	"math/rand"
 	"os"
 	"runtime"
+	"sort"
 	"time"
 
 	"github.com/vdobler/ht/cookiejar"
@@ -36,12 +37,18 @@ func main() {
 		panic(err)
 	}
 
-	for _, t := range testCollection {
-		t.Execution.PreSleep = time.Duration(rand.Intn(20)) * time.Millisecond
+	var testKeys = make([]int, 0, len(testCollection))
+	for k := range testCollection {
+		testKeys = append(testKeys, k)
 	}
+	sort.Ints(testKeys)
 
 	c := ht.Collection{
-		Tests: testCollection,
+		Tests: make([]*ht.Test, 0, len(testCollection)),
+	}
+	for _, k := range testKeys {
+		testCollection[k].Execution.PreSleep = time.Duration(rand.Intn(50)) * time.Millisecond
+		c.Tests = append(c.Tests, testCollection[k])
 	}
 
 	var exitStatus int
