@@ -36,12 +36,10 @@ script:
   - ineffassign .
   - go vet ./...
   - go test -tags esiall -race -count=4 ./...
-  # temporary fix because latests changes breaks everything #https://github.com/mholt/caddy/issues/1455
-  - cd $GOPATH/src/github.com/mholt/caddy && git checkout 977a3c322631b41b534f079e2466689f9aa3d3f7
-  - cd $TRAVIS_BUILD_DIR
   - ./integration.sh
 
 after_script:
   - golint ./... | grep -v .pb.go
   - go test -tags esiall -run=🤐 -bench=. -count=1 -benchmem ./...
-  - tail -n +1 cdy_test_*
+  # enable the next line only in case of debugging
+  # - tail -n +1 cdy_test_*
