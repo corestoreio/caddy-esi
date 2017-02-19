@@ -40,7 +40,7 @@ func headerCmd() (t *ht.Test) {
 					// Whenever we change the number of tests and the cached
 					// entries grows more we must change here the number of
 					// items in the cache before purging it.
-					Equals: `purge-ok-6`,
+					Equals: `purge-ok-8`,
 				},
 			},
 			&ht.Body{

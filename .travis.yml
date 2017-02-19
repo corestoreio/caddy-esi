@@ -36,6 +36,8 @@ script:
   - ineffassign .
   - go vet ./...
   - go test -tags esiall -race -count=4 ./...
+  # temporary fix because latests changes breaks everything #https://github.com/mholt/caddy/issues/1455
+  - cd $GOPATH/src/github.com/mholt/caddy && git checkout 977a3c322631b41b534f079e2466689f9aa3d3f7
   - ./integration.sh
 
 after_script:
