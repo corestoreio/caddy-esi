@@ -12,4 +12,8 @@
         <alias>redisGCPNoHost1</alias>
         <url><![CDATA[redis://127.0.0.1:6699/?db=2&lazy=1]]></url>
     </item>
+    <item>
+        <alias>grpc_integration_01</alias>
+        <url><![CDATA[grpc://127.0.0.1:50666]]></url>
+    </item>
 </items>

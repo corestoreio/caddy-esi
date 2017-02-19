@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	// also stored in _test file
+	// also stored in CaddyfileResources.xml file with key grpc_integration_01
 	serverListenAddr = "127.0.0.1:50666"
 )
 
@@ -51,7 +51,7 @@ func (s *server) GetHeaderBody(_ context.Context, arg *esigrpc.ResourceArgs) (*e
 	switch {
 	case arg.GetKey() == "coalesce_enabled":
 		counter = atomic.AddUint64(&s.coaOn, 1)
-	case arg.GetKey() == "coalesce_disbled":
+	case arg.GetKey() == "coalesce_disabled":
 		counter = atomic.AddUint64(&s.coaOff, 1)
 	case strings.Contains(arg.GetKey(), "error"):
 		return nil, errors.NewInterruptedf("[grpc_server] Interrupted. Detected word error in %q for URL %q", arg.GetKey(), arg.GetUrl())
@@ -60,7 +60,7 @@ func (s *server) GetHeaderBody(_ context.Context, arg *esigrpc.ResourceArgs) (*e
 	buf := new(bytes.Buffer)
 	writeLine(buf, "Arg URL", arg.GetUrl())
 	writeLine(buf, "Arg Key", arg.GetKey())
-	writeLine(buf, "Counter", strconv.FormatUint(counter, 10))
+	writeLine(buf, arg.GetKey(), strconv.FormatUint(counter, 10))
 	writeLine(buf, "Time", time.Now().Format(time.RFC3339))
 
 	return &esigrpc.HeaderBody{
@@ -72,7 +72,7 @@ func (s *server) GetHeaderBody(_ context.Context, arg *esigrpc.ResourceArgs) (*e
 func writeLine(buf *bytes.Buffer, key, val string) {
 	buf.WriteString(`<p>`)
 	buf.WriteString(key)
-	buf.WriteString(": ")
+	buf.WriteString("=")
 	buf.WriteString(val)
 	buf.WriteString(`</p>`)
 	buf.WriteRune('\n')

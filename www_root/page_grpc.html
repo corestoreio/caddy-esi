@@ -14,11 +14,13 @@
         </tr>
         <tr>
             <td class="gRPCSuccess">Should load text coalesce</td>
-            <td><esi:include src="grpc1" key="coalesce_enabled" coalesce="true" onerror="Hoppla - Something went wrong in grpc1a" timeout="100ms"/></td>
+            <td><esi:include src="grpc_integration_01" key="coalesce_enabled"
+                             coalesce="true" onerror="Hoppla - Something went wrong in grpc1a" timeout="100ms"/></td>
         </tr>
         <tr>
             <td class="gRPCSuccess">Should load text on every request</td>
-            <td><esi:include src="grpc1" key="coalesce_disabled" onerror="Hoppla - Something went wrong in grpc1b" timeout="100ms"/></td>
+            <td><esi:include src="grpc_integration_01" key="coalesce_disabled"
+                             onerror="Hoppla - Something went wrong in grpc1b" timeout="100ms"/></td>
         </tr>
     </table>
 
