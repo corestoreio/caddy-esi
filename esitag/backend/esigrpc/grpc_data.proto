@@ -43,10 +43,10 @@ message ResourceArgs {
         repeated string transfer_encoding = 8;
         bool close = 9;
         string host = 10;
-        repeated string form = 11;
-        repeated string post_form = 12;
-        string remote_addr = 13;
-        string request_uri = 14;
+        string remote_addr = 11;
+        string real_ip = 12;
+        string request_uri = 13;
+        bytes form = 14;
     }
 
     ExternalReq external_req = 1; // required
