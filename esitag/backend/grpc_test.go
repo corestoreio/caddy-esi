@@ -22,6 +22,9 @@ import (
 	"testing"
 	"time"
 
+	"bytes"
+	"io/ioutil"
+
 	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/SchumacherFM/caddyesi/esitag/backend"
 	"github.com/SchumacherFM/caddyesi/esitesting"
@@ -194,6 +197,30 @@ func TestNewGRPCClient(t *testing.T) {
 			t.Errorf("Content should be nil: %q", content)
 		}
 		assert.Contains(t, err.Error(), `[grpc_server] Interrupted. Detected word error in "word error in the key triggers an error on the server" for URL "grpcShoppingCart2"`)
+	})
+
+	t.Run("POST request gets its body echoed back from the gRPC server", func(t *testing.T) {
+
+		rfa := esitag.NewResourceArgs(
+			getExternalReqWithExtendedHeaders(),
+			"grpcShoppingCart2",
+			esitag.Config{
+				ForwardPostData: true,
+				Timeout:         5 * time.Second,
+				MaxBodySize:     1e5,
+				Key:             "too_large",
+				Log:             log.BlackHole{},
+			},
+		)
+		rfa.ExternalReq.Method = "POST"
+		rfa.ExternalReq.Body = ioutil.NopCloser(bytes.NewBufferString("This string exceeds not the 1e5 bytes defined in the resource arguments type."))
+
+		hdr, content, err := grpcInsecureClient.DoRequest(rfa)
+		assert.NoError(t, err)
+		if hdr != nil {
+			t.Errorf("Header should be nil because not yet supported: %#v", hdr)
+		}
+		assert.Contains(t, string(content), `<p>BodyEcho: This string exceeds not the 1e5 bytes defined in the resource arguments type.</p>`)
 	})
 }
 

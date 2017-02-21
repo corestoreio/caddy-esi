@@ -66,6 +66,7 @@ func (s server) GetHeaderBody(_ context.Context, arg *esigrpc.ResourceArgs) (*es
 	writeLine(buf, "Arg Key", arg.GetKey())
 	writeLine(buf, "RequestURI", arg.GetExternalReq().RequestUri)
 	writeLine(buf, "Time", time.Now().Format(time.RFC3339))
+	writeLine(buf, "BodyEcho", string(arg.GetExternalReq().GetBody()))
 
 	return &esigrpc.HeaderBody{
 		// Header: []*esigrpc.MapValues{},

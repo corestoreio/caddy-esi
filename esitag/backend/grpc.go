@@ -19,6 +19,8 @@
 package backend
 
 import (
+	"bytes"
+	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -108,30 +110,39 @@ func (mc *grpcClient) DoRequest(args *esitag.ResourceArgs) (http.Header, []byte,
 	timeStart := monotime.Now()
 
 	if err := args.Validate(); err != nil {
-		return nil, nil, errors.Wrap(err, "[esibackend] FetchHTTP.args.Validate")
+		return nil, nil, errors.Wrap(err, "[esibackend] gRPC.args.Validate")
 	}
 	if err := args.ValidateWithKey(); err != nil {
-		return nil, nil, errors.Wrap(err, "[esibackend] FetchHTTP.args.ValidateWithKey")
+		return nil, nil, errors.Wrap(err, "[esibackend] gRPC.args.ValidateWithKey")
 	}
 
-	// TODO(CyS) Distinguish between GET and POST like requests to reduce argument
-	// building times and allocs.
+	r := args.ExternalReq
+	var body []byte
+	if args.IsPostAllowed() {
+		var err error
+		body, err = ioutil.ReadAll(r.Body)
+		r.Body.Close()
+		if err != nil {
+			return nil, nil, errors.NewReadFailedf("[esibackend] Body too large: %s", err)
+		}
+		r.Body = ioutil.NopCloser(bytes.NewReader(body))
+	}
+
 	in := &esigrpc.ResourceArgs{
 		ExternalReq: &esigrpc.ResourceArgs_ExternalReq{
-			Method:           args.ExternalReq.Method,
-			Url:              args.ExternalReq.URL.String(), // needed? maybe remove
-			Proto:            args.ExternalReq.Proto,
-			ProtoMajor:       int32(args.ExternalReq.ProtoMajor),
-			ProtoMinor:       int32(args.ExternalReq.ProtoMinor),
+			Method:           r.Method,
+			Url:              r.URL.String(), // needed? maybe remove
+			Proto:            r.Proto,
+			ProtoMajor:       int32(r.ProtoMajor),
+			ProtoMinor:       int32(r.ProtoMinor),
 			Header:           args.PrepareForwardHeaders(),
-			ContentLength:    args.ExternalReq.ContentLength,
-			TransferEncoding: args.ExternalReq.TransferEncoding,
-			Close:            args.ExternalReq.Close,
-			Host:             args.ExternalReq.Host,
-			Form:             args.PrepareForm(),
-			PostForm:         args.PreparePostForm(),
-			RemoteAddr:       args.ExternalReq.RemoteAddr,
-			RequestUri:       args.ExternalReq.RequestURI,
+			ContentLength:    r.ContentLength,
+			TransferEncoding: r.TransferEncoding,
+			Close:            r.Close,
+			Host:             r.Host,
+			RemoteAddr:       r.RemoteAddr,
+			RequestUri:       r.RequestURI,
+			Body:             body,
 		},
 		Url:              args.URL,
 		MaxBodySize:      args.Tag.MaxBodySize,
@@ -140,19 +151,19 @@ func (mc *grpcClient) DoRequest(args *esitag.ResourceArgs) (http.Header, []byte,
 		ReturnHeadersAll: args.Tag.ReturnHeadersAll,
 	}
 
-	r, err := mc.client.GetHeaderBody(args.ExternalReq.Context(), in)
+	hb, err := mc.client.GetHeaderBody(r.Context(), in)
 	if args.Tag.Log.IsDebug() {
 		args.Tag.Log.Debug("backend.grpcClient.DoRequest.ResourceArg",
 			log.Err(err), log.Duration(log.KeyNameDuration, monotime.Since(timeStart)),
 			log.Marshal("resource_args", args), log.Object("grpc_resource_args", in),
-			log.String("grpc_return_body", string(r.GetBody())),
+			log.String("grpc_return_body", string(hb.GetBody())),
 		)
 	}
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "[esibackend] GetHeaderBody")
 	}
 
-	bdy := r.GetBody()
+	bdy := hb.GetBody()
 	if mbs := int(args.Tag.MaxBodySize); len(bdy) > mbs && mbs > 0 {
 		bdy = bdy[:mbs]
 	}
