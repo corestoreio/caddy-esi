@@ -77,11 +77,11 @@ func pageGRPC2() (t *ht.Test) {
 		Request:     makeRequestGET("page_grpc.html"),
 		Checks: makeChecklist200(
 			&ht.Body{
-				Regexp: "coalesce_enabled=[45][0-9]{2}", // 4xx
+				Regexp: "coalesce_enabled=[0-9]{3}", // xxx
 				Count:  1,
 			},
 			&ht.Body{
-				Regexp: "coalesce_disabled=5[0-9]{3}", // 5xxx
+				Regexp: "coalesce_disabled=[0-9]{4}", // xxxx
 				Count:  1,
 			},
 		),
