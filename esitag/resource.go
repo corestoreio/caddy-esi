@@ -90,6 +90,8 @@ func (a *ResourceArgs) Validate() (err error) {
 	return
 }
 
+// ValidateWithKey same as Validate but validates the key instead of the URL
+// field.
 func (a *ResourceArgs) ValidateWithKey() (err error) {
 	switch {
 	case a.Tag.Key == "":

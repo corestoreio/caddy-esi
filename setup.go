@@ -126,7 +126,7 @@ func setupLogger(pc *PathConfig) error {
 	pc.Log = log.BlackHole{}
 	const loggingDisabled zapcore.Level = -50
 
-	var lvl zapcore.Level = loggingDisabled
+	var lvl = loggingDisabled
 	switch pc.LogLevel {
 	case "debug":
 		lvl = zap.DebugLevel

@@ -204,7 +204,7 @@ func easyjson1688e6a4DecodeGithubComSchumacherFMCaddyesiBackend1(in *jlexer.Lexe
 				if out.URL == nil {
 					out.URL = new(url.URL)
 				}
-				easyjson1688e6a4DecodeNetUrl(in, out.URL)
+				easyjson1688e6a4DecodeNetURL(in, out.URL)
 			}
 		case "proto":
 			out.Proto = in.String()
@@ -420,7 +420,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 		if in.URL == nil {
 			out.RawString("null")
 		} else {
-			easyjson1688e6a4EncodeNetUrl(out, *in.URL)
+			easyjson1688e6a4EncodeNetURL(out, *in.URL)
 		}
 	}
 	if in.Proto != "" {
@@ -644,7 +644,7 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 	}
 	out.RawByte('}')
 }
-func easyjson1688e6a4DecodeNetUrl(in *jlexer.Lexer, out *url.URL) {
+func easyjson1688e6a4DecodeNetURL(in *jlexer.Lexer, out *url.URL) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -675,7 +675,7 @@ func easyjson1688e6a4DecodeNetUrl(in *jlexer.Lexer, out *url.URL) {
 				if out.User == nil {
 					out.User = new(url.Userinfo)
 				}
-				easyjson1688e6a4DecodeNetUrl1(in, out.User)
+				easyjson1688e6a4DecodeNetURL1(in, out.User)
 			}
 		case "host":
 			out.Host = in.String()
@@ -699,7 +699,7 @@ func easyjson1688e6a4DecodeNetUrl(in *jlexer.Lexer, out *url.URL) {
 		in.Consumed()
 	}
 }
-func easyjson1688e6a4EncodeNetUrl(out *jwriter.Writer, in url.URL) {
+func easyjson1688e6a4EncodeNetURL(out *jwriter.Writer, in url.URL) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -728,7 +728,7 @@ func easyjson1688e6a4EncodeNetUrl(out *jwriter.Writer, in url.URL) {
 		if in.User == nil {
 			out.RawString("null")
 		} else {
-			easyjson1688e6a4EncodeNetUrl1(out, *in.User)
+			easyjson1688e6a4EncodeNetURL1(out, *in.User)
 		}
 	}
 	if in.Host != "" {
@@ -781,7 +781,7 @@ func easyjson1688e6a4EncodeNetUrl(out *jwriter.Writer, in url.URL) {
 	}
 	out.RawByte('}')
 }
-func easyjson1688e6a4DecodeNetUrl1(in *jlexer.Lexer, out *url.Userinfo) {
+func easyjson1688e6a4DecodeNetURL1(in *jlexer.Lexer, out *url.Userinfo) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -809,7 +809,7 @@ func easyjson1688e6a4DecodeNetUrl1(in *jlexer.Lexer, out *url.Userinfo) {
 		in.Consumed()
 	}
 }
-func easyjson1688e6a4EncodeNetUrl1(out *jwriter.Writer, in url.Userinfo) {
+func easyjson1688e6a4EncodeNetURL1(out *jwriter.Writer, in url.Userinfo) {
 	out.RawByte('{')
 	first := true
 	_ = first
