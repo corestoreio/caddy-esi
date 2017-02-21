@@ -46,7 +46,7 @@ message ResourceArgs {
         string remote_addr = 11;
         string real_ip = 12;
         string request_uri = 13;
-        bytes form = 14;
+        bytes body = 14;
     }
 
     ExternalReq external_req = 1; // required
