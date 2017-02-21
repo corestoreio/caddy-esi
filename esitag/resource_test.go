@@ -20,7 +20,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"sort"
-	"strings"
 	"testing"
 	"time"
 
@@ -276,149 +275,35 @@ func TestResourceArgs_PrepareForwardHeaders(t *testing.T) {
 	})
 }
 
-func TestResourceArgs_PrepareForm_GET(t *testing.T) {
+func TestResourceArgs_IsPostAllowed(t *testing.T) {
 	t.Parallel()
 
-	rfa := &esitag.ResourceArgs{
-		URL:         "http://whatever.anydomain/page.html",
-		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Tag: esitag.Config{
-			Timeout:     time.Second,
-			MaxBodySize: 15,
-		},
-	}
-
-	rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm/search?q=foo&q=bar&both=x&prio=1&orphan=nope&empty=not",
-		nil)
-	rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
-
-	have := rfa.PrepareForm()
-	want := []string{"q", "foo", "q", "bar", "both", "x", "prio", "1", "orphan", "nope", "empty", "not"}
-
-	// because url.Values is a map we must sort it first before comparing it.
-	sort.Strings(have)
-	sort.Strings(want)
-	assert.Exactly(t, want, have)
-}
-
-func TestResourceArgs_PrepareForm_GET_POST(t *testing.T) {
-	t.Parallel()
-
-	rfa := &esitag.ResourceArgs{
-		URL:         "http://whatever.anydomain/page.html",
-		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Tag: esitag.Config{
-			Timeout:     time.Second,
-			MaxBodySize: 15,
-		},
-	}
-
-	rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm/search?q=foo&q=bar&both=x&prio=1&orphan=nope&empty=not",
-		strings.NewReader("z=post&both=y&prio=2&=nokey&orphan;empty=&"))
-	rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
-
-	t.Run("Both", func(t *testing.T) {
-		rfa.Tag.ForwardPostData = true
-
-		have := rfa.PrepareForm()
-		want := []string{"empty", "", "empty", "not", "z", "post", "both", "y", "both", "x", "prio", "2", "prio", "1", "", "nokey", "q", "foo", "q", "bar", "orphan", "", "orphan", "nope"}
-
-		// because url.Values is a map we must sort it first before comparing it.
-		sort.Strings(have)
-		sort.Strings(want)
-		assert.Exactly(t, want, have)
+	t.Run("isAllowed", func(t *testing.T) {
+		rfa := &esitag.ResourceArgs{
+			URL:         "http://whatever.anydomain/page.html",
+			ExternalReq: getExternalReqWithExtendedHeaders(),
+			Tag: esitag.Config{
+				Timeout:         time.Second,
+				MaxBodySize:     15,
+				ForwardPostData: true,
+			},
+		}
+		rfa.ExternalReq.Method = "PATCH"
+		assert.True(t, rfa.IsPostAllowed())
 	})
-
-	t.Run("GET only", func(t *testing.T) {
-		rfa.Tag.ForwardPostData = false
-
-		have := rfa.PrepareForm()
-		want := []string{"empty", "not", "q", "foo", "q", "bar", "both", "x", "prio", "1", "orphan", "nope"}
-
-		// because url.Values is a map we must sort it first before comparing it.
-		sort.Strings(have)
-		sort.Strings(want)
-		assert.Exactly(t, want, have)
-	})
-
-}
-
-func TestResourceArgs_PrepareForm_POST(t *testing.T) {
-	t.Parallel()
-
-	rfa := &esitag.ResourceArgs{
-		URL:         "http://whatever.anydomain/page.html",
-		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Tag: esitag.Config{
-			Timeout:     time.Second,
-			MaxBodySize: 15,
-		},
-	}
-
-	rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm/search",
-		strings.NewReader("z=post&both=y&prio=2&=nokey&orphan;empty=&"))
-	rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
-
-	t.Run("Forward Post Disabled", func(t *testing.T) {
-		have := rfa.PrepareForm()
-		var want []string
-
-		assert.Exactly(t, want, have)
-	})
-	t.Run("Forward Post Enabled", func(t *testing.T) {
-		rfa.Tag.ForwardPostData = true
-		have := rfa.PrepareForm()
-		expectedPostData := []string{"prio", "2", "", "nokey", "orphan", "", "empty", "", "z", "post", "both", "y"}
-
-		// because url.Values is a map we must sort it first before comparing it.
-		sort.Strings(have)
-		sort.Strings(expectedPostData)
-		assert.Exactly(t, expectedPostData, have)
-	})
-
-}
-
-func TestResourceArgs_PreparePostForm(t *testing.T) {
-	t.Parallel()
-
-	rfa := &esitag.ResourceArgs{
-		URL:         "http://whatever.anydomain/page.html",
-		ExternalReq: getExternalReqWithExtendedHeaders(),
-		Tag: esitag.Config{
-			Timeout:     time.Second,
-			MaxBodySize: 15,
-		},
-	}
-
-	t.Run("ignores GET params", func(t *testing.T) {
-
-		rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm/search?q=foo&q=bar&both=x&prio=1&orphan=nope&empty=not",
-			nil)
-		rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
-
-		have := rfa.PreparePostForm()
-		var want []string
-
-		// because url.Values is a map we must sort it first before comparing it.
-		sort.Strings(have)
-		sort.Strings(want)
-		assert.Exactly(t, want, have)
-	})
-
-	t.Run("ignores GET but returns POST", func(t *testing.T) {
-		rfa.Tag.ForwardPostData = true
-
-		rfa.ExternalReq = httptest.NewRequest("POST", "http://www.schumacher.fm/search?q=foo&q=bar&both=x&prio=1&orphan=nope&empty=not",
-			strings.NewReader("z=post&both=y&prio=2&=nokey&orphan;empty=&"))
-		rfa.ExternalReq.Header.Set("Content-Type", "application/x-www-form-urlencoded; param=value")
-
-		have := rfa.PreparePostForm()
-		expectedPostData := []string{"prio", "2", "", "nokey", "orphan", "", "empty", "", "z", "post", "both", "y"}
-
-		// because url.Values is a map we must sort it first before comparing it.
-		sort.Strings(have)
-		sort.Strings(expectedPostData)
-		assert.Exactly(t, expectedPostData, have)
+	t.Run("not allowed because of missing body", func(t *testing.T) {
+		rfa := &esitag.ResourceArgs{
+			URL:         "http://whatever.anydomain/page.html",
+			ExternalReq: getExternalReqWithExtendedHeaders(),
+			Tag: esitag.Config{
+				Timeout:         time.Second,
+				MaxBodySize:     15,
+				ForwardPostData: true,
+			},
+		}
+		rfa.ExternalReq.Body = nil
+		rfa.ExternalReq.Method = "PATCH"
+		assert.False(t, rfa.IsPostAllowed())
 	})
 }
 

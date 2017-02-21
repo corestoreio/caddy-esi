@@ -25,7 +25,6 @@ import (
 
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
-	loghttp "github.com/corestoreio/log/http"
 	"github.com/dustin/go-humanize"
 )
 
@@ -67,6 +66,13 @@ func (a *ResourceArgs) ReplaceKeyURLForTesting() *ResourceArgs {
 	a.Tag.Key = a.repl.Replace(a.Tag.Key)
 	a.URL = a.repl.Replace(a.URL)
 	return a
+}
+
+// IsPostAllowed returns true if the forward post data config has been set to
+// true and if we have a POST, PUT or PATCH request.
+func (a *ResourceArgs) IsPostAllowed() bool {
+	r := a.ExternalReq
+	return a.Tag.ForwardPostData && r.Body != nil && (r.Method == "POST" || r.Method == "PUT" || r.Method == "PATCH")
 }
 
 // Validate checks if required arguments have been set
@@ -135,68 +141,6 @@ var DropHeadersReturn = map[string]bool{
 	"Trailer":                   true,
 	"Transfer-Encoding":         true,
 	"Upgrade":                   true,
-}
-
-// PrepareForm prepares (GET) form values in a balanced slice: i == key and i+1
-// == value. A key can occur multiple times. Errors parsing the form gets logged
-// on Info level.
-func (a *ResourceArgs) PrepareForm() []string {
-	if err := a.ExternalReq.ParseForm(); err != nil {
-		a.Tag.Log.Info("backend.ResourceArgs.PrepareForm.ExternalReq.ParseForm",
-			log.Err(err), loghttp.Request("request", a.ExternalReq), log.Marshal("resource_args", a))
-	}
-
-	form := a.ExternalReq.Form
-
-	if !a.Tag.ForwardPostData && a.ExternalReq.URL != nil {
-		// if disabled then parse only GET parameters
-		var err error
-		form, err = url.ParseQuery(a.ExternalReq.URL.RawQuery)
-		if err != nil {
-			a.Tag.Log.Info("backend.ResourceArgs.PrepareForm.ExternalReq.ParseQuery",
-				log.Err(err), loghttp.Request("request", a.ExternalReq), log.Marshal("resource_args", a))
-			return nil
-		}
-		if len(form) == 0 {
-			return nil
-		}
-	}
-
-	ret := make([]string, 0, len(form))
-	for k, vals := range form {
-		for _, val := range vals {
-			ret = append(ret, k, val)
-		}
-	}
-	return ret
-}
-
-// PreparePostForm prepares (POST,PUT,PATCH) form values in a balanced slice: i
-// == key and i+1 == value. A key can occur multiple times. Errors parsing the
-// form gets logged on Info level and will return nil. Does not consider GET
-// params.
-func (a *ResourceArgs) PreparePostForm() []string {
-	if !a.Tag.ForwardPostData {
-		return nil
-	}
-
-	if err := a.ExternalReq.ParseForm(); err != nil {
-		a.Tag.Log.Info("backend.ResourceArgs.PreparePostForm.ExternalReq.ParseForm",
-			log.Err(err), loghttp.Request("request", a.ExternalReq), log.Marshal("resource_args", a))
-		return nil
-	}
-
-	var ret []string
-	if lpf := len(a.ExternalReq.PostForm); lpf > 0 {
-		ret = make([]string, 0, lpf)
-	}
-
-	for k, vals := range a.ExternalReq.PostForm {
-		for _, val := range vals {
-			ret = append(ret, k, val)
-		}
-	}
-	return ret
 }
 
 // PrepareForwardHeaders returns all headers which must get forwarded to the
