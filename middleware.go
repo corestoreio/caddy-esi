@@ -78,6 +78,11 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 	////////////////////////////////////////////////////////////////////////////////
 	// Proceed from map, filled with the parsed Tag tags.
 
+	var logR *http.Request
+	if cfg.Log.IsInfo() || cfg.Log.IsDebug() {
+		logR = loghttp.ShallowCloneRequest(r)
+	}
+
 	chanTags := make(chan esitag.DataTags)
 	go func() {
 		var coaChanTags chan esitag.DataTags
@@ -88,11 +93,6 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 			// variable entities will be reused after go func() to query the
 			// non-coalesce resources.
 
-			var scr *http.Request
-			if cfg.Log.IsInfo() || cfg.Log.IsDebug() {
-				scr = loghttp.ShallowCloneRequest(r)
-			}
-
 			go func() {
 				coaID := coaEnt.UniqueID()
 				coaRes, _, _ := mw.coalesce.Do(strconv.FormatUint(coaID, 10), func() (interface{}, error) {
@@ -101,7 +101,7 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 						if cfg.Log.IsInfo() {
 							cfg.Log.Info("caddyesi.Middleware.ServeHTTP.coaEnt.QueryResources.Error",
 								log.Err(err), log.Stringer("config", cfg), log.Uint64("page_id", pageID),
-								log.Uint64("entities_coalesce_id", coaID), loghttp.Request("request", scr),
+								log.Uint64("entities_coalesce_id", coaID), loghttp.Request("request", logR),
 							)
 						}
 					}
@@ -109,7 +109,7 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 						cfg.Log.Info("caddyesi.Middleware.ServeHTTP.coaEnt.QueryResources.Once",
 							log.Uint64("page_id", pageID), log.Uint64("entities_coalesce_id", coaID),
 							log.Stringer("coalesce_entities", coaEnt), log.Stringer("non_coalesce_entities", entities),
-							loghttp.Request("request", scr),
+							loghttp.Request("request", logR),
 						)
 					}
 					return cTags, nil
