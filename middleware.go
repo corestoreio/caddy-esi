@@ -78,6 +78,9 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 	////////////////////////////////////////////////////////////////////////////////
 	// Proceed from map, filled with the parsed Tag tags.
 
+	var rLog = new(http.Request)
+	*rLog = *r
+
 	chanTags := make(chan esitag.DataTags)
 	go func() {
 		var coaChanTags chan esitag.DataTags
@@ -95,8 +98,8 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 					if err != nil {
 						if cfg.Log.IsInfo() {
 							cfg.Log.Info("caddyesi.Middleware.ServeHTTP.coaEnt.QueryResources.Error",
-								log.Err(err), loghttp.Request("request", r), log.Stringer("config", cfg),
-								log.Uint64("page_id", pageID), log.Uint64("entities_coalesce_id", coaID),
+								log.Err(err), log.Stringer("config", cfg), log.Uint64("page_id", pageID),
+								log.Uint64("entities_coalesce_id", coaID), loghttp.Request("request", rLog),
 							)
 						}
 					}
@@ -104,7 +107,7 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 						cfg.Log.Info("caddyesi.Middleware.ServeHTTP.coaEnt.QueryResources.Once",
 							log.Uint64("page_id", pageID), log.Uint64("entities_coalesce_id", coaID),
 							log.Stringer("coalesce_entities", coaEnt), log.Stringer("non_coalesce_entities", entities),
-							loghttp.Request("request", r),
+							loghttp.Request("request", rLog),
 						)
 					}
 					return cTags, nil
@@ -121,7 +124,7 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 		if err != nil {
 			if cfg.Log.IsInfo() {
 				cfg.Log.Info("caddyesi.Middleware.ServeHTTP.entities.QueryResources.Error",
-					log.Err(err), loghttp.Request("request", r), log.Stringer("config", cfg),
+					log.Err(err), loghttp.Request("request", rLog), log.Stringer("config", cfg),
 					log.Uint64("page_id", pageID),
 				)
 			}
