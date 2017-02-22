@@ -268,7 +268,12 @@ func pageID(source []string, r *http.Request) (_ uint64, ok bool) {
 
 // String used for log information output
 func (pc *PathConfig) String() string {
-	return fmt.Sprintf("TODO(CyS) Nicer debug: %#v\n", pc)
+	pc.esiMU.RLock()
+	el := len(pc.esiCache)
+	pc.esiMU.RUnlock()
+	return fmt.Sprintf("Scope:%q; MaxBodySize:%d; Timeout:%s; PageIDSource:%v; AllowedMethods:%v; LogFile:%q; LogLevel:%q; EntityCount: %d",
+		pc.Scope, pc.MaxBodySize, pc.Timeout, pc.PageIDSource, pc.AllowedMethods, pc.LogFile, pc.LogLevel, el,
+	)
 }
 
 func (pc *PathConfig) purgeESICache() (itemsInMap int) {
