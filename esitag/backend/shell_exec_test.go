@@ -55,7 +55,7 @@ func TestFetchShellExec(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Len(t, string(data), 1047)
+		assert.Len(t, string(data), 1076)
 	})
 
 	t.Run("Bash script writes to stdErr and triggers a fatal error", func(t *testing.T) {

@@ -23,6 +23,7 @@ package esitag
 import (
 	"net/http"
 	"net/url"
+	"time"
 )
 
 // Request used to hack easyjson generation. Type has removed interfaces and
@@ -40,20 +41,31 @@ type Request struct {
 	Host             string
 	Form             url.Values
 	PostForm         url.Values
-	// MultipartForm    *multipart.Form
-	Trailer    http.Header
-	RemoteAddr string
-	RequestURI string
+	Trailer          http.Header
+	RemoteAddr       string
+	RequestURI       string
+	Body             []byte
+}
+
+type Config struct {
+	ForwardHeaders    []string
+	ReturnHeaders     []string
+	ForwardPostData   bool
+	ForwardHeadersAll bool
+	ReturnHeadersAll  bool
+	Timeout           time.Duration
+	TTL               time.Duration
+	MaxBodySize       uint64
+	Key               string
+	Coalesce          bool
+	PrintDebug        bool
 }
 
 // ResourceArgs only for easyjson. Same as backend.ResourceArgs but stripped of
 // some fields for security reasons.
 //easyjson:json
 type ResourceArgs struct {
-	ExternalReq      *Request
-	URL              string
-	MaxBodySize      uint64
-	Key              string
-	ReturnHeaders    []string
-	ReturnHeadersAll bool
+	ExternalReq *Request
+	URL         string
+	Tag         Config
 }
