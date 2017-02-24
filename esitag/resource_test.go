@@ -506,3 +506,59 @@ func TestParseNoSQLURL(t *testing.T) {
 		},
 		false))
 }
+
+func TestResourceArgs_ValidateWithKey(t *testing.T) {
+	t.Parallel()
+
+	t.Run("URL", func(t *testing.T) {
+		rfa := esitag.ResourceArgs{}
+		err := rfa.ValidateWithKey()
+		assert.True(t, errors.IsEmpty(err), "%+v", err)
+		assert.Contains(t, err.Error(), `Key value`)
+	})
+	t.Run("ExternalReq", func(t *testing.T) {
+		rfa := esitag.ResourceArgs{
+			Tag: esitag.Config{
+				Key: "http_www",
+			},
+		}
+		err := rfa.ValidateWithKey()
+		assert.True(t, errors.IsEmpty(err), "%+v", err)
+		assert.Contains(t, err.Error(), `ExternalReq value`)
+	})
+	t.Run("timeout", func(t *testing.T) {
+		rfa := esitag.ResourceArgs{
+			ExternalReq: httptest.NewRequest("GET", "/", nil),
+			Tag: esitag.Config{
+				Key: "http_www",
+			},
+		}
+		err := rfa.ValidateWithKey()
+		assert.True(t, errors.IsEmpty(err), "%+v", err)
+		assert.Contains(t, err.Error(), `timeout value`)
+	})
+	t.Run("maxBodySize", func(t *testing.T) {
+		rfa := esitag.ResourceArgs{
+			ExternalReq: httptest.NewRequest("GET", "/", nil),
+			Tag: esitag.Config{
+				Key:     "http_www",
+				Timeout: time.Second,
+			},
+		}
+		err := rfa.ValidateWithKey()
+		assert.True(t, errors.IsEmpty(err), "%+v", err)
+		assert.Contains(t, err.Error(), `maxBodySize value`)
+	})
+	t.Run("Correct", func(t *testing.T) {
+		rfa := esitag.ResourceArgs{
+			ExternalReq: httptest.NewRequest("GET", "/", nil),
+			Tag: esitag.Config{
+				Key:         "http://www",
+				Timeout:     time.Second,
+				MaxBodySize: 5,
+			},
+		}
+		err := rfa.ValidateWithKey()
+		assert.NoError(t, err, "%+v", err)
+	})
+}
