@@ -20,6 +20,7 @@ func init() {
 	// Must run at the end because cannot run concurrent.
 	RegisterAfterTest(pageGRPC())
 	RegisterAfterTest(pageGRPC2())
+	RegisterAfterTest(pageGRPC3())
 }
 
 var grpcCommonChecks = ht.CheckList{
@@ -76,5 +77,44 @@ func pageGRPC2() (t *ht.Test) {
 		),
 	}
 	t.Checks = append(t.Checks, grpcCommonChecks...)
+	return
+}
+
+func pageGRPC3() (t *ht.Test) {
+	t = &ht.Test{
+		Name:        "Page GRPC PrintDebug",
+		Description: `Request loads page_grpc.html and checks for the printdebug output`,
+		Request:     makeRequestGET("page_grpc_printdebug.html"),
+		Checks: makeChecklist200(
+			&ht.Body{
+				Contains: `<!-- Duration:`,
+				Count:    2,
+			},
+			&ht.Body{
+				Contains: `Error:none`,
+				Count:    2,
+			},
+			&ht.Body{
+				Contains: `Tag:include src="grpc_integration_01"`,
+				Count:    2,
+			},
+			&ht.Body{
+				Contains: `Hoppla - Something went wrong`,
+				Count:    2,
+			},
+			&ht.Body{
+				Contains: "Arg Key=printdebug_1",
+				Count:    1,
+			},
+			&ht.Body{
+				Contains: "Arg Key=printdebug_2",
+				Count:    1,
+			},
+			&ht.Body{
+				Contains: ` class="gRPCSuccess"`,
+				Count:    2,
+			},
+		),
+	}
 	return
 }

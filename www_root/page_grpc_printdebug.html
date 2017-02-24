@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en-US" xmlns:esi="http://www.w3.org/2001/XMLSchema">
+<head>
+    <title>Caddy ESI Tag gRPC PrintDebug</title>
+</head>
+<body>
+
+    <h1>Caddy ESI Tag gRPC PrintDebug</h1>
+
+    <table border="1">
+        <tr>
+            <th>Name</th>
+            <th>Output</th>
+        </tr>
+        <tr>
+            <td class="gRPCSuccess">Should load text coalesce</td>
+            <td><esi:include src="grpc_integration_01" key="printdebug_1" printdebug="1" onerror="Hoppla - Something went wrong in grpc1a" timeout="10ms"/></td>
+        </tr>
+        <tr>
+            <td class="gRPCSuccess">Should load text on every request</td>
+            <td><esi:include src="grpc_integration_01" key="printdebug_2" printdebug="1" onerror="Hoppla - Something went wrong in grpc1b" timeout="10ms"/></td>
+        </tr>
+    </table>
+
+</body>
+</html>

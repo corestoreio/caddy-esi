@@ -244,6 +244,26 @@ func TestESITag_ParseRaw(t *testing.T) {
 		},
 	))
 
+	t.Run("enable printdebug", runner(
+		[]byte(`include  src="awsRedis3" printdebug="1" coalesce="true"`),
+		nil,
+		&esitag.Entity{
+			Resources: []*esitag.Resource{
+				esitag.MustNewResource(0, "awsRedis3"),
+			},
+			Config: esitag.Config{
+				Coalesce:   true,
+				PrintDebug: true,
+			},
+		},
+	))
+
+	t.Run("printdebug returns error", runner(
+		[]byte(`include  src="awsRedis3" printdebug="errrr" coalesce="true"`),
+		errors.IsNotValid,
+		nil,
+	))
+
 	t.Run("enable coalesce", runner(
 		[]byte(`include  src="awsRedis3" coalesce="true"`),
 		nil,

@@ -15,6 +15,7 @@
 package esitag
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -80,6 +81,10 @@ type Config struct {
 	// Coalesce TODO(CyS) multiple external requests which triggers a backend
 	// resource request gets merged into one backend request
 	Coalesce bool
+	// PrintDebug injects the time taken into the returned data as hidden HTML
+	// comment in function Entities.QueryResources. It also provides the raw tag
+	// and in future some other data for easier debugging.
+	PrintDebug bool
 	// Above fields are special aligned to save space, see "aligncheck"
 }
 
@@ -157,6 +162,12 @@ func (et *Entity) ParseRaw() error {
 				return errors.NewNotValidf("[caddyesi] Failed to parse coalesce %q into bool value in tag %q with error %s", value, et.RawTag, err)
 			}
 			et.Coalesce = b
+		case "printdebug":
+			b, err := strconv.ParseBool(value)
+			if err != nil {
+				return errors.NewNotValidf("[caddyesi] Failed to parse printdebug %q into bool value in tag %q with error %s", value, et.RawTag, err)
+			}
+			et.PrintDebug = b
 		case "condition":
 			if err := et.parseCondition(value); err != nil {
 				return errors.Wrapf(err, "[caddyesi] Failed to parse condition %q in tag %q", value, et.RawTag)
@@ -277,8 +288,10 @@ func (et *Entity) SetDefaultConfig(tag Config) {
 // when MaxBackOffs have been reached and then tries again. Returns a Temporary
 // error behaviour when all requests to all resources have failed.
 func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
-	timeStart := monotime.Now()
-
+	var timeStart time.Duration
+	if et.Log.IsInfo() || et.Log.IsDebug() {
+		timeStart = monotime.Now()
+	}
 	// mErr: just for collecting errors for informational purposes at the
 	// Temporary error at the end.
 	var mErr *errors.MultiErr
@@ -429,10 +442,14 @@ func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 	}
 
 	g, ctx := errgroup.WithContext(r.Context())
-	cTag := make(chan DataTag)
+	cTag := make(chan DataTag) // todo: refactor and put it into the argument list and remove 2nd return DataTags
 	for _, e := range et {
 		e := e
 		g.Go(func() error {
+			var start time.Duration
+			if e.PrintDebug {
+				start = monotime.Now()
+			}
 			data, err := e.QueryResources(r)
 			// A temporary error describes that we have problems reaching the
 			// backend resource and that the circuit breaker has been triggered
@@ -441,7 +458,6 @@ func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 
 			if err != nil && !isTempErr {
 				// err should have in most cases temporary error behaviour.
-				// but here URL template rendering went wrong.
 				return errors.Wrapf(err, "[esitag] QueryResources.Resources.DoRequest failed for Tag %q", e.RawTag)
 			}
 
@@ -449,6 +465,21 @@ func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 			t.Data = data
 			if isTempErr {
 				t.Data = e.OnError
+			}
+			if e.PrintDebug {
+				// gets tested by an integration test in package "ht".
+				if err == nil {
+					err = nilErr{} // just for nice output
+				}
+				var buf bytes.Buffer
+				buf.WriteString("\n<!-- Duration:")
+				buf.WriteString(monotime.Since(start).String())
+				buf.WriteString(" Error:")
+				buf.WriteString(err.Error())
+				buf.WriteString(" Tag:")
+				buf.Write(e.RawTag)
+				buf.WriteString(" -->\n")
+				t.Data = append(t.Data, buf.Bytes()...)
 			}
 
 			select {
@@ -464,7 +495,7 @@ func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 		close(cTag)
 	}()
 
-	tags := make(DataTags, 0, len(et))
+	tags := make(DataTags, 0, len(et)) // TODO remove this all!
 	for t := range cTag {
 		tags = append(tags, t)
 	}
@@ -478,3 +509,7 @@ func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 
 	return tags, nil
 }
+
+type nilErr struct{}
+
+func (nilErr) Error() string { return "none" }
