@@ -64,27 +64,30 @@ type Entity struct {
 // passed on as an argument towards the backend resources and enriches the
 // Entity type.
 type Config struct {
-	Log               log.Logger    // optional
-	ForwardHeaders    []string      // optional, already treated with http.CanonicalHeaderKey
-	ReturnHeaders     []string      // optional, already treated with http.CanonicalHeaderKey
-	ForwardPostData   bool          // optional
-	ForwardHeadersAll bool          // optional
-	ReturnHeadersAll  bool          // optional
-	Timeout           time.Duration // required
-	// TTL retrieved content from a backend can live this time in the middleware
-	// cache.
-	TTL time.Duration // optional
-	// MaxBodySize allowed max body size to read from the backend resource.
-	MaxBodySize uint64 // required
-	// Key also in type esitag.Entity
-	Key string // optional (for KV Service)
-	// Coalesce TODO(CyS) multiple external requests which triggers a backend
-	// resource request gets merged into one backend request
+	Log               log.Logger // optional
+	ForwardHeaders    []string   // optional, already treated with http.CanonicalHeaderKey
+	ReturnHeaders     []string   // optional, already treated with http.CanonicalHeaderKey
+	ForwardPostData   bool       // optional
+	ForwardHeadersAll bool       // optional
+	ReturnHeadersAll  bool       // optional
+	// Coalesce will merge n-external parallel requests into one resource
+	// backend request.
 	Coalesce bool
 	// PrintDebug injects the time taken into the returned data as hidden HTML
 	// comment in function Entities.QueryResources. It also provides the raw tag
 	// and in future some other data for easier debugging.
 	PrintDebug bool
+	// Timeout maximum time needed for a backend request before the cancellation
+	// context kills it.
+	Timeout time.Duration // required
+	// TTL retrieved content from a backend can live this time in the middleware
+	// cache.
+	TTL time.Duration // optional
+	// MaxBodySize allowed max body size to read from the backend resource.
+	MaxBodySize uint64 // required
+	// Key defines the name of the key in an NoSQL service or as additional
+	// identifier in a gRPC request.
+	Key string
 	// Above fields are special aligned to save space, see "aligncheck"
 }
 

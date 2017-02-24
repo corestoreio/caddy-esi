@@ -52,18 +52,18 @@ func responseWrapBuffer(buf io.Writer, w http.ResponseWriter) responseBufferWrit
 // bufferedWriter wraps a http.ResponseWriter that implements the minimal
 // http.ResponseWriter interface.
 type bufferedWriter struct {
-	rw  http.ResponseWriter
-	buf io.Writer
-	// writeReal does not write to the buffer and writes directly to the original
-	// rw.
-	writeReal bool
+	rw     http.ResponseWriter
+	buf    io.Writer
+	header http.Header
 	// addContentLength rewrites the Content-Length header to the correct
 	// returned length. Value can also be negative when the error message in an
 	// Tag tag is shorter than the length of the Tag tag.
 	addContentLength int
-	wroteHeader      bool
 	code             int
-	header           http.Header
+	wroteHeader      bool
+	// writeReal does not write to the buffer and writes directly to the original
+	// rw.
+	writeReal bool
 }
 
 func (b *bufferedWriter) TriggerRealWrite(addContentLength int) {

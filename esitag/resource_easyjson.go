@@ -82,7 +82,6 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend(out *jwriter.Wri
 		if !first {
 			out.RawByte(',')
 		}
-		first = false
 		out.RawString("\"tag\":")
 		easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiEsitagTestdata2(out, in.Tag)
 	}
@@ -307,7 +306,6 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiEsitagTestdata2(out *jwr
 		if !first {
 			out.RawByte(',')
 		}
-		first = false
 		out.RawString("\"print_debug\":")
 		out.Bool(bool(in.PrintDebug))
 	}
@@ -791,7 +789,6 @@ func easyjson1688e6a4EncodeGithubComSchumacherFMCaddyesiBackend1(out *jwriter.Wr
 		if !first {
 			out.RawByte(',')
 		}
-		first = false
 		out.RawString("\"body\":")
 		// out.Base64Bytes(in.Body)
 		out.Base64Bytes([]byte(`TODO read body`))
@@ -929,7 +926,6 @@ func easyjson1688e6a4EncodeNetUrl(out *jwriter.Writer, in url.URL) {
 		if !first {
 			out.RawByte(',')
 		}
-		first = false
 		out.RawString("\"fragment\":")
 		out.String(string(in.Fragment))
 	}
