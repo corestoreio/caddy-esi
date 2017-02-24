@@ -21,8 +21,8 @@ import (
 )
 
 func init() {
-	RegisterTest(20, page02())
-	RegisterTest(21, page02())
+	RegisterConcurrentTest(20, page02())
+	RegisterConcurrentTest(21, page02())
 }
 
 var tc02 int // tc = test counter

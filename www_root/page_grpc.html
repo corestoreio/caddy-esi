@@ -5,7 +5,8 @@
 </head>
 <body>
 
-    <h1> Caddy ESI Tag gRPC</h1>
+    <h1>Caddy ESI Tag gRPC.</h1>
+    <h2>The coalesce request sleeps for 300ms to let other requests pile up in the singleflight.Group.Do</h2>
 
     <table border="1">
         <tr>
@@ -15,7 +16,7 @@
         <tr>
             <td class="gRPCSuccess">Should load text coalesce</td>
             <td><esi:include src="grpc_integration_01" key="coalesce_enabled"
-                             coalesce="true" onerror="Hoppla - Something went wrong in grpc1a" timeout="100ms"/></td>
+                             coalesce="true" onerror="Hoppla - Something went wrong in grpc1a" timeout="500ms"/></td>
         </tr>
         <tr>
             <td class="gRPCSuccess">Should load text on every request</td>

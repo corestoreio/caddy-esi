@@ -29,8 +29,8 @@ var (
 	afterTests     []*ht.Test
 )
 
-// RegisterTest adds a set of tests to the collection
-func RegisterTest(position int, test *ht.Test) {
+// RegisterConcurrentTest adds a set of tests to the collection
+func RegisterConcurrentTest(position int, test *ht.Test) {
 	if _, ok := testCollection[position]; ok {
 		panic(fmt.Sprintf("Position %d already exists with test: %#v", position, test))
 	}

@@ -14,19 +14,12 @@
 
 package main
 
-import (
-	"fmt"
-
-	"github.com/vdobler/ht/ht"
-)
+import "github.com/vdobler/ht/ht"
 
 func init() {
-	// For now we must create new pointers each time we want to run a test. A
-	// single test cannot be shared between goroutines. This is a limitation
-	// which can maybe fixed by a special handling of the Request and Jar field
-	// in ht. This change might complicate things ...
-	RegisterTest(1000, pageGRPC())
-	RegisterTest(1010, pageGRPC2())
+	// Must run at the end because cannot run concurrent.
+	RegisterAfterTest(pageGRPC())
+	RegisterAfterTest(pageGRPC2())
 }
 
 var grpcCommonChecks = ht.CheckList{
@@ -48,19 +41,16 @@ var grpcCommonChecks = ht.CheckList{
 	},
 }
 
-var tcGRPC int // tc = test counter
-
 func pageGRPC() (t *ht.Test) {
-	tcGRPC++
 	t = &ht.Test{
-		Name:        fmt.Sprintf("Page GRPC Latency Iteration %d", tcGRPC),
+		Name:        "Page GRPC Latency Iteration",
 		Description: `Request loads page_grpc.html from a GRPC micro service. One of the three requests has a coalesce attribute set true.`,
 		Request:     makeRequestGET("page_grpc.html"),
 		Checks: makeChecklist200(
 			&ht.Latency{
-				N:                  5000,
-				Concurrent:         24,
-				Limits:             "0.9995 ≤ 0.9s",
+				N:                  2240,
+				Concurrent:         20,
+				Limits:             "0.9995 ≤ 0.4s",
 				IndividualSessions: false,
 			},
 		),
@@ -70,18 +60,17 @@ func pageGRPC() (t *ht.Test) {
 }
 
 func pageGRPC2() (t *ht.Test) {
-	tcGRPC++
 	t = &ht.Test{
-		Name:        fmt.Sprintf("Page GRPC Check Latency Iteration %d", tcGRPC),
+		Name:        "Page GRPC Check Latency Iteration",
 		Description: `Request loads page_grpc.html and checks if coalesce requests are much lower than non-coalesce requests`,
 		Request:     makeRequestGET("page_grpc.html"),
 		Checks: makeChecklist200(
 			&ht.Body{
-				Regexp: "coalesce_enabled=[0-9]{3}", // xxx
+				Regexp: "coalesce_enabled=[0-9]{2,3}",
 				Count:  1,
 			},
 			&ht.Body{
-				Regexp: "coalesce_disabled=[0-9]{4}", // xxxx
+				Regexp: "coalesce_disabled=[0-9]{4}",
 				Count:  1,
 			},
 		),

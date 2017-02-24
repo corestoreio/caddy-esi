@@ -46,7 +46,11 @@ func main() {
 	c := ht.Collection{
 		Tests: make([]*ht.Test, 0, len(testCollection)),
 	}
+	//var buf bytes.Buffer
+	//lg := log.New(&buf, "", log.LstdFlags)
 	for _, k := range testKeys {
+		//testCollection[k].Log = lg
+		//testCollection[k].Execution.Verbosity = 5 // 5 = max verbosity
 		testCollection[k].Execution.PreSleep = time.Duration(rand.Intn(50)) * time.Millisecond
 		c.Tests = append(c.Tests, testCollection[k])
 	}
@@ -66,6 +70,8 @@ func main() {
 			exitStatus = 64
 		}
 	}
+
+	//println("\n", buf.String(), "\n")
 
 	// Travis CI requires an exit code for the build to fail. Anything not 0
 	// will fail the build.

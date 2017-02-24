@@ -51,6 +51,7 @@ func (s *server) GetHeaderBody(_ context.Context, arg *esigrpc.ResourceArgs) (*e
 	switch {
 	case arg.GetKey() == "coalesce_enabled":
 		counter = atomic.AddUint64(&s.coaOn, 1)
+		time.Sleep(300 * time.Millisecond) // long running operation, like a tiny PHP script.
 	case arg.GetKey() == "coalesce_disabled":
 		counter = atomic.AddUint64(&s.coaOff, 1)
 	case strings.Contains(arg.GetKey(), "error"):

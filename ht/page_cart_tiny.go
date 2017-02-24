@@ -21,13 +21,9 @@ import (
 )
 
 func init() {
-	// For now we must create new pointers each time we want to run a test. A
-	// single test cannot be shared between goroutines. This is a limitation
-	// which can maybe fixed by a special handling of the Request and Jar field
-	// in ht. This change might complicate things ...
-	RegisterTest(10, page01())
-	RegisterTest(11, page01())
-	RegisterTest(12, page01())
+	RegisterConcurrentTest(10, page01())
+	RegisterConcurrentTest(11, page01())
+	RegisterConcurrentTest(12, page01())
 }
 
 var tc01 int // tc = test counter
