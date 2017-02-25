@@ -189,7 +189,7 @@ Quick overview which options are available for two different kinds of ESI tags.
     onerror="text or path to file" maxbodysize="bytes"
     forwardheaders="all or specific comma separated list of header names"
     returnheaders="all or specific comma separated list of header names"
-    coalesce="true|false"
+    coalesce="true|false" printdebug="true|false"
 />
 ```
 
@@ -197,7 +197,7 @@ Quick overview which options are available for two different kinds of ESI tags.
 
 ```
 <esi:include src="alias_name1" src="alias_nameN" key="key name" 
-    onerror="text or path to file" timeout="time.Duration" />
+    onerror="text or path to file" timeout="time.Duration" coalesce="true|false" printdebug="true|false"/>
 ```
 
 `key` or `src` can contain variables which gets replaced to their corresponding
@@ -343,17 +343,33 @@ response.
 <esi:include src="https://micro.service/esi/foo" returnheaders="Set-Cookie"/>
 ```
 
-### Coalesce multiple requests into one backend request (optional) (TODO)
+### Coalesce multiple requests into one backend request (optional)
 
-The basic tag with the attribute `coalesce="true"` takes care that for multiple
-incoming requests only one backend request gets fired. Other incoming requests
-waits until the backend returns from the initializing request. Any returned data
-from a backend resource gets shared with an unknown number of external requests.
-This feature limits the pressure onto a backend resource. Other attributes can
-be additionally defined.
+The basic tag with the attribute `coalesce="boolean"` takes care that for
+multiple incoming requests only one backend request gets fired. Other parallel
+incoming requests waits until the backend returns from the initializing request.
+Any returned data from a backend resource gets shared with an unknown number of
+external requests. This feature limits the pressure onto a backend resource.
+Other attributes can be additionally defined. Default value `false`, hence
+disabled.
+`coalesce="false|true|1|0"`
 
 ```
 <esi:include src="https://micro.service/esi/foo" coalesce="true"/>
+```
+
+### Printdebug (optional)
+
+The basic tag with the attribute `printdebug="boolean"` allows to print
+debugging information as an HTML comment. Debugging contains the time taken to
+complete the backend request, any possible error and the raw tag itself. Be
+aware that if you store sensitive information in the raw tag they will leak
+towards the evil internet. Other attributes can be additionally defined. Default
+value `false`, hence disabled.
+`printdebug="false|true|1|0"`
+
+```
+<esi:include src="https://micro.service/esi/foo" printdebug="true"/>
 ```
 
 ### Multiple sources
@@ -370,7 +386,7 @@ is the fastest gets served and the others dropped.
     src="http://micro2.service/esi/foo"
     src="https://micro3.service/esi/foo" 
     timeout="time.Duration" 
-    race="true|false" />
+    race="boolean" />
 ```
 
 ### Dynamic sources and keys (string replacement)
