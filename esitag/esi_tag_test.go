@@ -688,11 +688,13 @@ func TestEntities_QueryResources(t *testing.T) {
 		ctx, cancel := context.WithCancel(req.Context())
 		req = req.WithContext(ctx)
 		cancel()
+
+		tags, err := entities.QueryResources(req)
+
 		// wait until the cancel has been propagated. this should fix this weird
 		// flaky behaviour under OSX. It still occurs ...
 		time.Sleep(20 * time.Millisecond)
 
-		tags, err := entities.QueryResources(req)
 		// sometimes this test gets flaky because it seems the the cancel() does
 		// not work properly :-( No idea ...
 		assert.EqualError(t, errors.Cause(err), context.Canceled.Error())
