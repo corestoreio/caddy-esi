@@ -49,9 +49,12 @@ func pageGRPC() (t *ht.Test) {
 		Request:     makeRequestGET("page_grpc.html"),
 		Checks: makeChecklist200(
 			&ht.Latency{
-				N:                  2240,
-				Concurrent:         20,
-				Limits:             "0.9995 ≤ 0.4s",
+				N:          2240,
+				Concurrent: 20,
+				// This test also runs on Travis and compiled with -race so must
+				// set the limit to a higher seconds value. Usually it can be
+				// run with "0.9995 ≤ 0.2s", now 0.8s should pass the tests.
+				Limits:             "0.9995 ≤ 0.8s",
 				IndividualSessions: false,
 			},
 		),
