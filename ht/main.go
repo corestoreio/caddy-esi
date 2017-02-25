@@ -51,6 +51,9 @@ func main() {
 	for _, k := range testKeys {
 		//testCollection[k].Log = lg
 		//testCollection[k].Execution.Verbosity = 5 // 5 = max verbosity
+		testCollection[k].Execution.Tries = 2
+		testCollection[k].Execution.Wait = 1 * time.Second
+		testCollection[k].Request.Timeout = 20 * time.Second // default was 10 but set to 20 because slow OSX on travis
 		testCollection[k].Execution.PreSleep = time.Duration(rand.Intn(50)) * time.Millisecond
 		c.Tests = append(c.Tests, testCollection[k])
 	}
