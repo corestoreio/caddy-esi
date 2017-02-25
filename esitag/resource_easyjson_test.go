@@ -95,6 +95,24 @@ func TestResourceArgs_JSON(t *testing.T) {
 	//	},
 	//}
 
-	const match = `\{ExternalReq:0x[a-f0-9]+ repl:<nil> URL:https://micro\.service/cart\?id=3 Tag:\{Log:<nil> ForwardHeaders:\[fwd-header1 fwd-header2\] ReturnHeaders:\[ret-header1 ret-header2\] ForwardPostData:true ForwardHeadersAll:true ReturnHeadersAll:true Timeout:2s TTL:4s MaxBodySize:10000000 Key:a key stored in redis Coalesce:true PrintDebug:true\}\}`
-	assert.Regexp(t, match, fmt.Sprintf("%+v", rfa2))
+	have := fmt.Sprintf("%+v", rfa2)
+
+	shouldContain := [...]string{
+		`URL:https://micro.service/cart?id=3`,
+		`ForwardHeaders:[fwd-header1 fwd-header2]`,
+		`ReturnHeaders:[ret-header1 ret-header2]`,
+		`ForwardPostData:true`,
+		`ForwardHeadersAll:true `,
+		`Log:<nil>`,
+		`ReturnHeadersAll:true`,
+		`Timeout:2s`,
+		`TTL:4s`,
+		`MaxBodySize:10000000`,
+		`Key:a key stored in redis`,
+		`Coalesce:true`,
+		`PrintDebug:true`,
+	}
+	for _, contains := range shouldContain {
+		assert.Contains(t, have, contains)
+	}
 }
