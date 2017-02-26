@@ -15,6 +15,8 @@
 package esitag
 
 import (
+	"bytes"
+	"fmt"
 	"io"
 
 	"github.com/SchumacherFM/caddyesi/bufpool"
@@ -129,3 +131,12 @@ func (dts DataTags) DataLen() (l int) {
 func (dts DataTags) Len() int           { return len(dts) }
 func (dts DataTags) Swap(i, j int)      { dts[i], dts[j] = dts[j], dts[i] }
 func (dts DataTags) Less(i, j int) bool { return dts[i].Start < dts[j].Start }
+
+// String used for debug output during development
+func (dts DataTags) String() string {
+	var buf bytes.Buffer
+	for i, t := range dts {
+		fmt.Fprintf(&buf, "IDX(%d/%d): Data: %q\n", i+1, dts.Len(), t.Data)
+	}
+	return buf.String()
+}

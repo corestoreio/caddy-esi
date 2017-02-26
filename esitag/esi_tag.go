@@ -438,14 +438,14 @@ func (et Entities) UniqueID() uint64 {
 // request gets canceled via its context then all resource requests gets
 // cancelled too. This function does not sort the DataTags to restore the
 // original order as the occur in an HTML page.
-func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
+func (et Entities) QueryResources(cTag chan<- DataTag, r *http.Request) error {
 
 	if len(et) == 0 {
-		return DataTags{}, nil
+		return nil
 	}
 
 	g, ctx := errgroup.WithContext(r.Context())
-	cTag := make(chan DataTag) // todo: refactor and put it into the argument list and remove 2nd return DataTags
+
 	for _, e := range et {
 		e := e
 		g.Go(func() error {
@@ -493,24 +493,15 @@ func (et Entities) QueryResources(r *http.Request) (DataTags, error) {
 			return nil
 		})
 	}
-	go func() {
-		g.Wait()
-		close(cTag)
-	}()
-
-	tags := make(DataTags, 0, len(et)) // TODO remove this all!
-	for t := range cTag {
-		tags = append(tags, t)
-	}
 
 	// Check whether any of the goroutines failed. Since g is accumulating the
 	// errors, we don't need to send them (or check for them) in the individual
 	// results sent on the channel.
 	if err := g.Wait(); err != nil {
-		return DataTags{}, errors.Wrap(err, "[esitag] Entities.QueryResources ErrGroup.Error")
+		return errors.Wrap(err, "[esitag] Entities.QueryResources ErrGroup.Error")
 	}
 
-	return tags, nil
+	return nil
 }
 
 type nilErr struct{}
