@@ -17,7 +17,7 @@ matrix:
 
 before_install:
   # default ulimit set to 256
-  - ulimit -n 1024
+  - ulimit -n 8192
   - if [ "$TRAVIS_OS_NAME" = osx ]; then brew update; fi
   - if [ "$TRAVIS_OS_NAME" = osx ]; then brew install memcached; fi
   - if [ "$TRAVIS_OS_NAME" = osx ]; then /usr/local/opt/memcached/bin/memcached -l 127.0.0.1:11211 -d; fi
