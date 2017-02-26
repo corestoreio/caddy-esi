@@ -22,6 +22,8 @@ go build -tags esiall -race -o caddy.bin $GOPATH/src/github.com/mholt/caddy/cadd
 ./caddy.bin -conf ./Caddyfile &
 sleep 6
 # temp curl test request for OSX
-curl -i -v http://127.0.0.1:2017/page_grpc.html
+curl --trace-time -i -v http://127.0.0.1:2017/page_grpc.html
 
 go run $GOPATH/src/github.com/SchumacherFM/caddyesi/ht/*.go
+
+curl --trace-time -i -v http://127.0.0.1:2017/page_grpc.html
