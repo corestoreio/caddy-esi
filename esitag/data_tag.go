@@ -33,6 +33,11 @@ type DataTag struct {
 	End   int // End position in the stream. Never smaller than Start.
 }
 
+// String prints human readable the data tag for debugging purposes.
+func (dt DataTag) String() string {
+	return fmt.Sprintf("Start:%06d End:%06d Tag:%q", dt.Start, dt.End, dt.Data)
+}
+
 // DataTags a list of tags with their position within a page and the content
 type DataTags []DataTag
 
@@ -136,7 +141,7 @@ func (dts DataTags) Less(i, j int) bool { return dts[i].Start < dts[j].Start }
 func (dts DataTags) String() string {
 	var buf bytes.Buffer
 	for i, t := range dts {
-		fmt.Fprintf(&buf, "IDX(%d/%d): Data: %q\n", i+1, dts.Len(), t.Data)
+		fmt.Fprintf(&buf, "IDX(%d/%d): %s\n", i+1, dts.Len(), t)
 	}
 	return buf.String()
 }
