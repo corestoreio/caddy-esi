@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"sync"
 
 	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/SchumacherFM/caddyesi/esitag"
@@ -30,6 +31,8 @@ import (
 	"github.com/mholt/caddy/caddyhttp/httpserver"
 	"golang.org/x/sync/singleflight"
 )
+
+const avgESITagsPerPage = 5 // just a guess
 
 // Middleware implements the Tag tag middleware
 type Middleware struct {
@@ -80,14 +83,17 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 
 	var logR *http.Request
 	if cfg.Log.IsInfo() || cfg.Log.IsDebug() { // avoids race condition when logging
+		// TODO(CyS) logging this request can be avoided because we only need to
+		// trace a request ID and log somewhere which request ID belongs to
+		// which printed request for debugging
 		logR = loghttp.ShallowCloneRequest(r)
 	}
 
-	chanTags := make(chan esitag.DataTags)
+	chanTag := make(chan esitag.DataTag)
 	go func() {
-		var coaChanTags chan esitag.DataTags
+		var wg *sync.WaitGroup
 		if entities.HasCoalesce() {
-			coaChanTags = make(chan esitag.DataTags)
+			wg = new(sync.WaitGroup)
 			var coaEnt esitag.Entities
 			coaEnt, entities = entities.SplitCoalesce()
 			// variable entities will be reused after go func() to query the
@@ -97,37 +103,50 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 			if cfg.Log.IsInfo() || cfg.Log.IsDebug() { // avoids race condition when logging
 				logR2 = loghttp.ShallowCloneRequest(logR)
 			}
-
+			wg.Add(1)
 			go func() {
+				defer wg.Done()
 				coaID := coaEnt.UniqueID()
-				coaRes, _, _ := mw.coalesce.Do(strconv.FormatUint(coaID, 10), func() (interface{}, error) {
-					cTags, err := coaEnt.QueryResources(r)
-					if err != nil {
-						if cfg.Log.IsInfo() {
-							cfg.Log.Info("caddyesi.Middleware.ServeHTTP.coaEnt.QueryResources.Error",
-								log.Err(err), log.Stringer("config", cfg), log.Uint64("page_id", pageID),
-								log.Uint64("entities_coalesce_id", coaID), loghttp.Request("request", logR2),
+				doRes, _, _ := mw.coalesce.Do(strconv.FormatUint(coaID, 10), func() (interface{}, error) {
+					coaChanTag := make(chan esitag.DataTag)
+					// wow this is ugly (3 level of goroutines) but for now the
+					// best I can come up with. but not using coalesce will
+					// consume less memory than with the code in the previous
+					// version of QueryResources.
+					go func() {
+						if err := coaEnt.QueryResources(coaChanTag, r); err != nil {
+							if cfg.Log.IsInfo() {
+								cfg.Log.Info("caddyesi.Middleware.ServeHTTP.coaEnt.QueryResources.Error",
+									log.Err(err), log.Uint64("page_id", pageID), log.Uint64("entities_coalesce_id", coaID),
+									loghttp.Request("request", logR2),
+								)
+							}
+						}
+						if cfg.Log.IsDebug() {
+							cfg.Log.Info("caddyesi.Middleware.ServeHTTP.coaEnt.QueryResources.Once",
+								log.Uint64("page_id", pageID), log.Uint64("entities_coalesce_id", coaID),
+								log.Stringer("coalesce_entities", coaEnt), log.Stringer("non_coalesce_entities", entities),
+								loghttp.Request("request", logR2),
 							)
 						}
+						close(coaChanTag)
+					}()
+					tags := make(esitag.DataTags, 0, avgESITagsPerPage)
+					for tag := range coaChanTag {
+						tags = append(tags, tag)
 					}
-					if cfg.Log.IsDebug() {
-						cfg.Log.Info("caddyesi.Middleware.ServeHTTP.coaEnt.QueryResources.Once",
-							log.Uint64("page_id", pageID), log.Uint64("entities_coalesce_id", coaID),
-							log.Stringer("coalesce_entities", coaEnt), log.Stringer("non_coalesce_entities", entities),
-							loghttp.Request("request", logR2),
-						)
-					}
-					return cTags, nil
+					return tags, nil
 				})
-				coaChanTags <- coaRes.(esitag.DataTags)
-				close(coaChanTags)
+				for _, tag := range doRes.(esitag.DataTags) {
+					chanTag <- tag
+				}
 			}()
 		}
 
 		// trigger the DoRequests and query all backend resources in
 		// parallel. Errors are mostly of cancelled client requests which
 		// the context propagates.
-		tags, err := entities.QueryResources(r)
+		err := entities.QueryResources(chanTag, r)
 		if err != nil {
 			if cfg.Log.IsInfo() {
 				cfg.Log.Info("caddyesi.Middleware.ServeHTTP.entities.QueryResources.Error",
@@ -136,15 +155,12 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 				)
 			}
 		}
-		if coaChanTags != nil {
-			ct := <-coaChanTags
-			tags = append(tags, ct...)
+		if wg != nil {
+			wg.Wait()
 		}
-		chanTags <- tags
-		close(chanTags)
+		close(chanTag)
 	}()
-
-	return mw.Next.ServeHTTP(responseWrapInjector(chanTags, w), r)
+	return mw.Next.ServeHTTP(responseWrapInjector(chanTag, w), r)
 }
 
 // serveBuffered creates a http.ResponseWriter buffer, calls the next handler,
@@ -218,17 +234,26 @@ func (mw *Middleware) serveBuffered(cfg *PathConfig, pageID uint64, w http.Respo
 	// Trigger the queries to the resource backends in parallel
 	// TODO(CyS) Coalesce requests
 
-	tags, err := (groupEntitiesResult.(esitag.Entities)).QueryResources(r)
-	if err != nil {
-		if cfg.Log.IsDebug() {
-			cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.esiEntities.QueryResources.Error",
-				log.Err(err), loghttp.Request("request", r), log.Stringer("config", cfg),
-				log.Uint64("page_id", pageID),
-			)
+	cTags := make(chan esitag.DataTag, 1)
+	go func() {
+		if err := (groupEntitiesResult.(esitag.Entities)).QueryResources(cTags, r); err != nil {
+			if cfg.Log.IsDebug() {
+				cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.esiEntities.QueryResources.Error",
+					log.Err(err), loghttp.Request("request", r), log.Stringer("config", cfg),
+					log.Uint64("page_id", pageID),
+				)
+			}
+			// todo: might leak senitive data now because the error gets not handled
+			// Reported errors are mostly because of incorrect template syntax. Those gets
+			// reported during first parsing.
+			//return http.StatusInternalServerError, err
 		}
-		// Reported errors are mostly because of incorrect template syntax. Those gets
-		// reported during first parsing.
-		return http.StatusInternalServerError, err
+		close(cTags)
+	}()
+
+	tags := make(esitag.DataTags, 0, avgESITagsPerPage)
+	for t := range cTags {
+		tags = append(tags, t)
 	}
 
 	// Calculates the correct Content-Length and enables now the real writing to the

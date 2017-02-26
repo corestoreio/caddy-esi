@@ -73,35 +73,36 @@ func (f *responseMock) ReadFrom(r io.Reader) (int64, error) {
 func TestResponseWrapInjector(t *testing.T) {
 
 	t.Run("WriteHeader with additional Content-Length (Idempotence)", func(t *testing.T) {
-		dtChan := make(chan esitag.DataTags, 1)
-		dtChan <- esitag.DataTags{
-			esitag.DataTag{End: 5, Start: 1}, // Final calculation 0-5-1 = -4
-		}
+		dtChan := make(chan esitag.DataTag, 1)
+		dtChan <- esitag.DataTag{End: 5, Start: 1} // Final calculation 0-5-1 = -4
+		close(dtChan)
 
 		rec := httptest.NewRecorder()
 		rwi := responseWrapInjector(dtChan, rec)
 		rwi.Header().Set("Content-LENGTH", "300")
 
 		for i := 0; i < 3; i++ {
-			// Test for Idempotence
+			// Test for being idempotent
 			rwi.WriteHeader(http.StatusMultipleChoices)
 			assert.Exactly(t, http.StatusMultipleChoices, rec.Code, "Expecting http.StatusMultipleChoices")
 			assert.Exactly(t, "296", rec.Header().Get("Content-Length"), "Expecting Content-Length value")
 		}
 	})
 
-	t.Run("Get injectingFlushWriter", func(t *testing.T) {
-		dtChan := make(chan esitag.DataTags, 1)
-		dtChan <- nil
+	t.Run("Get injecting Flush Writer", func(t *testing.T) {
+		dtChan := make(chan esitag.DataTag, 1)
+		dtChan <- esitag.DataTag{}
+		close(dtChan)
 
 		rwi := responseWrapInjector(dtChan, httptest.NewRecorder())
 		_, ok := rwi.(*injectingFlushWriter)
 		assert.True(t, ok, "Expecting a injectingFlushWriter type")
 	})
 
-	t.Run("Get injectingFancyWriter", func(t *testing.T) {
-		dtChan := make(chan esitag.DataTags, 1)
-		dtChan <- nil
+	t.Run("Get injecting Fancy Writer", func(t *testing.T) {
+		dtChan := make(chan esitag.DataTag, 1)
+		dtChan <- esitag.DataTag{}
+		close(dtChan)
 
 		rwi := responseWrapInjector(dtChan, newResponseMock())
 		_, ok := rwi.(*injectingFancyWriter)
@@ -109,10 +110,9 @@ func TestResponseWrapInjector(t *testing.T) {
 	})
 
 	t.Run("Dot not run injector on binary data", func(t *testing.T) {
-		dtChan := make(chan esitag.DataTags, 1)
-		dtChan <- esitag.DataTags{
-			esitag.DataTag{End: 5, Start: 1}, // Final calculation 0-5-1 = -4
-		}
+		dtChan := make(chan esitag.DataTag, 1)
+		dtChan <- esitag.DataTag{End: 5, Start: 1} // Final calculation 0-5-1 = -4
+		close(dtChan)
 
 		rec := httptest.NewRecorder()
 		rwi := responseWrapInjector(dtChan, rec)
@@ -127,10 +127,9 @@ func TestResponseWrapInjector(t *testing.T) {
 	})
 
 	t.Run("Run injector once on text data", func(t *testing.T) {
-		dtChan := make(chan esitag.DataTags, 1)
-		dtChan <- esitag.DataTags{
-			esitag.DataTag{Data: []byte(`Hello XML`), End: 16, Start: 12},
-		}
+		dtChan := make(chan esitag.DataTag, 1)
+		dtChan <- esitag.DataTag{Data: []byte(`Hello XML`), End: 16, Start: 12}
+		close(dtChan)
 
 		rec := httptest.NewRecorder()
 		rwi := responseWrapInjector(dtChan, rec)
@@ -142,10 +141,9 @@ func TestResponseWrapInjector(t *testing.T) {
 	})
 
 	t.Run("Run injector twice on text data", func(t *testing.T) {
-		dtChan := make(chan esitag.DataTags, 1)
-		dtChan <- esitag.DataTags{
-			esitag.DataTag{Data: []byte(`<Hello><world status="sinking"></world></Hello>`), Start: 13, End: 34},
-		}
+		dtChan := make(chan esitag.DataTag, 1)
+		dtChan <- esitag.DataTag{Data: []byte(`<Hello><world status="sinking"></world></Hello>`), Start: 13, End: 34}
+		close(dtChan)
 
 		rec := httptest.NewRecorder()
 		rwi := responseWrapInjector(dtChan, rec)

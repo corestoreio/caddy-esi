@@ -25,16 +25,16 @@ import (
 	"github.com/SchumacherFM/caddyesi/esitag"
 )
 
-func responseWrapInjector(chanTags <-chan esitag.DataTags, w http.ResponseWriter) http.ResponseWriter {
+func responseWrapInjector(cTag <-chan esitag.DataTag, w http.ResponseWriter) http.ResponseWriter {
 	_, cn := w.(http.CloseNotifier)
 	_, fl := w.(http.Flusher)
 	_, hj := w.(http.Hijacker)
 	_, rf := w.(io.ReaderFrom)
 
 	bw := injectingWriter{
-		rw:       w,
-		chanTags: chanTags,
-		header:   make(http.Header),
+		rw:      w,
+		chanTag: cTag,
+		header:  make(http.Header),
 	}
 
 	if cn && fl && hj && rf {
@@ -50,7 +50,7 @@ func responseWrapInjector(chanTags <-chan esitag.DataTags, w http.ResponseWriter
 // http.ResponseWriter interface.
 type injectingWriter struct {
 	rw              http.ResponseWriter
-	chanTags        <-chan esitag.DataTags
+	chanTag         <-chan esitag.DataTag
 	lazyTags        esitag.DataTags
 	responseAllowed uint8 // 0 not yet tested, 1 yes, 2 no
 	wroteHeader     bool
@@ -58,12 +58,15 @@ type injectingWriter struct {
 	lastWritePos    int
 }
 
-// initLazyTags reads only once from the chanTags and blocks until data is
+// initLazyTags reads only once from the chanTag and blocks until data is
 // available and then sorts them all to maintain the order as which they occur
-// in the HTML page.
+// in the HTML page. You must close chanTag or this blocks 4ever.
 func (b *injectingWriter) initLazyTags() {
 	if b.lazyTags == nil {
-		b.lazyTags = <-b.chanTags
+		b.lazyTags = make(esitag.DataTags, 0, avgESITagsPerPage)
+		for ct := range b.chanTag {
+			b.lazyTags = append(b.lazyTags, ct)
+		}
 		sort.Sort(b.lazyTags)
 	}
 }
