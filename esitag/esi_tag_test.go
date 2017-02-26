@@ -661,23 +661,25 @@ func TestEntity_QueryResources_Multi_Calls(t *testing.T) {
 }
 
 func TestEntities_QueryResources(t *testing.T) {
+	// cannot run with t.Parallel
 
 	t.Run("Empty Entities returns not a nil DataTags slice", func(t *testing.T) {
 		ets := make(esitag.Entities, 0, 2)
-		tags, err := ets.QueryResources(nil)
-		if err != nil {
+		if err := ets.QueryResources(nil, nil); err != nil {
 			t.Fatal(err)
 		}
-		assert.Exactly(t, esitag.DataTags{}, tags)
 	})
 
-	defer esitag.RegisterResourceHandler("teste1", esitesting.MockRequestContent("Content")).DeferredDeregister()
-
+	defer esitag.RegisterResourceHandler("cancel01", esitesting.MockRequestContentCB("Content", func() error {
+		time.Sleep(2 * time.Millisecond) // long running backend resource request
+		return nil
+	})).DeferredDeregister()
 	t.Run("QueryResources Request context canceled", func(t *testing.T) {
 		entities, err := esitag.Parse(strings.NewReader(`<html><head></head><body>
-			<p><esi:include src="teste1://micro1.service1" timeout='2s' maxbodysize='3kb' /></p>
-			<p><esi:include src="teste1://micro2.service2" timeout='2s' maxbodysize='3kb' /></p>
-			<p><esi:include src="teste1://micro3.service3" timeout='2s' maxbodysize='3kb' /></p>
+			<p><esi:include src="cancel01://micro1.service1" timeout='1s' maxbodysize='10kb' /></p>
+			<p><esi:include src="cancel01://micro2.service2" timeout='2s' maxbodysize='20kb' /></p>
+			<p><esi:include src="cancel01://micro3.service3" timeout='3s' maxbodysize='30kb' /></p>
+			<p><esi:include src="cancel01://micro4.service4" timeout='4s' maxbodysize='40kb' /></p>
 		</body></html>`))
 		if err != nil {
 			t.Fatalf("%+v", err)
@@ -689,16 +691,17 @@ func TestEntities_QueryResources(t *testing.T) {
 		req = req.WithContext(ctx)
 		cancel()
 
-		tags, err := entities.QueryResources(req)
-
-		// wait until the cancel has been propagated. this should fix this weird
-		// flaky behaviour under OSX. It still occurs ...
-		time.Sleep(20 * time.Millisecond)
-
-		// sometimes this test gets flaky because it seems the the cancel() does
-		// not work properly :-( No idea ...
+		dtChan := make(chan esitag.DataTag)
+		err = entities.QueryResources(dtChan, req)
 		assert.EqualError(t, errors.Cause(err), context.Canceled.Error())
-		assert.Exactly(t, esitag.DataTags{}, tags)
+		close(dtChan)
+
+		hasTag := false
+		for tag := range dtChan { // not really necessary this code
+			t.Log(tag.String())
+			hasTag = true
+		}
+		assert.False(t, hasTag, "Did not expect to receive any DataTag on the channel")
 	})
 
 	defer esitag.RegisterResourceHandler("teste2a", esitesting.MockRequestError(errors.NewAlreadyClosedf("Ups already closed"))).DeferredDeregister()
@@ -714,10 +717,17 @@ func TestEntities_QueryResources(t *testing.T) {
 		}
 
 		req := httptest.NewRequest("GET", "https://cyrillschumacher.com/esi/endpoint1", nil)
-		tags, err := entities.QueryResources(req)
-		if err != nil {
+		dtChan := make(chan esitag.DataTag, 3)
+		if err := entities.QueryResources(dtChan, req); err != nil {
 			t.Fatalf("%+v", err)
 		}
+		close(dtChan)
+
+		tags := make(esitag.DataTags, 0, 3)
+		for tag := range dtChan {
+			tags = append(tags, tag)
+		}
+
 		sort.Sort(tags)
 		assert.Exactly(t, esitag.DataTags{
 			{Data: []byte(`failed to load service 1`), Start: 32, End: 146},
@@ -726,6 +736,7 @@ func TestEntities_QueryResources(t *testing.T) {
 		}, tags)
 	})
 
+	defer esitag.RegisterResourceHandler("teste1", esitesting.MockRequestContent("Content")).DeferredDeregister()
 	t.Run("Success", func(t *testing.T) {
 		entities, err := esitag.Parse(strings.NewReader(`<html><head></head><body>
 			<p><esi:include src="testE1://micro1.service1" timeout='2s' maxbodysize='3kb'  /></p>
@@ -737,11 +748,17 @@ func TestEntities_QueryResources(t *testing.T) {
 		}
 
 		req := httptest.NewRequest("GET", "https://cyrillschumacher.com/esi/endpoint1", nil)
-
-		tags, err := entities.QueryResources(req)
-		if err != nil {
+		dtChan := make(chan esitag.DataTag, 3)
+		if err := entities.QueryResources(dtChan, req); err != nil {
 			t.Fatalf("%+v", err)
 		}
+		close(dtChan)
+
+		tags := make(esitag.DataTags, 0, 3)
+		for tag := range dtChan {
+			tags = append(tags, tag)
+		}
+
 		sort.Sort(tags)
 		assert.Exactly(t, esitag.DataTags{
 			{Data: []byte(`Content "testE1://micro1.service1" Timeout 2s MaxBody 3.0 kB`), Start: 32, End: 110},

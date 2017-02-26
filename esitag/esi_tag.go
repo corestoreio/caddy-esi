@@ -433,11 +433,10 @@ func (et Entities) UniqueID() uint64 {
 }
 
 // QueryResources runs in parallel to query all available backend services /
-// resources which are available in the current page. The returned DataTags
-// slice is guaranteed to be sorted after Start positions and non-nil. If the
-// request gets canceled via its context then all resource requests gets
-// cancelled too. This function does not sort the DataTags to restore the
-// original order as the occur in an HTML page.
+// resources which are available in the current page. The channel DataTag must
+// not be buffered. All create DataTag object will be written randomly into the
+// channel. The developer must take care for the correct order. If the request
+// gets canceled via its context then all resource requests gets cancelled too.
 func (et Entities) QueryResources(cTag chan<- DataTag, r *http.Request) error {
 
 	if len(et) == 0 {
