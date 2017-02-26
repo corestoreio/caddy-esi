@@ -30,6 +30,8 @@ install:
   - go get github.com/gordonklaus/ineffassign
   - go get github.com/mholt/caddy/...
   - go get github.com/vdobler/ht/...
+  - go get github.com/rakyll/hey
+  - go install github.com/rakyll/hey
 
 script:
   - diff <(echo -n) <(gofmt -s -d .)

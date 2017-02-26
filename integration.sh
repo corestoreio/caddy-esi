@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-set -o pipefail
-set -e
+# https://www.gnu.org/software/bash/manual/html_node/The-Set-Builtin.html#The-Set-Builtin
+set -exo pipefail
 
 sed -i.bak '/This is where other plugins get plugged in (imported)/a\
 _ "github.com/SchumacherFM/caddyesi"\'$'\n' $GOPATH/src/github.com/mholt/caddy/caddy/caddymain/run.go
@@ -26,4 +26,6 @@ curl --trace-time -i -v http://127.0.0.1:2017/page_grpc.html
 
 go run $GOPATH/src/github.com/SchumacherFM/caddyesi/ht/*.go
 
+curl --trace-time -i -v http://127.0.0.1:2017/page_grpc.html
+hey -n 2240 -c 20 -t 30 http://127.0.0.1:2017/page_grpc.html
 curl --trace-time -i -v http://127.0.0.1:2017/page_grpc.html
