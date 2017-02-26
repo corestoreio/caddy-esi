@@ -14,15 +14,15 @@
         </tr>
         <tr>
             <td class="redisfailure01">Should load ESI tag error</td>
-            <td><esi:include src="redisGCPNoHost1" key="category_tree" onerror="Redis on google cloud platform one not found"/></td>
+            <td><esi:include src="redisGCPNoHost1" timeout="1s" key="category_tree" onerror="Redis on google cloud platform one not found"/></td>
         </tr>
         <tr>
             <td class="redisfailure01">Should load global error</td>
-            <td><esi:include src="redisGCPNoHost1" key="category_tree1"/></td>
+            <td><esi:include src="redisGCPNoHost1" timeout="1s" key="category_tree1"/></td>
         </tr>
         <tr>
             <td class="redisfailure01">Should load from file the error</td>
-            <td><esi:include src="redisGCPNoHost1" key="category_tree1" onerror="./www_root/page_redis_unavailable.txt"/></td>
+            <td><esi:include src="redisGCPNoHost1" timeout="1s" key="category_tree1" onerror="./www_root/page_redis_unavailable.txt"/></td>
         </tr>
     </table>
 
