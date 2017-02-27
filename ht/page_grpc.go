@@ -64,8 +64,8 @@ func pageGRPC() (t *ht.Test) {
 				Concurrent: 20,
 				// This test also runs on Travis and compiled with -race so must
 				// set the limit to a higher seconds value. Usually it can be
-				// run with "0.9995 ≤ 0.2s", now 0.8s should pass the tests.
-				Limits:             "0.9995 ≤ 0.8s",
+				// run with "0.9995 ≤ 0.2s".
+				Limits:             "0.9995 ≤ 1.5s",
 				IndividualSessions: false,
 			},
 		),
