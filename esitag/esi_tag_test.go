@@ -470,11 +470,18 @@ func BenchmarkDataTags_InjectContent(b *testing.B) {
 			if err != nil {
 				b.Fatal(err)
 			}
+			defer page3F.Close()
 
 			ets, err := esitag.Parse(page3F)
 			if err != nil {
 				b.Fatal(err)
 			}
+
+			fs, err := page3F.Stat()
+			if err != nil {
+				b.Fatal(err)
+			}
+			b.SetBytes(fs.Size())
 
 			var tags = make(esitag.DataTags, len(ets))
 			for k := 0; k < len(ets); k++ {
