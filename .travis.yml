@@ -18,6 +18,7 @@ matrix:
 before_install:
   # default ulimit set to 256
   - ulimit -n 8192
+  - ulimit -a
   - if [ "$TRAVIS_OS_NAME" = osx ]; then brew update; fi
   - if [ "$TRAVIS_OS_NAME" = osx ]; then brew install memcached; fi
   - if [ "$TRAVIS_OS_NAME" = osx ]; then /usr/local/opt/memcached/bin/memcached -l 127.0.0.1:11211 -d; fi
@@ -43,5 +44,8 @@ script:
 after_script:
   - golint ./... | grep -v .pb.go
   - go test -tags esiall -run=🤐 -bench=. -count=1 -benchmem ./...
+  # curl --trace-time -i -v http://127.0.0.1:2017/page_grpc.html
+  - hey -n 2240 -c 20 -t 30 http://127.0.0.1:2017/page_grpc.html
+  # curl --trace-time -i -v http://127.0.0.1:2017/page_grpc.html
   # enable the next line only in case of debugging
   # - tail -n +1 cdy_test_*
