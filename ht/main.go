@@ -17,6 +17,8 @@
 package main
 
 import (
+	"bytes"
+	"log"
 	"math/rand"
 	"os"
 	"runtime"
@@ -46,11 +48,11 @@ func main() {
 	c := ht.Collection{
 		Tests: make([]*ht.Test, 0, len(testCollection)),
 	}
-	//var buf bytes.Buffer
-	//lg := log.New(&buf, "", log.LstdFlags)
+	var buf bytes.Buffer
+	lg := log.New(&buf, "", log.LstdFlags)
 	for _, k := range testKeys {
-		//testCollection[k].Log = lg
-		//testCollection[k].Execution.Verbosity = 5 // 5 = max verbosity
+		testCollection[k].Log = lg
+		testCollection[k].Execution.Verbosity = 5 // 5 = max verbosity
 		testCollection[k].Execution.Tries = 2
 		testCollection[k].Execution.Wait = 1 * time.Second
 		testCollection[k].Request.Timeout = 20 * time.Second // default was 10 but set to 20 because slow OSX on travis
@@ -74,7 +76,7 @@ func main() {
 		}
 	}
 
-	//println("\n", buf.String(), "\n")
+	println("\n", buf.String(), "\n")
 
 	// Travis CI requires an exit code for the build to fail. Anything not 0
 	// will fail the build.
