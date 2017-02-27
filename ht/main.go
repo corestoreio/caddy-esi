@@ -50,13 +50,9 @@ func main() {
 	}
 	var buf bytes.Buffer
 	lg := log.New(&buf, "", log.LstdFlags)
+
 	for _, k := range testKeys {
-		testCollection[k].Log = lg
-		testCollection[k].Execution.Verbosity = 5 // 5 = max verbosity
-		testCollection[k].Execution.Tries = 2
-		testCollection[k].Execution.Wait = 1 * time.Second
-		testCollection[k].Request.Timeout = 20 * time.Second // default was 10 but set to 20 because slow OSX on travis
-		testCollection[k].Execution.PreSleep = time.Duration(rand.Intn(50)) * time.Millisecond
+		prepareTest(testCollection[k], lg)
 		c.Tests = append(c.Tests, testCollection[k])
 	}
 
@@ -70,6 +66,7 @@ func main() {
 	}
 
 	for _, test := range afterTests {
+		prepareTest(test, lg)
 		_ = test.Run()
 		if es := handleTestResult(test); es > 0 {
 			exitStatus = 64
@@ -83,4 +80,13 @@ func main() {
 	//os.Exit(exitStatus)
 	_ = exitStatus
 	os.Exit(0)
+}
+
+func prepareTest(t *ht.Test, lg *log.Logger) {
+	t.Log = lg
+	t.Execution.Verbosity = 5 // 5 = max verbosity
+	t.Execution.Tries = 2
+	t.Execution.Wait = 1 * time.Second
+	t.Request.Timeout = 20 * time.Second // default was 10 but set to 20 because slow OSX on travis
+	t.Execution.PreSleep = time.Duration(rand.Intn(50)) * time.Millisecond
 }
