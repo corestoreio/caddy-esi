@@ -29,9 +29,6 @@ import (
 	"github.com/mholt/caddy/caddyhttp/httpserver"
 )
 
-// BenchmarkMiddleware_ServeHTTP-4   	   20000	     60994 ns/op	   44397 B/op	      52 allocs/op
-// BenchmarkMiddleware_ServeHTTP-4     	   20000	     85158 ns/op	   49099 B/op	      99 allocs/op
-// BenchmarkMiddleware_ServeHTTP-4   	   20000	     74384 ns/op	   46020 B/op	      66 allocs/op
 func BenchmarkMiddleware(b *testing.B) {
 
 	defer esitag.RegisterResourceHandler("bmServe01", esitesting.MockRequestContent("Hello 2017!")).DeferredDeregister()
@@ -44,6 +41,12 @@ func BenchmarkMiddleware(b *testing.B) {
 			# log_file ./benchmark_serve.log
 			# log_level debug
 		}`
+
+	fileStat, err := os.Stat(serveFile)
+	if err != nil {
+		b.Fatal(err)
+	}
+	fileSize := fileStat.Size()
 
 	ctc := caddy.NewTestController("http", caddyFile)
 
@@ -96,6 +99,7 @@ func BenchmarkMiddleware(b *testing.B) {
 	}
 
 	b.Run("ServeHTTP_Serial", func(b *testing.B) {
+		b.SetBytes(fileSize)
 		b.ResetTimer()
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
@@ -110,6 +114,7 @@ func BenchmarkMiddleware(b *testing.B) {
 		}
 	})
 	b.Run("ServeHTTP_Parallel", func(b *testing.B) {
+		b.SetBytes(fileSize)
 		b.ResetTimer()
 		b.ReportAllocs()
 		b.RunParallel(func(pb *testing.PB) {
