@@ -17,7 +17,6 @@
 package main
 
 import (
-	"bytes"
 	"log"
 	"math/rand"
 	"os"
@@ -48,8 +47,8 @@ func main() {
 	c := ht.Collection{
 		Tests: make([]*ht.Test, 0, len(testCollection)),
 	}
-	var buf bytes.Buffer
-	lg := log.New(&buf, "", log.LstdFlags)
+
+	lg := log.New(os.Stdout, "", log.LstdFlags)
 
 	for _, k := range testKeys {
 		prepareTest(testCollection[k], lg)
@@ -61,7 +60,7 @@ func main() {
 
 	for _, test := range c.Tests {
 		if es := handleTestResult(test); es > 0 {
-			exitStatus = 57
+			exitStatus = 63
 		}
 	}
 
@@ -69,24 +68,20 @@ func main() {
 		prepareTest(test, lg)
 		_ = test.Run()
 		if es := handleTestResult(test); es > 0 {
-			exitStatus = 64
+			exitStatus = 71
 		}
 	}
 
-	println("\n", buf.String(), "\n")
-
 	// Travis CI requires an exit code for the build to fail. Anything not 0
 	// will fail the build.
-	//os.Exit(exitStatus)
-	_ = exitStatus
-	os.Exit(0)
+	os.Exit(exitStatus)
 }
 
 func prepareTest(t *ht.Test, lg *log.Logger) {
 	t.Log = lg
 	t.Execution.Verbosity = 5 // 5 = max verbosity
-	t.Execution.Tries = 2
+	t.Execution.Tries = 1
 	t.Execution.Wait = 1 * time.Second
-	t.Request.Timeout = 20 * time.Second // default was 10 but set to 20 because slow OSX on travis
+	t.Request.Timeout = 40 * time.Second // default was 10 but set to 40 because slow OSX on travis
 	t.Execution.PreSleep = time.Duration(rand.Intn(50)) * time.Millisecond
 }
