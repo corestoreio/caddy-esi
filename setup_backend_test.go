@@ -28,7 +28,7 @@ import (
 )
 
 func TestPluginSetup_Backends(t *testing.T) {
-	t.Parallel()
+	// t.Parallel() cannot run in parallel as the test gets flaky because of the global map in esicache.MainRegistry
 
 	mr := miniredis.NewMiniRedis()
 	if err := mr.Start(); err != nil {
