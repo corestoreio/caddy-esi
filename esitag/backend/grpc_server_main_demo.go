@@ -21,6 +21,7 @@ package main
 
 import (
 	"bytes"
+	"html"
 	"log"
 	"net"
 	"strconv"
@@ -34,7 +35,7 @@ import (
 )
 
 const (
-	serverListenAddr = "127.0.0.1:50055"
+	serverListenAddr = "127.0.0.1:42042"
 )
 
 type server struct {
@@ -48,9 +49,9 @@ func (s server) GetHeaderBody(_ context.Context, arg *esigrpc.ResourceArgs) (*es
 	}
 
 	// key will be set in an ESI tag.
-	// <esi:include src="grpcServerdemo" key="session_{Fsession}" timeout="500ms" onerror="Demo gRPC server unavailable :-("/>
-	key := arg.GetKey() // key is now "session_JHDASDHASKDH_\x00"
-	if len(key) < 20 {
+	// <esi:include src="grpcServerDemo" key="session_{Fsession}" timeout="500ms" onerror="Demo gRPC server unavailable :-("/>
+	key := arg.GetKey() // key is now e.g. "session_JHDASDHASKDH_\x00"
+	if len(key) < 8 || len(key) > 128 {
 		return nil, errors.NewNotValidf("[grpc_server] Session key %q not valid", key)
 	}
 
@@ -63,17 +64,13 @@ func (s server) GetHeaderBody(_ context.Context, arg *esigrpc.ResourceArgs) (*es
 	}
 
 	var buf bytes.Buffer
-	buf.WriteString("<table><tr><th>Key</th><th>Value</th></tr>\n")
-	writeLine(&buf, "Session", key)
-	writeLine(&buf, "Next Integer", strconv.FormatInt(inc, 10))
+	buf.WriteString("<table border='1' cellpadding='3' cellspacing='2'><tr><th>Key</th><th>Value</th></tr>\n")
+	writeLine(&buf, "Session", html.EscapeString(key))
+	writeLine(&buf, "Next Session Integer", strconv.FormatInt(inc, 10))
 	writeLine(&buf, "RequestURI", arg.GetExternalReq().RequestUri)
+	writeLine(&buf, "Headers", printHeader(arg.GetExternalReq().GetHeader()))
 	writeLine(&buf, "Time", time.Now().Format(time.RFC1123Z))
 	buf.WriteString("</table>\n")
-
-	//select {
-	//case <-ctx.Done():
-	//	return nil,errors.NewTimeoutf("[grpc_server] Request timed out: %s",ctx.Err())
-	//}
 
 	return &esigrpc.HeaderBody{
 		// Header: []*esigrpc.MapValues{},
@@ -90,6 +87,17 @@ func writeLine(buf *bytes.Buffer, key, val string) {
 	buf.WriteRune('\n')
 }
 
+func printHeader(hdr []string) string {
+	var buf bytes.Buffer
+	for i := 0; i < len(hdr)/2; i = i + 2 {
+		buf.WriteString(hdr[i])
+		buf.WriteString(": ")
+		buf.WriteString(html.EscapeString(hdr[i+1]))
+		buf.WriteString("<br>\n")
+	}
+	return buf.String()
+}
+
 func main() {
 
 	lis, err := net.Listen("tcp", serverListenAddr)
@@ -99,7 +107,7 @@ func main() {
 
 	s := grpc.NewServer()
 	esigrpc.RegisterHeaderBodyServiceServer(s, server{
-		session: cache.New(5*time.Minute, 30*time.Second),
+		session: cache.New(3*time.Minute, 1*time.Minute),
 	})
 
 	log.Printf("Try starting gRPC server on %q", serverListenAddr)
