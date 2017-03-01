@@ -16,4 +16,8 @@
         <alias>grpc_integration_01</alias>
         <url><![CDATA[grpc://127.0.0.1:50666]]></url>
     </item>
+    <!--<item>-->
+        <!--<alias>grpcServerDemo</alias>-->
+        <!--<url><![CDATA[grpc://127.0.0.1:42042]]></url>-->
+    <!--</item>-->
 </items>

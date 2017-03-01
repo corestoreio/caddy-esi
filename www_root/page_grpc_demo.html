@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en-US" xmlns:esi="http://www.w3.org/2001/XMLSchema">
+<head>
+    <title>Caddy ESI Tag gRPC</title>
+</head>
+<body>
+
+    <h1>Caddy ESI Tag Demo gRPC.</h1>
+    <h2>Integer iteration </h2>
+
+    <form method="GET" action="page_grpc_demo.html">
+        <label for="session">Session Name (8-128 characters)</label>
+        <input id="session" name="session" value="" maxlength="128" minlength="8">
+        <button type="submit">Submit</button>
+    </form>
+
+    <p>
+    <esi:include src="grpcServerDemo" printdebug="1" key="session_{Fsession}" forwardheaders="all" timeout="4ms" onerror="Demo gRPC server unavailable :-("/>
+    </p>
+
+</body>
+</html>
