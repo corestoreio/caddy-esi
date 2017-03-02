@@ -14,15 +14,17 @@ page
 - Querying multiple backend server parallel and concurrent.
 - Coalesce multiple incoming requests into one single request to a backend
 server
-- Forwarding and returning of HTTP headers from backend servers
+- Forwarding and returning (todo) of HTTP headers from backend servers
 - Query multiple backend servers sequentially as a fall back mechanism
 - Query multiple backend servers parallel and use the first returned result and
-discard other responses
+discard other responses, an obvious race condition. (todo)
 - Support for NoSQL Server to query a key and simply display its value
-- Variables support based on Cookie or Request parameters
+- Variables support based on Server, Cookie, Header or GET/POST form parameters
 - Error handling and fail over. Either display a text from a string or a static
 file content when a backend server is unavailable.
-- No full ESI support
+- If an HTTP/S backend request takes longer than the specified timeout, flip the
+source URL into an XHR request or an HTTP2 push. (todo)
+- No full ESI support, if desired use a scripting language ;-)
 - Supports Go >= 1.8
 
 ## High level overview
