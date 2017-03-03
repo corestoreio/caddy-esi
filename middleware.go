@@ -17,7 +17,6 @@ package caddyesi
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"net/http"
 	"sort"
 	"strconv"
@@ -61,7 +60,7 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 	if !cfg.IsRequestAllowed(r) {
 		if cfg.Log.IsDebug() {
 			cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.IsRequestAllowed",
-				log.Bool("benchIsResponseAllowed", false), loghttp.Request("request", r), log.Stringer("config", cfg),
+				log.Bool("is_response_allowed", false), loghttp.Request("request", r), log.Stringer("config", cfg),
 			)
 		}
 		return mw.Next.ServeHTTP(w, r) // go on ...
@@ -200,18 +199,19 @@ func (mw *Middleware) serveBuffered(cfg *PathConfig, pageID uint64, w http.Respo
 	// run a performance load test to see if it's worth to switch to Group.DoChan
 	groupEntitiesResult, err, shared := mw.Group.Do(strconv.FormatUint(pageID, 10), func() (interface{}, error) {
 
-		var body io.Reader = bufRdr
-		var bodyBuf *bytes.Buffer
+		entities, err := esitag.Parse(bufRdr)
 		if cfg.Log.IsDebug() {
-			bodyBuf = new(bytes.Buffer)
-			body = io.TeeReader(body, bodyBuf)
-		}
+			const contentMaxLength = 512
+			var content string
+			if buf.Len() < contentMaxLength {
+				content = buf.String()
+			} else {
+				content = buf.String()[:contentMaxLength]
+			}
 
-		entities, err := esitag.Parse(body)
-		if cfg.Log.IsDebug() {
 			cfg.Log.Debug("caddyesi.Middleware.ServeHTTP.ESITagsByRequest.Parse",
 				log.Err(err), log.Uint64("page_id", pageID), log.Int("tag_count", len(entities)),
-				loghttp.Request("request", r), log.Stringer("content", bodyBuf),
+				loghttp.Request("request", r), log.String("content_512", content),
 			)
 		}
 		if err != nil {
