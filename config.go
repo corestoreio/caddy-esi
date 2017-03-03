@@ -15,6 +15,7 @@
 package caddyesi
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -50,12 +51,25 @@ type PathConfigs []*PathConfig
 // ConfigForPath selects in the ServeHTTP function the config for a path.
 func (pc PathConfigs) ConfigForPath(r *http.Request) *PathConfig {
 	for _, c := range pc {
+		println("r.URL.Path).Matches(c.Scope", r.URL.Path, "=>", c.Scope)
 		if httpserver.Path(r.URL.Path).Matches(c.Scope) { // not negated
 			// match also all sub paths ...
 			return c
 		}
 	}
 	return nil
+}
+
+// String prints debug information. Very slow ...
+func (pc PathConfigs) String() string {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "PathConfig Count: %d", len(pc))
+	buf.WriteRune('\n')
+	for _, c := range pc {
+		buf.WriteString(c.String())
+		buf.WriteRune('\n')
+	}
+	return buf.String()
 }
 
 // PathConfig per path prefix

@@ -24,7 +24,24 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var _ fmt.Stringer = (*PathConfigs)(nil)
 var _ fmt.Stringer = (*PathConfig)(nil)
+
+func TestPathConfigs_String(t *testing.T) {
+	pc := PathConfigs{
+		&PathConfig{
+			Scope:       "/catalog/product",
+			MaxBodySize: 4,
+		},
+		&PathConfig{
+			Scope:       "/checkout/cart",
+			MaxBodySize: 3,
+		},
+	}
+	assert.Exactly(t,
+		"PathConfig Count: 2\nScope:\"/catalog/product\"; MaxBodySize:4; Timeout:0s; PageIDSource:[]; AllowedMethods:[]; LogFile:\"\"; LogLevel:\"\"; EntityCount: 0\nScope:\"/checkout/cart\"; MaxBodySize:3; Timeout:0s; PageIDSource:[]; AllowedMethods:[]; LogFile:\"\"; LogLevel:\"\"; EntityCount: 0\n",
+		pc.String())
+}
 
 const weirdLongURL = `https://app.usunu.com/-/login?u=https%3A%2F%2Fapp.usunu.com%2F0%2Fsearch%2F2385944396396%2F81453167684176&e=emailaddress%40gmail.com&passive=1`
 
