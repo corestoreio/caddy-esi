@@ -51,7 +51,6 @@ type PathConfigs []*PathConfig
 // ConfigForPath selects in the ServeHTTP function the config for a path.
 func (pc PathConfigs) ConfigForPath(r *http.Request) *PathConfig {
 	for _, c := range pc {
-		println("r.URL.Path).Matches(c.Scope", r.URL.Path, "=>", c.Scope)
 		if httpserver.Path(r.URL.Path).Matches(c.Scope) { // not negated
 			// match also all sub paths ...
 			return c
