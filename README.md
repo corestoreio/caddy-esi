@@ -8,7 +8,7 @@ retrieving from heterogeneous backends aka. micro services.
 
 #### Some features:
 
-- Query data from HTTP, HTTPS, gRPC, Redis, Memcache and soon SQL.
+- Query data from HTTP, HTTPS, gRPC, Redis, Memcache and soon SQL. Default implementation: HTTP/S.
 - Multiple incoming requests trigger only one single parsing of the ESI tags per
 page
 - Querying multiple backend server parallel and concurrent.
@@ -27,9 +27,23 @@ source URL into an XHR request or an HTTP2 push. (todo)
 - No full ESI support, if desired use a scripting language ;-)
 - Supports Go >= 1.8
 
+**Warning:** Project still in beta phase and to enable more backend resources
+you need to buy a monthly recurring Enterprise maintenance support (Coming
+soon!)
+
 ## High level overview
 
 ![Architectural overview](caddy-esi-archi.png)
+
+As the above sequence diagram shows, the output of the initial byte starts only
+then, when all data from the backend resources has been received. This enables
+us to calculate the correct `Content-Length` header and also allows to return
+headers from the backend to the client. So [time to first byte "TTFB"](https://en.wikipedia.org/wiki/Time_To_First_Byte) 
+depends on the slowest backend resource.
+
+Future versions of CaddyESI provides the additional option of enabling
+`Transfer-Encoding: chunked` to start immediately the output and then waiting
+for all backend resources when the first ESI tag occurs in the page.
 
 ## Plugin configuration (optional)
 
@@ -86,7 +100,9 @@ ESI tag cache. `X-Esi-Cmd: purge`
 - `log-none` disables logging.
 
 `resources` defines the path to a configuration file for more backend resource
-services. An example on how the XML or JSON must be coded:
+services. You need this file once CaddyESI has been enabled to work with other
+plugins as the default HTTP implementation. An example on how the XML or JSON
+must be coded:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -141,6 +157,9 @@ Please be aware that this file must be stored securely on the hard drive and
 that the owner of the Caddy process can read it. Other resource credential
 loading options might be added in the future.
 
+The resource configuration file is only needed when other services besides HTTP
+are enabled.
+
 The further usage of configuration gets explained in the ESI tag documentation.
 
 ## Supported ESI Tags and their attributes
@@ -158,10 +177,10 @@ Implemented:
 - [ ] Flip src to AJAX call after timeout
 - [x] Forward all headers
 - [x] Forward some headers
-- [ ] Forward POST,PATCH, PUT data
+- [x] Forward POST,PATCH, PUT data
 - [ ] Return all headers
 - [ ] Return some headers
-- [ ] Forward QUERY STRING and/or POST form data
+- [x] Forward QUERY STRING and/or POST form data
 - [x] Multiple sources
 - [ ] Multiple sources with `race="true"`
 - [x] Dynamic sources/keys (string replacement)
@@ -170,20 +189,20 @@ Implemented:
 - [x] Memcache access
 - [ ] MySQL access
 - [ ] PGSQL access
+- [ ] fCGI access
 - [x] gRPC access
 - [x] Shell scripts/programs access (stderr|out|in) communication
 - [x] Handle compressed content from backends (Go http.Client)
 - [x] Query HTTP/S backend servers
-- [ ] Coalesce multiple requests into one backend request
+- [x] Coalesce multiple requests into one backend request
 
-Databases, NoSQL or gRPC access in package `backend` must be enabled via Go
-build tags. Please see the source files for the correct build tag.
+Only HTTP backend resources are enabled by default.
 
 ### TL;DR ESI tag options
 
 Quick overview which options are available for two different kinds of ESI tags.
 
-1. Querying an HTTP backend
+1. Querying an HTTP backend (default enabled)
 
 ```
 <esi:include src="https://micro1.service/esi/foo" src="https://microN.service/esi/foo" 
@@ -195,7 +214,7 @@ Quick overview which options are available for two different kinds of ESI tags.
 />
 ```
 
-2. Querying a NOSQL database or gRPC service
+2. Querying a NOSQL database or gRPC service (not enabled)
 
 ```
 <esi:include src="alias_name1" src="alias_nameN" key="key name" 
@@ -443,7 +462,7 @@ The basic ESI tag can contain the attribute `condition`. A `condition` must
 evaluate an expression to `true` to trigger the loading of the `src`.
 
 ```
-<esi:include src="http://micro.service/search?query={{ .Req.Form.Encode }}"
+<esi:include src="http://micro.service/search?query={Fquery}"
     condition="{hostname} eq 'customer.micro.service'"/>
 ```
 
@@ -464,6 +483,13 @@ applies. Return and forward headers might not be supported.
 <esi:include src="redisAWS1" key="my_redis_key_x" onerror="myLocalFile.html" timeout="time.Duration" />
 <esi:include src="redis1" key="prefix_{host}_{HX-Whatever}" timeout="time.Duration" />
 ```
+
+### General ESI tag attribute handling
+
+Unrecognized attributes within an `<esi:include` will trigger a parse error. Protects you from fat fingers ;-)
+
+*ProTip:* To disable an attribute instead of removing it from the tag you can prepend it with an `x`.
+So `src="..."` will become `xsrc="..."`.
 
 ### Registered schemes or aliases in the src attribute
 
