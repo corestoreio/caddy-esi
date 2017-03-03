@@ -190,7 +190,7 @@ func (r *replacer) getSubstitution(key string) string {
 		dir, _ := path.Split(r.request.URL.Path)
 		return dir
 	}
-
+	// TODO: add RealIP from package helper
 	return r.emptyValue
 }
 
