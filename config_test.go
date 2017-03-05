@@ -128,7 +128,7 @@ func TestPathConfig_PageID(t *testing.T) {
 			r.Header.Set(helper.XClusterClientIP, "127.0.0.2")
 			return r
 		}(),
-		0x8b7d8dd0ed3fb96d, // hash of the byte slice of cluster client IP
+		0x11155771612facfc, // hash of the byte slice of cluster client IP
 	))
 	t.Run("scheme", runner(
 		[]string{"scheme"},

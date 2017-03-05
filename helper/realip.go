@@ -40,7 +40,7 @@ var ForwardedIPHeaders = headers{XForwarded, XForwardedFor, Forwarded, Forwarded
 
 type headers [7]string
 
-func (hs headers) findIP(r *http.Request) net.IP {
+func (hs headers) findIP(r *http.Request) string {
 	for _, h := range hs {
 		addresses := strings.Split(r.Header.Get(h), ",")
 		// march from right to left until we get a public address
@@ -62,21 +62,22 @@ func (hs headers) findIP(r *http.Request) net.IP {
 			}
 
 			if realIP != nil {
-				return realIP
+				return host
 			}
 		}
 	}
-	return nil
+	return ""
 }
 
 // RealIP extracts the remote address from a request and takes care of different
 // headers in which an IP address can be stored. Checks if the IP in one of the
-// header fields lies in net.PrivateIPRanges. Return value can be nil. A check for
-// the RealIP costs 8 allocs, for now.
-func RealIP(r *http.Request) net.IP {
+// header fields lies in net.PrivateIPRanges. Return value can be empty. A check
+// for the RealIP costs 8 allocs, for now. This implementation trusts the values
+// found in the forward headers.
+func RealIP(r *http.Request) string {
 	// Courtesy https://husobee.github.io/golang/ip-address/2015/12/17/remote-ip-go.html
 
-	if ip := ForwardedIPHeaders.findIP(r); ip != nil {
+	if ip := ForwardedIPHeaders.findIP(r); ip != "" {
 		return ip
 	}
 
@@ -84,7 +85,11 @@ func RealIP(r *http.Request) net.IP {
 	if err != nil {
 		host = r.RemoteAddr
 	}
-	return net.ParseIP(filterIP(host))
+	ip := net.ParseIP(filterIP(host))
+	if ip == nil {
+		return "" // otherwise output would be "<nil"
+	}
+	return ip.String() // validate correctly the IP address
 }
 
 func filterIP(ip string) string {

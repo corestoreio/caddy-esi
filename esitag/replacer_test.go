@@ -120,6 +120,7 @@ func TestReplace(t *testing.T) {
 	req.AddCookie(&http.Cookie{Name: "xtestKeks", Value: "xVal"})
 	req.Header.Set("Custom", "foobarbaz")
 	req.Header.Set("ShorterVal", "1")
+	req.Header.Set("Forwarded-For", "192.100.2.3")
 	repl := MakeReplacer(req, "-")
 	// add some headers after creating replacer
 	req.Header.Set("CustomAdd", "caddy")
@@ -163,6 +164,8 @@ func TestReplace(t *testing.T) {
 		{"Bad {host placeholder...", "Bad {host placeholder..."},
 		{"Bad {HCustom placeholder", "Bad {HCustom placeholder"},
 		{"Bad {HCustom placeholder {HShorterVal}", "Bad -"},
+
+		{"real ip {real_remote}", "real ip 192.0.2.1:1234"},
 	}
 
 	for _, c := range testCases {

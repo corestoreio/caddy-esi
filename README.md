@@ -438,6 +438,7 @@ The following string replacements are possible:
 - {fragment}
 - {proto}
 - {remote} IP address, might not be the real IP address
+- {real_remote} real IP address
 - {port}
 - {uri} the RequestURI
 - {uri_escaped} the RequestURI

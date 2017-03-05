@@ -255,7 +255,7 @@ func pageID(source []string, r *http.Request) (_ uint64, ok bool) {
 		case "remoteaddr":
 			_, _ = buf.WriteString(r.RemoteAddr)
 		case "realip":
-			_, _ = buf.Write(helper.RealIP(r))
+			_, _ = buf.WriteString(helper.RealIP(r))
 		case "scheme":
 			_, _ = buf.WriteString(r.URL.Scheme)
 		case "host":

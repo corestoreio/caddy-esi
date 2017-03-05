@@ -12,6 +12,8 @@ import (
 	"path"
 	"strings"
 	"time"
+
+	"github.com/SchumacherFM/caddyesi/helper"
 )
 
 // now mocked out for testing
@@ -174,6 +176,12 @@ func (r *replacer) getSubstitution(key string) string {
 			return r.emptyValue
 		}
 		return port
+	case "{real_remote}":
+		host, _, err := net.SplitHostPort(helper.RealIP(r.request))
+		if err != nil {
+			return r.request.RemoteAddr
+		}
+		return host
 	case "{uri}":
 		return r.request.URL.RequestURI()
 	case "{uri_escaped}":
@@ -190,7 +198,6 @@ func (r *replacer) getSubstitution(key string) string {
 		dir, _ := path.Split(r.request.URL.Path)
 		return dir
 	}
-	// TODO: add RealIP from package helper
 	return r.emptyValue
 }
 
