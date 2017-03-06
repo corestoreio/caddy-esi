@@ -82,26 +82,28 @@ func (b *bufferedWriter) WriteHeader(code int) {
 	}
 }
 
-// Write does not write to the client instead it writes in the underlying buffer.
+// Write does not write to the client instead it writes in the underlying
+// buffer.
 func (b *bufferedWriter) Write(p []byte) (int, error) {
-	if b.writeReal {
-		if !b.wroteHeader {
-			b.wroteHeader = true
-			if b.addContentLength != 0 {
-				const clName = "Content-Length"
-				clRaw := b.header.Get(clName)
-				cl, _ := strconv.Atoi(clRaw) // ignoring that err ... for now
-				b.header.Set(clName, strconv.Itoa(cl+b.addContentLength))
-			}
-
-			for k, v := range b.header {
-				b.rw.Header()[k] = v
-			}
-			b.rw.WriteHeader(b.code)
-		}
-		return b.rw.Write(p)
+	if !b.writeReal {
+		return b.buf.Write(p)
 	}
-	return b.buf.Write(p)
+
+	const clName = "Content-Length"
+	if !b.wroteHeader {
+		b.wroteHeader = true
+		if b.addContentLength != 0 {
+			clRaw := b.header.Get(clName)
+			cl, _ := strconv.Atoi(clRaw) // ignoring that err ... for now
+			b.header.Set(clName, strconv.Itoa(cl+b.addContentLength))
+		}
+
+		for k, v := range b.header {
+			b.rw.Header()[k] = v
+		}
+		b.rw.WriteHeader(b.code)
+	}
+	return b.rw.Write(p)
 }
 
 // bufferedFancyWriter is a writer that additionally satisfies
