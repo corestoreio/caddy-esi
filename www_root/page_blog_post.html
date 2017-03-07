@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en-US">
+<head>
+  <base href="//cyrillschumacher.com/">
+  <script type="text/javascript">
+ 
+(function(){var a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z,A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X=[].slice,Y={}.hasOwnProperty,Z=function(a,b){function c(){this.constructor=a}for(var d in b)Y.call(b,d)&&(a[d]=b[d]);return c.prototype=b.prototype,a.prototype=new c,a.__super__=b.prototype,a},$=[].indexOf||function(a){for(var b=0,c=this.length;c>b;b++)if(b in this&&this[b]===a)return b;return-1};for(u={catchupTime:100,initialRate:.03,minTime:250,ghostTime:100,maxProgressPerFrame:20,easeFactor:1.25,startOnPageLoad:!0,restartOnPushState:!0,restartOnRequestAfter:500,target:"body",elements:{checkInterval:100,selectors:["body"]},eventLag:{minSamples:10,sampleCount:3,lagThreshold:3},ajax:{trackMethods:["GET"],trackWebSockets:!0,ignoreURLs:[]}},C=function(){var a;return null!=(a="undefined"!=typeof performance&&null!==performance&&"function"==typeof performance.now?performance.now():void 0)?a:+new Date},E=window.requestAnimationFrame||window.mozRequestAnimationFrame||window.webkitRequestAnimationFrame||window.msRequestAnimationFrame,t=window.cancelAnimationFrame||window.mozCancelAnimationFrame,null==E&&(E=function(a){return setTimeout(a,50)},t=function(a){return clearTimeout(a)}),G=function(a){var b,c;return b=C(),(c=function(){var d;return d=C()-b,d>=33?(b=C(),a(d,function(){return E(c)})):setTimeout(c,33-d)})()},F=function(){var a,b,c;return c=arguments[0],b=arguments[1],a=3<=arguments.length?X.call(arguments,2):[],"function"==typeof c[b]?c[b].apply(c,a):c[b]},v=function(){var a,b,c,d,e,f,g;for(b=arguments[0],d=2<=arguments.length?X.call(arguments,1):[],f=0,g=d.length;g>f;f++)if(c=d[f])for(a in c)Y.call(c,a)&&(e=c[a],null!=b[a]&&"object"==typeof b[a]&&null!=e&&"object"==typeof e?v(b[a],e):b[a]=e);return b},q=function(a){var b,c,d,e,f;for(c=b=0,e=0,f=a.length;f>e;e++)d=a[e],c+=Math.abs(d),b++;return c/b},x=function(a,b){var c,d,e;if(null==a&&(a="options"),null==b&&(b=!0),e=document.querySelector("[data-pace-"+a+"]")){if(c=e.getAttribute("data-pace-"+a),!b)return c;try{return JSON.parse(c)}catch(f){return d=f,"undefined"!=typeof console&&null!==console?console.error("Error parsing inline pace options",d):void 0}}},g=function(){function a(){}return a.prototype.on=function(a,b,c,d){var e;return null==d&&(d=!1),null==this.bindings&&(this.bindings={}),null==(e=this.bindings)[a]&&(e[a]=[]),this.bindings[a].push({handler:b,ctx:c,once:d})},a.prototype.once=function(a,b,c){return this.on(a,b,c,!0)},a.prototype.off=function(a,b){var c,d,e;if(null!=(null!=(d=this.bindings)?d[a]:void 0)){if(null==b)return delete this.bindings[a];for(c=0,e=[];c<this.bindings[a].length;)e.push(this.bindings[a][c].handler===b?this.bindings[a].splice(c,1):c++);return e}},a.prototype.trigger=function(){var a,b,c,d,e,f,g,h,i;if(c=arguments[0],a=2<=arguments.length?X.call(arguments,1):[],null!=(g=this.bindings)?g[c]:void 0){for(e=0,i=[];e<this.bindings[c].length;)h=this.bindings[c][e],d=h.handler,b=h.ctx,f=h.once,d.apply(null!=b?b:this,a),i.push(f?this.bindings[c].splice(e,1):e++);return i}},a}(),j=window.Pace||{},window.Pace=j,v(j,g.prototype),D=j.options=v({},u,window.paceOptions,x()),U=["ajax","document","eventLag","elements"],Q=0,S=U.length;S>Q;Q++)K=U[Q],D[K]===!0&&(D[K]=u[K]);i=function(a){function b(){return V=b.__super__.constructor.apply(this,arguments)}return Z(b,a),b}(Error),b=function(){function a(){this.progress=0}return a.prototype.getElement=function(){var a;if(null==this.el){if(a=document.querySelector(D.target),!a)throw new i;this.el=document.createElement("div"),this.el.className="pace pace-active",document.body.className=document.body.className.replace(/pace-done/g,""),document.body.className+=" pace-running",this.el.innerHTML='<div class="pace-progress">\n  <div class="pace-progress-inner"></div>\n</div>\n<div class="pace-activity"></div>',null!=a.firstChild?a.insertBefore(this.el,a.firstChild):a.appendChild(this.el)}return this.el},a.prototype.finish=function(){var a;return a=this.getElement(),a.className=a.className.replace("pace-active",""),a.className+=" pace-inactive",document.body.className=document.body.className.replace("pace-running",""),document.body.className+=" pace-done"},a.prototype.update=function(a){return this.progress=a,this.render()},a.prototype.destroy=function(){try{this.getElement().parentNode.removeChild(this.getElement())}catch(a){i=a}return this.el=void 0},a.prototype.render=function(){var a,b,c,d,e,f,g;if(null==document.querySelector(D.target))return!1;for(a=this.getElement(),d="translate3d("+this.progress+"%, 0, 0)",g=["webkitTransform","msTransform","transform"],e=0,f=g.length;f>e;e++)b=g[e],a.children[0].style[b]=d;return(!this.lastRenderedProgress||this.lastRenderedProgress|0!==this.progress|0)&&(a.children[0].setAttribute("data-progress-text",""+(0|this.progress)+"%"),this.progress>=100?c="99":(c=this.progress<10?"0":"",c+=0|this.progress),a.children[0].setAttribute("data-progress",""+c)),this.lastRenderedProgress=this.progress},a.prototype.done=function(){return this.progress>=100},a}(),h=function(){function a(){this.bindings={}}return a.prototype.trigger=function(a,b){var c,d,e,f,g;if(null!=this.bindings[a]){for(f=this.bindings[a],g=[],d=0,e=f.length;e>d;d++)c=f[d],g.push(c.call(this,b));return g}},a.prototype.on=function(a,b){var c;return null==(c=this.bindings)[a]&&(c[a]=[]),this.bindings[a].push(b)},a}(),P=window.XMLHttpRequest,O=window.XDomainRequest,N=window.WebSocket,w=function(a,b){var c,d,e;e=[];for(d in b.prototype)try{e.push(null==a[d]&&"function"!=typeof b[d]?"function"==typeof Object.defineProperty?Object.defineProperty(a,d,{get:function(){return b.prototype[d]},configurable:!0,enumerable:!0}):a[d]=b.prototype[d]:void 0)}catch(f){c=f}return e},A=[],j.ignore=function(){var a,b,c;return b=arguments[0],a=2<=arguments.length?X.call(arguments,1):[],A.unshift("ignore"),c=b.apply(null,a),A.shift(),c},j.track=function(){var a,b,c;return b=arguments[0],a=2<=arguments.length?X.call(arguments,1):[],A.unshift("track"),c=b.apply(null,a),A.shift(),c},J=function(a){var b;if(null==a&&(a="GET"),"track"===A[0])return"force";if(!A.length&&D.ajax){if("socket"===a&&D.ajax.trackWebSockets)return!0;if(b=a.toUpperCase(),$.call(D.ajax.trackMethods,b)>=0)return!0}return!1},k=function(a){function b(){var a,c=this;b.__super__.constructor.apply(this,arguments),a=function(a){var b;return b=a.open,a.open=function(d,e){return J(d)&&c.trigger("request",{type:d,url:e,request:a}),b.apply(a,arguments)}},window.XMLHttpRequest=function(b){var c;return c=new P(b),a(c),c};try{w(window.XMLHttpRequest,P)}catch(d){}if(null!=O){window.XDomainRequest=function(){var b;return b=new O,a(b),b};try{w(window.XDomainRequest,O)}catch(d){}}if(null!=N&&D.ajax.trackWebSockets){window.WebSocket=function(a,b){var d;return d=null!=b?new N(a,b):new N(a),J("socket")&&c.trigger("request",{type:"socket",url:a,protocols:b,request:d}),d};try{w(window.WebSocket,N)}catch(d){}}}return Z(b,a),b}(h),R=null,y=function(){return null==R&&(R=new k),R},I=function(a){var b,c,d,e;for(e=D.ajax.ignoreURLs,c=0,d=e.length;d>c;c++)if(b=e[c],"string"==typeof b){if(-1!==a.indexOf(b))return!0}else if(b.test(a))return!0;return!1},y().on("request",function(b){var c,d,e,f,g;return f=b.type,e=b.request,g=b.url,I(g)?void 0:j.running||D.restartOnRequestAfter===!1&&"force"!==J(f)?void 0:(d=arguments,c=D.restartOnRequestAfter||0,"boolean"==typeof c&&(c=0),setTimeout(function(){var b,c,g,h,i,k;if(b="socket"===f?e.readyState<2:0<(h=e.readyState)&&4>h){for(j.restart(),i=j.sources,k=[],c=0,g=i.length;g>c;c++){if(K=i[c],K instanceof a){K.watch.apply(K,d);break}k.push(void 0)}return k}},c))}),a=function(){function a(){var a=this;this.elements=[],y().on("request",function(){return a.watch.apply(a,arguments)})}return a.prototype.watch=function(a){var b,c,d,e;return d=a.type,b=a.request,e=a.url,I(e)?void 0:(c="socket"===d?new n(b):new o(b),this.elements.push(c))},a}(),o=function(){function a(a){var b,c,d,e,f,g,h=this;if(this.progress=0,null!=window.ProgressEvent)for(c=null,a.addEventListener("progress",function(a){return h.progress=a.lengthComputable?100*a.loaded/a.total:h.progress+(100-h.progress)/2},!1),g=["load","abort","timeout","error"],d=0,e=g.length;e>d;d++)b=g[d],a.addEventListener(b,function(){return h.progress=100},!1);else f=a.onreadystatechange,a.onreadystatechange=function(){var b;return 0===(b=a.readyState)||4===b?h.progress=100:3===a.readyState&&(h.progress=50),"function"==typeof f?f.apply(null,arguments):void 0}}return a}(),n=function(){function a(a){var b,c,d,e,f=this;for(this.progress=0,e=["error","open"],c=0,d=e.length;d>c;c++)b=e[c],a.addEventListener(b,function(){return f.progress=100},!1)}return a}(),d=function(){function a(a){var b,c,d,f;for(null==a&&(a={}),this.elements=[],null==a.selectors&&(a.selectors=[]),f=a.selectors,c=0,d=f.length;d>c;c++)b=f[c],this.elements.push(new e(b))}return a}(),e=function(){function a(a){this.selector=a,this.progress=0,this.check()}return a.prototype.check=function(){var a=this;return document.querySelector(this.selector)?this.done():setTimeout(function(){return a.check()},D.elements.checkInterval)},a.prototype.done=function(){return this.progress=100},a}(),c=function(){function a(){var a,b,c=this;this.progress=null!=(b=this.states[document.readyState])?b:100,a=document.onreadystatechange,document.onreadystatechange=function(){return null!=c.states[document.readyState]&&(c.progress=c.states[document.readyState]),"function"==typeof a?a.apply(null,arguments):void 0}}return a.prototype.states={loading:0,interactive:50,complete:100},a}(),f=function(){function a(){var a,b,c,d,e,f=this;this.progress=0,a=0,e=[],d=0,c=C(),b=setInterval(function(){var g;return g=C()-c-50,c=C(),e.push(g),e.length>D.eventLag.sampleCount&&e.shift(),a=q(e),++d>=D.eventLag.minSamples&&a<D.eventLag.lagThreshold?(f.progress=100,clearInterval(b)):f.progress=100*(3/(a+3))},50)}return a}(),m=function(){function a(a){this.source=a,this.last=this.sinceLastUpdate=0,this.rate=D.initialRate,this.catchup=0,this.progress=this.lastProgress=0,null!=this.source&&(this.progress=F(this.source,"progress"))}return a.prototype.tick=function(a,b){var c;return null==b&&(b=F(this.source,"progress")),b>=100&&(this.done=!0),b===this.last?this.sinceLastUpdate+=a:(this.sinceLastUpdate&&(this.rate=(b-this.last)/this.sinceLastUpdate),this.catchup=(b-this.progress)/D.catchupTime,this.sinceLastUpdate=0,this.last=b),b>this.progress&&(this.progress+=this.catchup*a),c=1-Math.pow(this.progress/100,D.easeFactor),this.progress+=c*this.rate*a,this.progress=Math.min(this.lastProgress+D.maxProgressPerFrame,this.progress),this.progress=Math.max(0,this.progress),this.progress=Math.min(100,this.progress),this.lastProgress=this.progress,this.progress},a}(),L=null,H=null,r=null,M=null,p=null,s=null,j.running=!1,z=function(){return D.restartOnPushState?j.restart():void 0},null!=window.history.pushState&&(T=window.history.pushState,window.history.pushState=function(){return z(),T.apply(window.history,arguments)}),null!=window.history.replaceState&&(W=window.history.replaceState,window.history.replaceState=function(){return z(),W.apply(window.history,arguments)}),l={ajax:a,elements:d,document:c,eventLag:f},(B=function(){var a,c,d,e,f,g,h,i;for(j.sources=L=[],g=["ajax","elements","document","eventLag"],c=0,e=g.length;e>c;c++)a=g[c],D[a]!==!1&&L.push(new l[a](D[a]));for(i=null!=(h=D.extraSources)?h:[],d=0,f=i.length;f>d;d++)K=i[d],L.push(new K(D));return j.bar=r=new b,H=[],M=new m})(),j.stop=function(){return j.trigger("stop"),j.running=!1,r.destroy(),s=!0,null!=p&&("function"==typeof t&&t(p),p=null),B()},j.restart=function(){return j.trigger("restart"),j.stop(),j.start()},j.go=function(){var a;return j.running=!0,r.render(),a=C(),s=!1,p=G(function(b,c){var d,e,f,g,h,i,k,l,n,o,p,q,t,u,v,w;for(l=100-r.progress,e=p=0,f=!0,i=q=0,u=L.length;u>q;i=++q)for(K=L[i],o=null!=H[i]?H[i]:H[i]=[],h=null!=(w=K.elements)?w:[K],k=t=0,v=h.length;v>t;k=++t)g=h[k],n=null!=o[k]?o[k]:o[k]=new m(g),f&=n.done,n.done||(e++,p+=n.tick(b));return d=p/e,r.update(M.tick(b,d)),r.done()||f||s?(r.update(100),j.trigger("done"),setTimeout(function(){return r.finish(),j.running=!1,j.trigger("hide")},Math.max(D.ghostTime,Math.max(D.minTime-(C()-a),0)))):c()})},j.start=function(a){v(D,a),j.running=!0;try{r.render()}catch(b){i=b}return document.querySelector(".pace")?(j.trigger("start"),j.go()):setTimeout(j.start,50)},"function"==typeof define&&define.amd?define(["pace"],function(){return j}):"object"==typeof exports?module.exports=j:D.startOnPageLoad&&j.start()}).call(this);
+</script>
+<style type="text/css">
+   
+  .pace {
+    -webkit-pointer-events: none;
+    pointer-events: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+  }
+
+  .pace.pace-inactive .pace-progress {
+    display: none;
+  }
+
+  .pace .pace-progress {
+    position: fixed;
+    z-index: 2000;
+    top: 0;
+    right: 45%;
+    height: 5rem;
+    width: 5rem;
+  }
+
+  .pace .pace-progress:after {
+    display: block;
+    position: absolute;
+    top: 0;
+    right: .5rem;
+    content: attr(data-progress-text);
+    font-family: "Helvetica Neue", sans-serif;
+    font-weight: 100;
+    font-size: 5rem;
+    line-height: 1;
+    text-align: right;
+    color: rgba(229, 146, 42, 0.90);
+  }
+</style>
+
+  <title>Edge Side Includes with Caddy - Cyrill Schumacher&#39;s Blog</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="description" content="Edge Side Includes with Caddy">
+<meta name="author" content="Cyrill Schumacher">
+<meta name="publisher" content="Cyrill Schumacher">
+<meta name="generator" content="http://gohugo.io/"/>
+
+<meta itemprop="name" content="Cyrill Schumacher&#39;s Blog - Edge Side Includes with Caddy">
+<meta itemprop="description" content="Edge Side Includes with Caddy">
+<meta itemprop="image" content="//cyrillschumacher.com/wp-content/uploads/schumacher.png">
+
+<meta property="og:title" content="Edge Side Includes with Caddy - Cyrill Schumacher&#39;s Blog" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="//cyrillschumacher.com/projects/2017-03-04-edge-side-includes-with-caddy/" />
+<meta property="og:image" content="//cyrillschumacher.com/wp-content/uploads/schumacher.png" />
+<meta property="og:description" content="Edge Side Includes with Caddy" />
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:site" content="@SchumacherFM">
+<meta name="twitter:title" content="Edge Side Includes with Caddy - Cyrill Schumacher&#39;s Blog">
+<meta name="twitter:description" content="Edge Side Includes with Caddy">
+<meta name="twitter:creator" content="@SchumacherFM">
+<meta name="twitter:image" content="//cyrillschumacher.com/wp-content/uploads/schumacher.png">
+
+  <script>document.documentElement.className = document.documentElement.className.replace("no-js", "js");</script>
+  <link rel="canonical" href="//cyrillschumacher.com/projects/2017-03-04-edge-side-includes-with-caddy/">
+  <link rel='shortlink' href="//cyrillschumacher.com/projects/2017-03-04-edge-side-includes-with-caddy/"/>
+  <link rel="shortcut icon" href="//cyrillschumacher.com/wp-content/uploads/schumacher.png"/>
+  
+
+<link rel="stylesheet" id="human-style-css" href="wp-content/themes/hueman/style.css" type="text/css" media="all"/>
+<link rel="stylesheet" id="human-style-css2" href="wp-content/themes/hueman-child/style.css" type="text/css" media="all"/>
+<link rel="stylesheet" id="responsive-css" href="wp-content/themes/hueman/responsive.css" type="text/css" media="all"/>
+<link rel="stylesheet" id="font-awesome-css" href="wp-content/themes/hueman/fonts/font-awesome.min.css" type="text/css" media="all"/>
+<link rel="stylesheet" id="wp-youtube-lyte" href="wp-content/plugins/wp-youtube-lyte/lyte/lyte.css" type="text/css" media="all"/>
+<link rel="stylesheet" id="hubinfo" href="assets/js/hubinfo.css" type="text/css" media="all"/>
+<link rel="stylesheet" id="highlight" href="assets/highlight/styles/github.css" type="text/css" media="all"/>
+<link rel="stylesheet" id="human-style-css3" href="wp-content/themes/hueman-child/user.css" type="text/css" media="all"/>
+
+
+</head>
+
+<body class="single single-post single-format-standard col-3cm full-width topbar-enabled chrome">
+<div id="wrapper">
+  <header id="header">
+
+  <nav class="nav-container group" id="nav-topbar">
+    <div class="nav-toggle"><i class="fa fa-bars"></i></div>
+    <div class="nav-text"></div>
+    <div class="nav-wrap container">
+      <a href="//cyrillschumacher.com/" class="nav-cs-icon">
+        <img width="40" height="40" src="wp-content/uploads/schumacher.png" alt="schumacherfm" title="Home">
+      </a>
+      <ul id="menu-default-menu" class="nav container-inner group">
+        
+        <li class="menu-item menu-item-type-post_type menu-item-object-page">
+          <a href="categories/thoughts">Thoughts</a>
+        </li>
+        
+        <li class="menu-item menu-item-type-post_type menu-item-object-page">
+          <a href="categories/projects">Projects</a>
+        </li>
+        
+        <li class="menu-item menu-item-type-post_type menu-item-object-page">
+          <a href="categories/imprint">Imprint</a>
+        </li>
+        
+        <li class="menu-item menu-item-type-post_type menu-item-text">
+          eBusiness | Magento Go JavaScript | Cyrill at Schumacher dot fm
+        </li>
+      </ul>
+    </div>
+
+    <div class="container">
+      <div class="container-inner">
+        <div class="toggle-search"><i class="fa fa-search"></i></div>
+        <div class="search-expand">
+          <div class="search-expand-inner">
+            <form method="get" class="searchform themeform" action="https://www.google.com/search">
+              <div>
+                <input type="text" class="search" name="q" placeholder="Press enter to start searching">
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+    
+
+  </nav>
+  
+
+  <div class="container group">
+    <div class="container-inner">
+
+      <div class="group pad">
+
+        <div class="group pad">
+          <h1 class="site-title">
+            <a href="//cyrillschumacher.com/" rel="home">
+              <img class="home-icon" width="50" height="50" src="wp-content/uploads/schumacher.png" alt="schumacherfm" title="Home">
+              Cyrill Schumacher&#39;s Blog
+            </a>
+          </h1>
+
+          
+          
+          
+        </div>
+
+      </div>
+    </div>
+    
+  </div>
+  
+
+</header>
+
+
+
+  <div class="container" id="page">
+    <div class="container-inner">
+      <div class="main">
+        <div class="main-inner group">
+          <section class="content">
+            <div class="page-title pad group">
+              <ul class="meta-single group">
+                
+                <li class="category">
+                  <a href="categories/projects" rel="category tag">Projects</a>
+                </li>
+                
+              </ul>
+            </div>
+
+            <div class="pad group">
+
+              <article
+                  class="post type-post status-publish format-standard has-post-thumbnail hentry category-australien tag-bondi-beach tag-city2surf tag-sydney">
+                <div class="post-inner group">
+
+                  <h1 class="post-title">Edge Side Includes with Caddy</h1>
+
+                  <p class="post-byline">
+                    by cyrill · 4 March 2017 · 937 Words ·
+                    ~5min reading time |
+                    <a href="https://github.com/SchumacherFM/blog-cs/blob/master/content/projects/2017-03-04-edge-side-includes-with-caddy.md"
+                       target="_blank">Improve on <i class="fa fa-github"></i></a>
+                  </p>
+
+                  <div class="clear"></div>
+
+                  <div class="entry">
+                    <div class="entry-inner">
+                      
+                      
+
+<p>Introduction of a middleware for the <a href="https://caddyserver.com/" target="_blank">Caddy web server</a>
+to handle Edge Side Includes (ESI) tags. ESI tags are use to query backend
+(micro) services. This middleware (CaddyESI) supports Redis, Memcache,
+HTTP/HTTPS, HTTP2, shell scripts and gRPC (Protocol buffers).</p>
+
+<h3>Latest commit and statistics from GitHub:</h3>
+<div class="hubinfo" data-u="SchumacherFM" data-r="caddyesi" data-c="5"></div>
+
+
+<p>ESI tags are used to fetch content from a backend resource and inject that
+content into the returned page to be displayed in a e.g. browser. ESI tags
+limits itself not to HTML only, you can include them into all text formats.</p>
+
+<p><strong>Warning:</strong> Project still in beta phase and to enable more backend resources
+(besides HTTP) you need to buy a monthly recurring Enterprise maintenance
+support (Coming soon!)</p>
+
+<p>This blog post and the GitHub might get moved to a different location.</p>
+
+<h2 id="architectural-overview">Architectural overview</h2>
+
+<p><a href="//cyrillschumacher.com/posts/esi/caddy-esi-archi.png"><img src="//cyrillschumacher.com/posts/esi/caddy-esi-archi.png" alt="Architectural overview" /></a></p>
+
+<p>As the above sequence diagram shows, the output of the initial byte starts only
+then, when all data from the backend resources has been received. This enables
+us to calculate the correct <code>Content-Length</code> header and also allows to return
+headers from the backend to the client. So <a href="https://en.wikipedia.org/wiki/Time_To_First_Byte" target="_blank">time to first byte &quot;TTFB&quot;</a>
+depends on the slowest backend resource.</p>
+
+<p>Future versions of CaddyESI provides the additional option of enabling
+<code>Transfer-Encoding: chunked</code> to start immediately the output and then waiting
+for all backend resources when the first ESI tag occurs in the page.</p>
+
+<h2 id="features">Features</h2>
+
+<ul>
+<li>Query data from HTTP, HTTPS, HTTP2, <a href="http://www.grpc.io" target="_blank">gRPC</a>, Redis, Memcache and soon SQL and fCGI.</li>
+<li>Multiple incoming requests trigger only one single parsing of the ESI tags per page</li>
+<li>Querying multiple backend server parallel and concurrent.</li>
+<li>Coalesce multiple incoming requests into one single request to a backend server</li>
+<li>Forwarding and returning (todo) of HTTP headers from backend servers</li>
+<li>Query multiple backend servers sequentially as a fall back mechanism</li>
+<li>Query multiple backend servers parallel and use the first returned result and
+discard other responses, an obvious race condition. (todo)</li>
+<li>Support for NoSQL Server to query a key and simply display its value</li>
+<li>Variables support based on Server, Cookie, Header or GET/POST form parameters</li>
+<li>Error handling and fail over. Either display a text from a string or a static
+file content when a backend server is unavailable.</li>
+<li>If an HTTP/S backend request takes longer than the specified timeout, flip the
+source URL into an XHR request or an HTTP2 push. (todo)</li>
+<li>No full ESI support, if desired use a scripting language ;-)</li>
+</ul>
+
+<p>More details how officially <a href="https://en.wikipedia.org/wiki/Edge_Side_Includes">Edge Side Includes</a> are defined.</p>
+
+<p>The middleware CaddyESI implements only the <code>&lt;esi:include /&gt;</code> tag with different
+features and interpretations.</p>
+
+<h2 id="example">Example</h2>
+
+<p>The following ESI tag has been implemented into this markdown document:</p>
+
+<pre><code>&lt;esi_COLON_include src=&quot;grpcServerDemo&quot; printdebug=&quot;1&quot; key=&quot;session_{Fsession}&quot; 
+forwardheaders=&quot;all&quot; timeout=&quot;4ms&quot; onerror=&quot;Demo gRPC server unavailable :-(&quot;/&gt;
+</code></pre>
+
+<p>Short explanation for the tag above:</p>
+
+<ul>
+<li><code>grpcServerDemo</code> is an alias stored in the resources file, which is not web accessible because it can contain sensitive data.</li>
+<li><code>printdebug</code> prints duration, possible error messages and the parsed tag. You should only enable it during development.</li>
+<li><code>session_{Fsession}</code> the uppercase <code>F</code> declares that the variable <code>session</code> can be found in the form, either GET or POST/PATCH/PUT.</li>
+<li><code>forwardheaders</code> forwards all headers from your browser to the micro service. You can define specific headers only.</li>
+<li><code>timeout</code> if the gRPC service takes longer than those <code>4ms</code> the error message in <code>onerror</code> gets displayed.</li>
+</ul>
+
+<p>The content of the resources file looks:</p>
+
+<pre><code class="language-xml">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot; standalone=&quot;yes&quot;?&gt;
+&lt;items&gt;
+    &lt;item&gt;
+        &lt;alias&gt;grpcServerDemo&lt;/alias&gt;
+        &lt;url&gt;&lt;![CDATA[grpc://127.0.0.1:42042]]&gt;&lt;/url&gt;
+    &lt;/item&gt;
+&lt;/items&gt;
+</code></pre>
+
+<p>The following form enables you to create different session counters:</p>
+
+<form method="GET" action="/projects/2017-03-04-edge-side-includes-with-caddy/">
+<label for="session">Session Name (8-128 characters)</label>
+<input id="session" name="session" value="" maxlength="128" minlength="8">
+<button type="submit">Submit</button>
+</form>
+
+<p><esi:include src="grpcServerDemo" printdebug="1" key="session_{Fsession}" forwardheaders="all" timeout="4ms" onerror="Demo gRPC server unavailable :-("/></p>
+
+<p>Now open the Web Inspector panel and search for HTML comment of the <code>printdebug</code> output.</p>
+
+<p><a href="https://github.com/SchumacherFM/caddyesi/blob/master/esitag/backend/grpc_server_main_demo.go" target="_blank">Click here</a> to discover the source for the gRPC server</p>
+
+<h2 id="documentation">Documentation</h2>
+
+<p>Please switch to the <a href="https://github.com/SchumacherFM/caddyesi/blob/master/README.md#plugin-configuration-optional">README.md</a> in the GitHub source code.</p>
+
+<h2 id="json-example">JSON Example</h2>
+
+<p>Redis feature not enabled by default.</p>
+
+<p>Lets say you want to output music stations as a JSON object. First we&rsquo;re
+configuration the backend resource alias &ldquo;myRedis&rdquo;. The URL to the Redis server
+gets stored in the resource configuration file (see Caddyfile). Second we&rsquo;re
+adding the ESI tags to the main JSON array, defining the src and each key points
+to a key in the Redis server. The value of each key contains a valid JSON
+object. Once the page gets requested from the e.g. browser the CaddyESI
+middleware will query in parallel Redis and insert the value into the main JSON
+array. As Redis is single threaded you can define additional Redis sources to
+gain even more performance. Finally you only need to write a program to insert
+the keys and values into Redis.</p>
+
+<pre><code class="language-json">[
+  &lt;esi:include src=&quot;myRedis&quot; key=&quot;station/best_of_80s&quot; /&gt;,
+  &lt;esi:include src=&quot;myRedis&quot; key=&quot;station/herrmerktradio&quot; /&gt;,
+  &lt;esi:include src=&quot;myRedis&quot; key=&quot;station/bluesclub&quot; /&gt;,
+  &lt;esi:include src=&quot;myRedis&quot; key=&quot;station/jazzloft&quot; /&gt;,
+  &lt;esi:include src=&quot;myRedis&quot; key=&quot;station/jahfari&quot; /&gt;,
+  &lt;esi:include src=&quot;myRedis&quot; key=&quot;station/maximix&quot; /&gt;,
+  &lt;esi:include src=&quot;myRedis&quot; key=&quot;station/ondalatina&quot; /&gt;,
+  &lt;esi:include src=&quot;myRedis&quot; key=&quot;station/deepgroove&quot; /&gt;,
+  &lt;esi:include src=&quot;myRedis&quot; key=&quot;station/germanyfm&quot; /&gt;,
+  &lt;esi:include src=&quot;myRedis&quot; key=&quot;station/alternativeworld&quot; /&gt;
+]
+</code></pre>
+
+<h2 id="similar-technologies">Similar technologies</h2>
+
+<h4 id="varnish-esi-tags">Varnish ESI Tags</h4>
+
+<p>Correct me if I&rsquo;m wrong:</p>
+
+<ul>
+<li>No HTTP2 support</li>
+<li>No HTTPS support</li>
+<li>Sequential processing of all ESI tags</li>
+<li>Nearly full support of the ESI tag specification</li>
+</ul>
+
+<p><a href="http://stackoverflow.com/questions/5960598/varnish-and-esi-how-is-the-performance" target="_blank">Stack Overflow: Varnish and ESI, how is the performance?</a></p>
+
+<p>CaddyESI solves this problem: <a href="http://serverfault.com/questions/737229/varnish-esi-streaming-response-is-it-possible-not-to-stream-the-response" target="_blank">Varnish ESI Streaming Response - Is it possible NOT to stream the response</a></p>
+
+<p>CaddyESI solves this problem: <a href="http://www.eschrade.com/page/magento-esi-varnish-and-performance/" target="_blank">ESchrade - Kevin Schroeder - MAGENTO, ESI, VARNISH AND PERFORMANCE</a></p>
+
+<h4 id="bigpipe">BigPipe</h4>
+
+<p><a href="https://www.facebook.com/notes/facebook-engineering/bigpipe-pipelining-web-pages-for-high-performance/389414033919" target="_blank">Invented at Facebook BigPipe</a></p>
+
+<p><a href="https://www.drupal.org/docs/8/core/modules/bigpipe/overview" target="_blank">Drupal BigPipe Overview</a></p>
+
+<p>How it works</p>
+
+<ol>
+<li>During rendering, the personalized parts are turned into placeholders.</li>
+<li>By default, Drupal 8 uses the Single Flush strategy (aka &ldquo;traditional&rdquo;) for replacing the placeholders. i.e. we don&rsquo;t send a response until we&rsquo;ve replaced all placeholders.</li>
+<li>The BigPipe module introduces a new strategy, that allows us to flush the initial page first, and then stream the replacements for the placeholders.</li>
+<li>This results in hugely improved front-end/perceived performance (watch the 40-second screencast above).</li>
+</ol>
+
+<h2 id="download-caddy-server-incl-esi-support">Download Caddy server incl. ESI support</h2>
+
+<p>TODO ;-)</p>
+
+                      
+                    </div>
+                    <div class="clear"></div>
+                  </div>
+                  
+
+                </div>
+                
+              </article>
+              
+
+              <div class="clear"></div>
+
+              <p class="post-tags">
+                <span>Tags:</span>
+                
+                <a rel="tag" href="//cyrillschumacher.com/tags/golang">GoLang</a>
+                
+                <a rel="tag" href="//cyrillschumacher.com/tags/edgesideincludes">EdgeSideIncludes</a>
+                
+                <a rel="tag" href="//cyrillschumacher.com/tags/caddy">Caddy</a>
+                
+                <a rel="tag" href="//cyrillschumacher.com/tags/caddyesi">CaddyESI</a>
+                
+                <a rel="tag" href="//cyrillschumacher.com/tags/microservices">MicroServices</a>
+                
+              </p>
+
+              <h4 class="heading">
+  <i class="fa fa-hand-o-right"></i>Related posts</h4>
+
+    <ul class="related-posts group">
+    
+    
+    
+        
+        
+        
+    
+        
+        
+        
+    
+        
+        
+        
+    
+        
+        
+        
+    
+        
+        
+        
+    
+    </ul>
+
+
+
+              <section id="comments" class="themeform">
+  <div id="disqus_thread"></div>
+<script type="text/javascript">
+    var disqus_shortname = 'cyrillschumacher';
+    var disqus_identifier = '\/2017\/03\/04\/caddyesi\/';
+    var disqus_title = 'Edge Side Includes with Caddy';
+    var disqus_url = '\/\/cyrillschumacher.com\/projects\/2017-03-04-edge-side-includes-with-caddy\/';
+
+    (function() {
+        var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+        dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+        (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+<a href="http://disqus.com" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</section>
+
+
+              
+            </div>
+
+
+          </section>
+          <div class="sidebar s1">
+
+  <a class="sidebar-toggle" title="Expand Sidebar"><i class="fa icon-sidebar-toggle"></i></a>
+
+  <div class="sidebar-content">
+
+    <div class="sidebar-top group">
+      <p>Follow:</p>
+      <ul class="social-links">
+  
+  
+  
+  
+  
+
+  <li>
+    <a class="social-tooltip" title="Write me a PGP encrypted email!"
+       href="wp-content/contactModal.html" id="contactModal" rel="modal:open">
+      <i class="fa fa-envelope-o"></i>
+    </a>
+  </li>
+  <li>
+    <a class="social-tooltip" title="Keybase.io"
+       href="https://keybase.io/cyrill" target="_blank">
+      <i class="fa fa-key"></i>
+    </a>
+  </li>
+  <li>
+    <a class="social-tooltip" title="On Twitter"
+       href="https://twitter.com/SchumacherFM" target="_blank">
+      <i class="fa fa-twitter"></i>
+    </a>
+  </li>
+  <li>
+    <a class="social-tooltip" title="On GitHub"
+       href="https://github.com/SchumacherFM" target="_blank">
+      <i class="fa fa-github"></i>
+    </a>
+  </li>
+  <li>
+    <a class="social-tooltip" title="On Flickr"
+       href="https://www.flickr.com/photos/kiri-wt/" target="_blank">
+      <i class="fa fa-flickr"></i>
+    </a>
+  </li>
+  <li>
+    <a class="social-tooltip" title="On LinkedIn"
+       href="https://www.linkedin.com/in/cyrillschumacher" target="_blank">
+      <i class="fa fa-linkedin-square"></i>
+    </a>
+  </li>
+  <li>
+    <a class="social-tooltip" title="On Google+" rel="publisher"
+       href="https://plus.google.com/+CyrillSchumacher/posts" target="_blank">
+      <i class="fa fa-google-plus-square"></i>
+    </a>
+    <a href="https://plus.google.com/109344723659834198041" ></a>
+  </li>
+</ul>
+    </div>
+
+    <ul class="post-nav group">
+      <li class="next">
+        
+        <a href="//cyrillschumacher.com/magento-2.2-list-of-all-dispatched-events/" rel="next">
+          <i class="fa fa-chevron-right"></i>
+          <strong>Next post</strong>
+          <span>Magento 2.2 - List of all dispatched events</span>
+        </a>
+        
+      </li>
+      <li class="previous">
+        
+      </li>
+    </ul>
+
+    <div class="widget widget_recent_entries sidebarLeft"><h3>Last Posts</h3>
+      <ul>
+        
+        <li><a href="//cyrillschumacher.com/projects/2017-03-04-edge-side-includes-with-caddy/">Edge Side Includes with Caddy</a></li>
+        
+        <li><a href="//cyrillschumacher.com/magento-2.2-list-of-all-dispatched-events/">Magento 2.2 - List of all dispatched events</a></li>
+        
+        <li><a href="//cyrillschumacher.com/2016/12/12/avoiding-duplicate-content-in-magentos-eav-model/">Avoiding duplicate content in Magento&#39;s EAV model</a></li>
+        
+        <li><a href="//cyrillschumacher.com/magento-2.1-list-of-all-dispatched-events/">Magento 2.1 - List of all dispatched events</a></li>
+        
+        <li><a href="//cyrillschumacher.com/2016/04/15/magento2-sloc---single-lines-of-code/">Magento2: SLOC - Single Lines of Code</a></li>
+        
+      </ul>
+    </div>
+
+    <div id="search-2" class="widget widget_search"><h3>Search</h3>
+
+      <form method="get" class="searchform themeform" action="https://www.google.com/search">
+        <div>
+          <input type="text" class="search" name="q" placeholder="Press enter to start searching">
+        </div>
+      </form>
+    </div>
+
+  </div>
+  
+</div>
+
+          <div class="sidebar s2">
+
+  <a class="sidebar-toggle" title="Expand Sidebar"><i class="fa icon-sidebar-toggle"></i></a>
+
+  <div class="sidebar-content">
+
+    <div class="sidebar-top group">
+      <p>More</p>
+    </div>
+
+
+    <div id="categories-2" class="widget widget_categories"><h3>Categories</h3>
+      <ul>
+        
+          <li class="cat-item cat-item-1">
+            <a href="categories/thoughts/">Thoughts</a>
+          </li>
+        
+          <li class="cat-item cat-item-1">
+            <a href="categories/projects/">Projects</a>
+          </li>
+        
+          <li class="cat-item cat-item-1">
+            <a href="categories/imprint/">Imprint</a>
+          </li>
+        
+      </ul>
+    </div>
+
+    <div id="tag_cloud-2" class="widget widget_tag_cloud"><h3>Tags</h3>
+
+      <div class="tagcloud">
+        <p class="post-tags">
+          
+              
+                <a rel="tag" href="tags/golang/">GoLang</a>
+              
+                <a rel="tag" href="tags/edgesideincludes/">EdgeSideIncludes</a>
+              
+                <a rel="tag" href="tags/caddy/">Caddy</a>
+              
+                <a rel="tag" href="tags/caddyesi/">CaddyESI</a>
+              
+                <a rel="tag" href="tags/microservices/">MicroServices</a>
+              
+            
+        </p>
+      </div>
+    </div>
+
+    <div class="widget widget_recent_entries sidebarLeftCategories"><h3>Last 5 GitHub Commits for this blog</h3>
+      <ul>
+        
+        
+            <li>
+              <a href="https://github.com/SchumacherFM/blog-cs/commit/1e2fb949c499cfbd3a0dfd693b104f2bfd206eee" target="_blank">
+                  2017-02-23T07:42:46Z<br>
+                  Update presentation for Go Meetup 23rd Feb 2017
+              </a>
+            </li>
+        
+            <li>
+              <a href="https://github.com/SchumacherFM/blog-cs/commit/303cf021442a5f948766a9f20ab41aba26cf7dc8" target="_blank">
+                  2017-02-12T18:40:37Z<br>
+                  Add presentation for Go Meetup 23rd Feb 2017
+              </a>
+            </li>
+        
+            <li>
+              <a href="https://github.com/SchumacherFM/blog-cs/commit/06e9f64e9b2b04abc1b137d6b67870ffc9761d93" target="_blank">
+                  2016-12-14T19:10:04Z<br>
+                  Fix wording in post and github starred post retrieves more pages
+              </a>
+            </li>
+        
+            <li>
+              <a href="https://github.com/SchumacherFM/blog-cs/commit/0d383db67d9f15f149687e60ff89382054e87d7a" target="_blank">
+                  2016-12-13T20:02:10Z<br>
+                  Finish blog post: Avoiding duplicate content in Magento&#39;s EAV model
+              </a>
+            </li>
+        
+            <li>
+              <a href="https://github.com/SchumacherFM/blog-cs/commit/4d6045c136c2b050dcf1d9ee4826e7da89f72958" target="_blank">
+                  2016-12-12T07:28:43Z<br>
+                  Add draft of blog post: Avoiding duplicate content in Magento&#39;s EAV model
+              </a>
+            </li>
+        
+      </ul>
+    </div>
+
+
+  </div>
+  
+</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <footer id="footer">
+
+  <nav class="nav-container group" id="nav-footer">
+    <div class="nav-toggle"><i class="fa fa-bars"></i></div>
+    <div class="nav-text"></div>
+    <div class="nav-wrap">
+      <ul id="menu-default-menu-1" class="nav container group">
+        
+        <li class="menu-item menu-item-type-post_type menu-item-object-page">
+          <a href="categories/thoughts">Thoughts</a>
+        </li>
+        
+        <li class="menu-item menu-item-type-post_type menu-item-object-page">
+          <a href="categories/projects">Projects</a>
+        </li>
+        
+        <li class="menu-item menu-item-type-post_type menu-item-object-page">
+          <a href="categories/imprint">Imprint</a>
+        </li>
+        
+      </ul>
+    </div>
+  </nav>
+  
+
+  <section class="container" id="footer-bottom">
+    <div class="container-inner">
+
+      <a id="back-to-top" href="#"><i class="fa fa-angle-up"></i></a>
+
+      <div class="pad group">
+
+        <div class="grid one-half">
+
+          <img id="footer-logo" src="wp-content/uploads/schumacher.png" alt="logo">
+
+          <div id="copyright">
+            <p>Cyrill Schumacher © 2014-2016. All Rights Reserved. <br>Powered by
+              <a href="http://gohugo.io/" target="_blank">Hugo - the static site generator</a>.
+              <a href="https://caddyserver.com/" target="_blank">Caddy - The HTTP/2 web server</a>.
+              <a href="http://golang.org" target="_blank">#golang</a>.
+            </p>
+          </div>
+          
+
+        </div>
+        
+
+        <div class="grid one-half last">
+          <ul class="social-links">
+  
+  
+  
+  
+  
+
+  <li>
+    <a class="social-tooltip" title="Write me a PGP encrypted email!"
+       href="wp-content/contactModal.html" id="contactModal" rel="modal:open">
+      <i class="fa fa-envelope-o"></i>
+    </a>
+  </li>
+  <li>
+    <a class="social-tooltip" title="Keybase.io"
+       href="https://keybase.io/cyrill" target="_blank">
+      <i class="fa fa-key"></i>
+    </a>
+  </li>
+  <li>
+    <a class="social-tooltip" title="On Twitter"
+       href="https://twitter.com/SchumacherFM" target="_blank">
+      <i class="fa fa-twitter"></i>
+    </a>
+  </li>
+  <li>
+    <a class="social-tooltip" title="On GitHub"
+       href="https://github.com/SchumacherFM" target="_blank">
+      <i class="fa fa-github"></i>
+    </a>
+  </li>
+  <li>
+    <a class="social-tooltip" title="On Flickr"
+       href="https://www.flickr.com/photos/kiri-wt/" target="_blank">
+      <i class="fa fa-flickr"></i>
+    </a>
+  </li>
+  <li>
+    <a class="social-tooltip" title="On LinkedIn"
+       href="https://www.linkedin.com/in/cyrillschumacher" target="_blank">
+      <i class="fa fa-linkedin-square"></i>
+    </a>
+  </li>
+  <li>
+    <a class="social-tooltip" title="On Google+" rel="publisher"
+       href="https://plus.google.com/+CyrillSchumacher/posts" target="_blank">
+      <i class="fa fa-google-plus-square"></i>
+    </a>
+    <a href="https://plus.google.com/109344723659834198041" ></a>
+  </li>
+</ul>
+        </div>
+      </div>
+
+    </div>
+    
+  </section>
+  
+
+</footer>
+
+</div>
+<script type="text/javascript">
+  var _paq = _paq || [];_paq.push([ 'trackPageView' ]);_paq.push([ 'enableLinkTracking' ]);
+  (function() {
+    var u = (("https:" == document.location.protocol) ? "https" : "http") + "://cyrillschumacher.com/piwik/";
+    _paq.push([ 'setTrackerUrl', u + 'js/' ]);_paq.push([ 'setSiteId', 5 ]);
+    var d = document, g = d.createElement('script'), s = d.getElementsByTagName('script')[ 0 ];
+    g.type = 'text/javascript';g.defer = true;g.async = true;g.src = u + 'js/';s.parentNode.insertBefore(g, s);
+  })();
+  var bU = "\/\/cyrillschumacher.com\/wp-content/plugins/wp-youtube-lyte/lyte/";
+</script>
+<noscript><p><img src="http://cyrillschumacher.com/piwik/js/?idsite=5" style="border:0;" alt=""/></p></noscript>
+
+
+
+<script type="text/javascript" async defer src="assets/js/all.min.js"></script>
+
+
+
+
+
+</body>
+</html>
