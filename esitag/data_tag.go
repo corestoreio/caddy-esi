@@ -39,31 +39,67 @@ func (dt DataTag) String() string {
 }
 
 // DataTags a list of tags with their position within a page and the content
-type DataTags []DataTag
+type DataTags struct {
+	Slice []DataTag
+
+	//mu sync.RWMutex // TODO maybe remove the lock but first check for races
+	// streamPos: first call to InjectContent and the streamPos equals 0
+	// because we're at the beginning of the stream. the next call to
+	// InjectContent and streamPos gets incremented by the length of the
+	// previous data in the Reader. DataTags.InjectContent does not know it gets
+	// called multiple times and hence it can inject the Tag tag data in
+	// subsequent calls. So streamPos protects recurring replacements.
+	streamPos int
+}
+
+// NewDataTags creates a new DataTags slice
+func NewDataTags(dts ...DataTag) *DataTags {
+	return &DataTags{
+		Slice: dts,
+	}
+}
+
+// NewDataTagsCapped creates a new object with a DataTag slice and its maximum
+// capacity.
+func NewDataTagsCapped(cap int) *DataTags {
+	return &DataTags{
+		Slice: make([]DataTag, 0, cap),
+	}
+}
+
+//func (dts *DataTags) skipInject(current int) bool {
+//	//dts.mu.RLock()
+//	isAfter := dts.streamPos > 0 && current > dts.streamPos
+//	//dts.mu.RUnlock()
+//	return isAfter
+//}
+//
+//func (dts *DataTags) incrementLastPost(p int) {
+//	//dts.mu.Lock()
+//	dts.streamPos += p
+//	//dts.mu.Unlock()
+//}
+//
+//func (dts *DataTags) getLastPost() (p int) {
+//	//dts.mu.Lock()
+//	p = dts.streamPos
+//	//dts.mu.Unlock()
+//	return
+//}
 
 // InjectContent reads from r and uses the data in a Tag to get injected a the
 // current position and then writes the output to w. DataTags must be a sorted
 // slice. Usually this function receives the data from Entities.QueryResources()
-func (dts DataTags) InjectContent(r io.Reader, w io.Writer, lastStreamPos int) (nRead, nWritten int, _ error) {
-	//if len(dts) == 0 {
-	//	println("dts is empty")
-	//	return 0, 0, nil
-	//}
-
-	// lastStreamPos: first call to InjectContent and the lastStreamPos equals 0
-	// because we're at the beginning of the stream. the next call to
-	// InjectContent and lastStreamPos gets incremented by the length of the
-	// previous data in the Reader. DataTags.InjectContent does not know it gets
-	// called multiple times and hence it can inject the Tag tag data in
-	// subsequent calls. So lastStreamPos protects recurring replacements.
-	// TODO(CyS) implement lastStreamPos
+func (dts *DataTags) InjectContent(r io.Reader, w io.Writer) (nRead, nWritten int, _ error) {
+	const writeErr = "[esitag] DataTags.InjectContent: Failed to write middleware data to writer: %q for tag index %d with start position %d and end position %d"
 
 	dataBuf := bufpool.Get()
 	defer bufpool.Put(dataBuf)
 	data := dataBuf.Bytes()
 
 	var prevBufDataSize int
-	for di, dt := range dts {
+	for di, dt := range dts.Slice {
+
 		bufDataSize := dt.End - prevBufDataSize
 
 		if cap(data) < bufDataSize {
@@ -76,19 +112,34 @@ func (dts DataTags) InjectContent(r io.Reader, w io.Writer, lastStreamPos int) (
 		if err != nil && err != io.EOF {
 			return nRead, nWritten, errors.NewReadFailedf("[esitag] DataTags.InjectContent: Read failed: %q for tag index %d with start position %d and end position %d", err, di, dt.Start, dt.End)
 		}
+		data = data[:n]
+		dts.streamPos += n
+
+		skipInsertion := dt.Start > dts.streamPos || dt.End < dts.streamPos
+		fmt.Printf("2:Stream Pos:%d Read:%d Start:%d End:%d skipInsertion:%t => %q\n", dts.streamPos, n, dt.Start, dt.End, skipInsertion, data)
+
+		if skipInsertion {
+			// we have not yet reached our position. so write the data to client and continue.
+			wn, errW := w.Write(data)
+			nWritten += wn
+			if errW != nil {
+				return nRead, nWritten, errors.NewWriteFailedf(writeErr, errW, di, dt.Start, dt.End)
+			}
+			continue
+		}
 
 		if n > 0 {
 			esiStartPos := n - (dt.End - dt.Start)
 			wn, errW := w.Write(data[:esiStartPos])
 			nWritten += wn
 			if errW != nil {
-				return nRead, nWritten, errors.NewWriteFailedf("[esitag] DataTags.InjectContent: Failed to write middleware data to writer: %q for tag index %d with start position %d and end position %d", errW, di, dt.Start, dt.End)
+				return nRead, nWritten, errors.NewWriteFailedf(writeErr, errW, di, dt.Start, dt.End)
 			}
 
 			wn, errW = w.Write(dt.Data)
 			nWritten += wn
 			if errW != nil {
-				return nRead, nWritten, errors.NewWriteFailedf("[esitag] DataTags.InjectContent: Failed to write resource backend data to writer: %q for tag index %d with start position %d and end position %d", errW, di, dt.Start, dt.End)
+				return nRead, nWritten, errors.NewWriteFailedf(writeErr, errW, di, dt.Start, dt.End)
 			}
 		}
 		prevBufDataSize = dt.End
@@ -121,8 +172,8 @@ func (dts DataTags) InjectContent(r io.Reader, w io.Writer, lastStreamPos int) (
 }
 
 // DataLen returns the total length of all data fields in bytes.
-func (dts DataTags) DataLen() (l int) {
-	for _, dt := range dts {
+func (dts *DataTags) DataLen() (l int) {
+	for _, dt := range dts.Slice {
 		// subtract the length of the raw Tag tag (end-start) from the data
 		// length to get the correct length of the inserted data for the
 		// Content-Length header. End can never be smaller than Start. The sum
@@ -133,14 +184,14 @@ func (dts DataTags) DataLen() (l int) {
 	return
 }
 
-func (dts DataTags) Len() int           { return len(dts) }
-func (dts DataTags) Swap(i, j int)      { dts[i], dts[j] = dts[j], dts[i] }
-func (dts DataTags) Less(i, j int) bool { return dts[i].Start < dts[j].Start }
+func (dts *DataTags) Len() int           { return len(dts.Slice) }
+func (dts *DataTags) Swap(i, j int)      { dts.Slice[i], dts.Slice[j] = dts.Slice[j], dts.Slice[i] }
+func (dts *DataTags) Less(i, j int) bool { return dts.Slice[i].Start < dts.Slice[j].Start }
 
 // String used for debug output during development
-func (dts DataTags) String() string {
+func (dts *DataTags) String() string {
 	var buf bytes.Buffer
-	for i, t := range dts {
+	for i, t := range dts.Slice {
 		fmt.Fprintf(&buf, "IDX(%d/%d): %s\n", i+1, dts.Len(), t)
 	}
 	return buf.String()

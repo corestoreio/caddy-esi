@@ -17,6 +17,8 @@ package esitag_test
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -389,6 +391,131 @@ func TestSplitAttributes(t *testing.T) {
 
 }
 
+func TestDataTags_InjectContent_MultipleWrites(t *testing.T) {
+
+	runner := func(rawInput, want string) func(*testing.T) {
+		return func(t *testing.T) {
+			ets, err := esitag.Parse(bytes.NewBufferString(rawInput))
+			if err != nil {
+				t.Fatal(err)
+			}
+			tags := esitag.NewDataTags()
+			for k := 0; k < len(ets); k++ {
+				ets[k].DataTag.Data = []byte(fmt.Sprintf("Content from MicroService %d", k))
+				tags.Slice = append(tags.Slice, ets[k].DataTag)
+			}
+
+			w := new(bytes.Buffer)
+
+			for _, part := range strings.SplitAfter(rawInput, `/>`) {
+				//t.Log(part)
+				if _, _, err := tags.InjectContent(bytes.NewBufferString(part), w); err != nil {
+					t.Fatalf("Pos %q => %+v", part, err)
+				}
+			}
+
+			assert.Exactly(t, 1, strings.Count(w.String(), `Content from MicroService 0`), "Should contain only one time")
+			if err := ioutil.WriteFile("testdata/inject_01.html", w.Bytes(), 0644); err != nil {
+				t.Fatal(err)
+			}
+			assert.Exactly(t, want, w.String())
+		}
+	}
+
+	//	t.Run("One ESI Tag", runner(
+	//		`<!DOCTYPE html>
+	//<html class="no-js" lang="en-US">
+	//<head>
+	//    <base href="//cyrillschumacher.com/">
+	//</head>
+	//<body>
+	//<esi:include src="https://...." onerror="Whoooppss ..."/>
+	//
+	//<script01 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//<script02 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//<script03 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//<script04 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//<script05 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//<script06 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//<script07 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//<script08 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//<script09 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//<script10 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//
+	//    </body>
+	//</html>`,
+	//		`<!DOCTYPE html>
+	//<html class="no-js" lang="en-US">
+	//<head>
+	//    <base href="//cyrillschumacher.com/">
+	//</head>
+	//<body>
+	//Content from MicroService 0
+	//
+	//<script01 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//<script02 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//<script03 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//<script04 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//<script05 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//<script06 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//<script07 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//<script08 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//<script09 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//<script10 type="text/javascript" async defer src="assets/js/all.min.js"/>
+	//
+	//    </body>
+	//</html>`,
+	//	))
+
+	t.Run("Two ESI Tags", runner(
+		`<!DOCTYPE html>
+<html class="no-js" lang="en-US">
+<head>
+    <base href="//cyrillschumacher.com/">
+</head>
+<body>
+<esi:include src="https://_zero_" />
+
+<script01 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script02 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<esi:include src="https://_one_" />
+<script03 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script04 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script05 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script06 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script07 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script08 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script09 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script10 type="text/javascript" async defer src="assets/js/all.min.js"/>
+
+    </body>
+</html>`,
+		`<!DOCTYPE html>
+<html class="no-js" lang="en-US">
+<head>
+    <base href="//cyrillschumacher.com/">
+</head>
+<body>
+Content from MicroService 0
+
+<script01 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script02 type="text/javascript" async defer src="assets/js/all.min.js"/>
+Content from MicroService 1
+<script03 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script04 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script05 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script06 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script07 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script08 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script09 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script10 type="text/javascript" async defer src="assets/js/all.min.js"/>
+
+    </body>
+</html>`,
+	))
+
+}
+
 func TestDataTags_InjectContent(t *testing.T) {
 	t.Parallel()
 
@@ -400,22 +527,24 @@ func TestDataTags_InjectContent(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			defer page3F.Close()
+
 			ets, err := esitag.Parse(page3F)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			var tags = make(esitag.DataTags, len(ets))
+			tags := esitag.NewDataTags()
 			for k := 0; k < len(ets); k++ {
 				ets[k].DataTag.Data = content[k]
-				tags = append(tags, ets[k].DataTag)
+				tags.Slice = append(tags.Slice, ets[k].DataTag)
 			}
 
 			w := new(bytes.Buffer)
 			if _, err := page3F.Seek(0, 0); err != nil {
 				t.Fatal(err)
 			}
-			if _, _, err := tags.InjectContent(page3F, w, 0); err != nil {
+			if _, _, err := tags.InjectContent(page3F, w); err != nil {
 				t.Fatalf("%+v", err)
 			}
 
@@ -483,10 +612,10 @@ func BenchmarkDataTags_InjectContent(b *testing.B) {
 			}
 			b.SetBytes(fs.Size())
 
-			var tags = make(esitag.DataTags, len(ets))
+			tags := esitag.NewDataTags()
 			for k := 0; k < len(ets); k++ {
 				ets[k].DataTag.Data = content[k]
-				tags = append(tags, ets[k].DataTag)
+				tags.Slice = append(tags.Slice, ets[k].DataTag)
 			}
 
 			b.ResetTimer()
@@ -499,7 +628,7 @@ func BenchmarkDataTags_InjectContent(b *testing.B) {
 				}
 				b.StartTimer()
 
-				if _, _, err := tags.InjectContent(page3F, w, 0); err != nil {
+				if _, _, err := tags.InjectContent(page3F, w); err != nil {
 					b.Fatalf("%+v", err)
 				}
 
@@ -730,17 +859,17 @@ func TestEntities_QueryResources(t *testing.T) {
 		}
 		close(dtChan)
 
-		tags := make(esitag.DataTags, 0, 3)
+		tags := esitag.NewDataTags()
 		for tag := range dtChan {
-			tags = append(tags, tag)
+			tags.Slice = append(tags.Slice, tag)
 		}
 
 		sort.Sort(tags)
-		assert.Exactly(t, esitag.DataTags{
-			{Data: []byte(`failed to load service 1`), Start: 32, End: 146},
-			{Data: []byte(`Content "testE2b://micro2.service2" Timeout 2s MaxBody 3.0 kB`), Start: 157, End: 237},
-			{Data: []byte(`failed to load service 3`), Start: 248, End: 362},
-		}, tags)
+		assert.Exactly(t, esitag.NewDataTags(
+			esitag.DataTag{Data: []byte(`failed to load service 1`), Start: 32, End: 146},
+			esitag.DataTag{Data: []byte(`Content "testE2b://micro2.service2" Timeout 2s MaxBody 3.0 kB`), Start: 157, End: 237},
+			esitag.DataTag{Data: []byte(`failed to load service 3`), Start: 248, End: 362},
+		), tags)
 	})
 
 	defer esitag.RegisterResourceHandler("teste1", esitesting.MockRequestContent("Content")).DeferredDeregister()
@@ -761,17 +890,17 @@ func TestEntities_QueryResources(t *testing.T) {
 		}
 		close(dtChan)
 
-		tags := make(esitag.DataTags, 0, 3)
+		tags := esitag.NewDataTags()
 		for tag := range dtChan {
-			tags = append(tags, tag)
+			tags.Slice = append(tags.Slice, tag)
 		}
 
 		sort.Sort(tags)
-		assert.Exactly(t, esitag.DataTags{
-			{Data: []byte(`Content "testE1://micro1.service1" Timeout 2s MaxBody 3.0 kB`), Start: 32, End: 110},
-			{Data: []byte(`Content "testE1://micro2.service2" Timeout 2s MaxBody 4.0 kB`), Start: 121, End: 199},
-			{Data: []byte(`Content "testE1://micro3.service3" Timeout 2s MaxBody 5.0 kB`), Start: 210, End: 288},
-		}, tags)
+		assert.Exactly(t, esitag.NewDataTags(
+			esitag.DataTag{Data: []byte(`Content "testE1://micro1.service1" Timeout 2s MaxBody 3.0 kB`), Start: 32, End: 110},
+			esitag.DataTag{Data: []byte(`Content "testE1://micro2.service2" Timeout 2s MaxBody 4.0 kB`), Start: 121, End: 199},
+			esitag.DataTag{Data: []byte(`Content "testE1://micro3.service3" Timeout 2s MaxBody 5.0 kB`), Start: 210, End: 288},
+		), tags)
 	})
 }
 

@@ -28,7 +28,7 @@ var _ fmt.Stringer = (*esitag.DataTags)(nil)
 func TestDataTags_String(t *testing.T) {
 	t.Parallel()
 
-	tags := esitag.DataTags{
+	tags := esitag.NewDataTags(
 		esitag.DataTag{
 			Data:  []byte(`Content "testE2b://micro2.service2" Timeout 2s MaxBody 3.0 kB`),
 			Start: 100,
@@ -39,7 +39,7 @@ func TestDataTags_String(t *testing.T) {
 			Start: 1000,
 			End:   2000,
 		},
-	}
+	)
 	assert.Exactly(t,
 		"IDX(1/2): Start:000100 End:000200 Tag:\"Content \\\"testE2b://micro2.service2\\\" Timeout 2s MaxBody 3.0 kB\"\nIDX(2/2): Start:001000 End:002000 Tag:\"Content \\\"testE1b://micro2.service2\\\" Timeout 3s MaxBody 5.0 kB\"\n",
 		tags.String())
