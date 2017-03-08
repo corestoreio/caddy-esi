@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/SchumacherFM/caddyesi/bufpool"
 	"github.com/corestoreio/errors"
 )
 
@@ -49,14 +48,8 @@ type DataTags struct {
 	// previous data in the Reader. DataTags.InjectContent does not know it gets
 	// called multiple times and hence it can inject the Tag tag data in
 	// subsequent calls. So streamPos protects recurring replacements.
-	streamPos int
-}
-
-// NewDataTags creates a new DataTags slice
-func NewDataTags(dts ...DataTag) *DataTags {
-	return &DataTags{
-		Slice: dts,
-	}
+	posPrev int
+	posCur  int
 }
 
 // NewDataTagsCapped creates a new object with a DataTag slice and its maximum
@@ -67,69 +60,32 @@ func NewDataTagsCapped(cap int) *DataTags {
 	}
 }
 
-//func (dts *DataTags) skipInject(current int) bool {
-//	//dts.mu.RLock()
-//	isAfter := dts.streamPos > 0 && current > dts.streamPos
-//	//dts.mu.RUnlock()
-//	return isAfter
-//}
-//
-//func (dts *DataTags) incrementLastPost(p int) {
-//	//dts.mu.Lock()
-//	dts.streamPos += p
-//	//dts.mu.Unlock()
-//}
-//
-//func (dts *DataTags) getLastPost() (p int) {
-//	//dts.mu.Lock()
-//	p = dts.streamPos
-//	//dts.mu.Unlock()
-//	return
-//}
-
-// InjectContent reads from r and uses the data in a Tag to get injected a the
-// current position and then writes the output to w. DataTags must be a sorted
-// slice. Usually this function receives the data from Entities.QueryResources()
-func (dts *DataTags) InjectContent(r io.Reader, w io.Writer) (nRead, nWritten int, _ error) {
+// InjectContent inspects data argument and uses the data field in a Tag type to
+// injected the backend data at the current position in the data argument and
+// then writes the output to w. DataTags must be a sorted slice. Usually this
+// function receives the data from Entities.QueryResources(). This function can
+// be called multiple times. It tracks the stream position and inserts the ESI
+// tag once the correct position has been reached. This function cannot yet be
+// used in parallel.
+func (dts *DataTags) InjectContent(data []byte, w io.Writer) (nRead, nWritten int, _ error) {
 	const writeErr = "[esitag] DataTags.InjectContent: Failed to write middleware data to writer: %q for tag index %d with start position %d and end position %d"
 
-	dataBuf := bufpool.Get()
-	defer bufpool.Put(dataBuf)
-	data := dataBuf.Bytes()
+	nRead = len(data)
+	dts.posCur += len(data)
 
-	var prevBufDataSize int
+	tagWritten := false
 	for di, dt := range dts.Slice {
 
-		bufDataSize := dt.End - prevBufDataSize
+		esiStartPos := len(data) - (dt.End - dt.Start)
 
-		if cap(data) < bufDataSize {
-			dataBuf.Grow(bufDataSize - cap(data))
-			data = dataBuf.Bytes()
-		}
-		data = data[:bufDataSize]
-		n, err := r.Read(data)
-		nRead += n
-		if err != nil && err != io.EOF {
-			return nRead, nWritten, errors.NewReadFailedf("[esitag] DataTags.InjectContent: Read failed: %q for tag index %d with start position %d and end position %d", err, di, dt.Start, dt.End)
-		}
-		data = data[:n]
-		dts.streamPos += n
+		switch {
+		case dt.Start >= dts.posPrev && dt.End <= dts.posCur:
+			// tags replacement fits directly into the start and end position.
 
-		skipInsertion := dt.Start > dts.streamPos || dt.End < dts.streamPos
-		fmt.Printf("2:Stream Pos:%d Read:%d Start:%d End:%d skipInsertion:%t => %q\n", dts.streamPos, n, dt.Start, dt.End, skipInsertion, data)
-
-		if skipInsertion {
-			// we have not yet reached our position. so write the data to client and continue.
-			wn, errW := w.Write(data)
-			nWritten += wn
-			if errW != nil {
-				return nRead, nWritten, errors.NewWriteFailedf(writeErr, errW, di, dt.Start, dt.End)
+			if len(data) > dt.Start {
+				esiStartPos = dt.Start
 			}
-			continue
-		}
 
-		if n > 0 {
-			esiStartPos := n - (dt.End - dt.Start)
 			wn, errW := w.Write(data[:esiStartPos])
 			nWritten += wn
 			if errW != nil {
@@ -141,32 +97,61 @@ func (dts *DataTags) InjectContent(r io.Reader, w io.Writer) (nRead, nWritten in
 			if errW != nil {
 				return nRead, nWritten, errors.NewWriteFailedf(writeErr, errW, di, dt.Start, dt.End)
 			}
+
+			esiEndPos := esiStartPos + (dt.End - dt.Start)
+			if len(data) > dt.End {
+				esiEndPos = dt.End
+			}
+
+			wn, errW = w.Write(data[esiEndPos:])
+			nWritten += wn
+			if errW != nil {
+				return nRead, nWritten, errors.NewWriteFailedf(writeErr, errW, di, dt.Start, dt.End)
+			}
+			tagWritten = true
+
+		case dt.Start >= dts.posPrev && dt.Start <= dts.posCur:
+			// start position is between previous and current position, which
+			// means that the tag begins here somewhere to start.
+
+			wn, errW := w.Write(data[:dt.Start-dts.posPrev])
+			nWritten += wn
+			if errW != nil {
+				return nRead, nWritten, errors.NewWriteFailedf(writeErr, errW, di, dt.Start, dt.End)
+			}
+
+			wn, errW = w.Write(dt.Data)
+			nWritten += wn
+			if errW != nil {
+				return nRead, nWritten, errors.NewWriteFailedf(writeErr, errW, di, dt.Start, dt.End)
+			}
+			tagWritten = true
+
+		case dt.Start < dts.posCur && dt.Start < dts.posPrev && dt.End > dts.posPrev && dt.End > dts.posCur:
+			// we're in the middle of writing the tag but we must discard the
+			// ESI tag itself. Hence we say that the tag has been written.
+			tagWritten = true
+
+		case dt.End >= dts.posPrev && dt.End <= dts.posCur:
+			// reached end of ESI tag and write the last chunk
+			wn, errW := w.Write(data[len(data)-(dts.posCur-dt.End):])
+			nWritten += wn
+			if errW != nil {
+				return nRead, nWritten, errors.NewWriteFailedf(writeErr, errW, di, dt.Start, dt.End)
+			}
+			tagWritten = true
 		}
-		prevBufDataSize = dt.End
 	}
 
-	// io.Copy has more over head than the following code ;-)
-	data = data[:cap(data)]
-	if len(data) == 0 {
-		panic("TODO caddyesi esitag InjectContent should not be possible ;-(")
-	}
-	for {
-		n, err := r.Read(data)
-		nRead += n
-		if err == io.EOF {
-			break // or return here
-		}
-		if err != nil {
-			return nRead, nWritten, errors.NewReadFailedf("[esitag] InjectContent failed to read remaining data: %s", err)
-		}
-		data = data[:n]
-
-		n, err = w.Write(data)
+	if !tagWritten {
+		n, err := w.Write(data)
 		nWritten += n
 		if err != nil {
 			return nRead, nWritten, errors.NewWriteFailedf("[esitag] InjectContent failed to copy remaining data to w: %s", err)
 		}
 	}
+
+	dts.posPrev += len(data)
 
 	return nRead, nWritten, nil
 }

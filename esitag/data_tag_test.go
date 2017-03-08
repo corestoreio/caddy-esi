@@ -28,7 +28,7 @@ var _ fmt.Stringer = (*esitag.DataTags)(nil)
 func TestDataTags_String(t *testing.T) {
 	t.Parallel()
 
-	tags := esitag.NewDataTags(
+	tags := newTestDataTags(
 		esitag.DataTag{
 			Data:  []byte(`Content "testE2b://micro2.service2" Timeout 2s MaxBody 3.0 kB`),
 			Start: 100,
