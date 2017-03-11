@@ -411,134 +411,104 @@ func TestDataTags_InjectContent_MultipleWrites(t *testing.T) {
 			}
 
 			w := new(bytes.Buffer)
-
 			for _, part := range strings.SplitAfter(rawInput, sep) {
-				if _, _, err := tags.InjectContent([]byte(part), w); err != nil {
+				if _, err := tags.InjectContent([]byte(part), w); err != nil {
 					t.Fatalf("Sep:%q Pos %q => %+v", sep, part, err)
 				}
 			}
-
 			assert.Exactly(t, 1, strings.Count(w.String(), `Content from MicroService 0`), "Should contain only one time")
-			if err := ioutil.WriteFile("testdata/inject_01.html", w.Bytes(), 0644); err != nil {
-				t.Fatal(err)
-			}
 			assert.Exactly(t, want, w.String(), "Seperator:%q", sep)
 		}
 
 		return func(t *testing.T) {
+			runTest(t, `p>`)
 			runTest(t, `/>`)
-			//runTest(t, ` `)
-			//runTest(t, `</html>`) // one write ;-)
+			runTest(t, ` `)
+			runTest(t, `</div>`)
 		}
 	}
 
-	//	t.Run("One ESI Tag", runner(
-	//		`<!DOCTYPE html>
-	//<html class="no-js" lang="en-US">
-	//<head>
-	//	<base href="//cyrillschumacher.com/">
-	//</head>
-	//<body>
-	//<esi:include src="https://...." onerror="Whoooppss ..."/>
-	//
-	//<script01 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script02 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script03 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script04 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script05 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script06 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script07 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script08 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script09 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script10 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//
-	//	</body>
-	//</html>`,
-	//		`<!DOCTYPE html>
-	//<html class="no-js" lang="en-US">
-	//<head>
-	//	<base href="//cyrillschumacher.com/">
-	//</head>
-	//<body>
-	//Content from MicroService 0
-	//
-	//<script01 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script02 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script03 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script04 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script05 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script06 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script07 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script08 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script09 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script10 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//
-	//	</body>
-	//</html>`,
-	//	))
-	//
-	//	t.Run("Two ESI Tags", runner(
-	//		`<!DOCTYPE html>
-	//<html class="no-js" lang="en-US">
-	//<head>
-	//	<base href="//cyrillschumacher.com/">
-	//</head>
-	//<body>
-	//<esi:include src="https://_zero_" />
-	//
-	//<script01 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script02 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<esi:include src="https://_one_" />
-	//<script03 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script04 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script05 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script06 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script07 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script08 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script09 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script10 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//
-	//	</body>
-	//</html>`,
-	//		`<!DOCTYPE html>
-	//<html class="no-js" lang="en-US">
-	//<head>
-	//	<base href="//cyrillschumacher.com/">
-	//</head>
-	//<body>
-	//Content from MicroService 0
-	//
-	//<script01 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script02 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//Content from MicroService 1
-	//<script03 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script04 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script05 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script06 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script07 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script08 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script09 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//<script10 type="text/javascript" async defer src="assets/js/all.min.js"/>
-	//
-	//	</body>
-	//</html>`,
-	//	))
+	t.Run("Four ESI Tags", runner(
+		`<!DOCTYPE html>
+<html class="no-js" lang="en-US">
+<head>
+	<base href="//cyrillschumacher.com/"/>
+</head>
+<body>
+	<div>
+		<p c="0"><esi:include src="http://microService0" timeout="5ms" maxbodysize="10kb"/></p>
+		<p c="1"><esi:include src="http://microService1" timeout="6ms" maxbodysize="20kb"/></p>
+		<p c="2"><esi:include src="http://microService2" timeout="7ms" maxbodysize="30kb"/></p>
+		<p c="3"><esi:include src="http://microService3" timeout="8ms" maxbodysize="40kb"/></p>
+	</div>
+</body>
+</html>`,
+		`<!DOCTYPE html>
+<html class="no-js" lang="en-US">
+<head>
+	<base href="//cyrillschumacher.com/"/>
+</head>
+<body>
+	<div>
+		<p c="0">Content from MicroService 0</p>
+		<p c="1">Content from MicroService 1</p>
+		<p c="2">Content from MicroService 2</p>
+		<p c="3">Content from MicroService 3</p>
+	</div>
+</body>
+</html>`,
+	))
 
-	t.Run("Three ESI Tags", runner(
+	t.Run("Seven ESI Tags", runner(
+		`<!DOCTYPE html>
+<html class="no-js" lang="en-US">
+<head>
+	<base href="//cyrillschumacher.com/"/>
+</head>
+<body>
+	<div>
+		0<esi:include src="http://microService0" timeout="5ms" maxbodysize="10kb"/> <hr0>
+		1<esi:include src="http://microService1" timeout="6ms" maxbodysize="20kb"/> <hr1>
+		2<esi:include src="http://microService2" timeout="7ms" maxbodysize="30kb"/> <hr2>
+		3<esi:include src="http://microService3" timeout="8ms" maxbodysize="40kb"/> <hr3>
+		4<esi:include src="http://microService4" timeout="9ms" maxbodysize="50kb"/> <hr4>
+		5<esi:include src="http://microService5" timeout="10ms" maxbodysize="60kb"/> <hr5>
+		6<esi:include src="http://microService6" timeout="11ms" maxbodysize="70kb"/> <hr6>
+	</div>
+</body>
+</html>`,
+		`<!DOCTYPE html>
+<html class="no-js" lang="en-US">
+<head>
+	<base href="//cyrillschumacher.com/"/>
+</head>
+<body>
+	<div>
+		0Content from MicroService 0 <hr0>
+		1Content from MicroService 1 <hr1>
+		2Content from MicroService 2 <hr2>
+		3Content from MicroService 3 <hr3>
+		4Content from MicroService 4 <hr4>
+		5Content from MicroService 5 <hr5>
+		6Content from MicroService 6 <hr6>
+	</div>
+</body>
+</html>`,
+	))
+
+	t.Run("One ESI Tag", runner(
 		`<!DOCTYPE html>
 <html class="no-js" lang="en-US">
 <head>
 	<base href="//cyrillschumacher.com/">
 </head>
 <body>
-<div>
-<p c=0><esi:include src="http://microService0" timeout="5ms" maxbodysize="10kb" /></p>
-<p c=1><esi:include src="http://microService1" timeout="6ms" maxbodysize="20kb"/></p>
-<p c=2><esi:include src="http://microService2" timeout="7ms" maxbodysize="30kb"/></p>
+<esi:include src="https://...." onerror="Whoooppss ..."/>
 
-	<h1>Hello World</h1>
-</div>
-</body>
+<script01 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script02 type="text/javascript" async defer src="assets/js/all.min.js"/>
+
+	</body>
 </html>`,
 		`<!DOCTYPE html>
 <html class="no-js" lang="en-US">
@@ -546,14 +516,45 @@ func TestDataTags_InjectContent_MultipleWrites(t *testing.T) {
 	<base href="//cyrillschumacher.com/">
 </head>
 <body>
-<div>
-<p c=0>Content from MicroService 0</p>
-<p c=1>Content from MicroService 1</p>
-<p c=2>Content from MicroService 2</p>
+Content from MicroService 0
 
-	<h1>Hello World</h1>
-</div>
-</body>
+<script01 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script02 type="text/javascript" async defer src="assets/js/all.min.js"/>
+
+	</body>
+</html>`,
+	))
+
+	t.Run("Two ESI Tags", runner(
+		`<!DOCTYPE html>
+<html class="no-js" lang="en-US">
+<head>
+	<base href="//cyrillschumacher.com/">
+</head>
+<body>
+<esi:include src="https://_zero_" />
+
+<script01 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script02 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<esi:include src="https://_one_" />
+<script03 type="text/javascript" async defer src="assets/js/all.min.js"/>
+
+	</body>
+</html>`,
+		`<!DOCTYPE html>
+<html class="no-js" lang="en-US">
+<head>
+	<base href="//cyrillschumacher.com/">
+</head>
+<body>
+Content from MicroService 0
+
+<script01 type="text/javascript" async defer src="assets/js/all.min.js"/>
+<script02 type="text/javascript" async defer src="assets/js/all.min.js"/>
+Content from MicroService 1
+<script03 type="text/javascript" async defer src="assets/js/all.min.js"/>
+
+	</body>
 </html>`,
 	))
 
@@ -583,7 +584,7 @@ func TestDataTags_InjectContent(t *testing.T) {
 			}
 
 			w := new(bytes.Buffer)
-			if _, _, err := tags.InjectContent(page, w); err != nil {
+			if _, err := tags.InjectContent(page, w); err != nil {
 				t.Fatalf("%+v", err)
 			}
 
@@ -656,14 +657,17 @@ func BenchmarkDataTags_InjectContent(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				var w bytes.Buffer
-				if _, _, err := tags.InjectContent(page, &w); err != nil {
+				if _, err := tags.InjectContent(page, &w); err != nil {
 					b.Fatalf("%+v", err)
 				}
 
 				b.StopTimer()
 				for k := 0; k < len(content); k++ {
-					assert.Contains(b, w.String(), string(content[k]))
+					if !assert.Contains(b, w.String(), string(content[k])) {
+						b.Fatal("Does not contain")
+					}
 				}
+				tags.ResetStates()
 				b.StartTimer()
 			}
 		}
@@ -673,28 +677,28 @@ func BenchmarkDataTags_InjectContent(b *testing.B) {
 			[]byte(`<p>Hello Jonathan Gopher. You're logged in.</p>`),
 		},
 	))
-	b.Run("Page2", runner("testdata/page2.html",
-		[][]byte{
-			[]byte(`<p>Hello John Gopher. You're logged in.</p>`),
-			[]byte(`<h1>You have 4 items in your shopping cart.</h1>`),
-		},
-	))
-	b.Run("Page3", runner("testdata/page3.html",
-		[][]byte{
-			[]byte(`<p>This microservice generates content one. </p>`),
-			[]byte(`<h1>This microservice generates content two. </h1>`),
-			[]byte(`<script> alert('This microservice generates content three. ');</script>`),
-		},
-	))
-	b.Run("Page4", runner("testdata/page4.html",
-		[][]byte{
-			[]byte(`<p>This microservice generates content one. </p>`),
-			[]byte(`<h1>This microservice generates content two. @</h1>`),
-			[]byte(`<h1>This microservice generates content three. €</h1>`),
-			[]byte(`<h1>This microservice generates content four. 4</h1>`),
-			[]byte(`<h1>This microservice generates content five. 5</h1>`),
-		},
-	))
+	//b.Run("Page2", runner("testdata/page2.html",
+	//	[][]byte{
+	//		[]byte(`<p>Hello John Gopher. You're logged in.</p>`),
+	//		[]byte(`<h1>You have 4 items in your shopping cart.</h1>`),
+	//	},
+	//))
+	//b.Run("Page3", runner("testdata/page3.html",
+	//	[][]byte{
+	//		[]byte(`<p>This microservice generates content one. </p>`),
+	//		[]byte(`<h1>This microservice generates content two. </h1>`),
+	//		[]byte(`<script> alert('This microservice generates content three. ');</script>`),
+	//	},
+	//))
+	//b.Run("Page4", runner("testdata/page4.html",
+	//	[][]byte{
+	//		[]byte(`<p>This microservice generates content one. </p>`),
+	//		[]byte(`<h1>This microservice generates content two. @</h1>`),
+	//		[]byte(`<h1>This microservice generates content three. €</h1>`),
+	//		[]byte(`<h1>This microservice generates content four. 4</h1>`),
+	//		[]byte(`<h1>This microservice generates content five. 5</h1>`),
+	//	},
+	//))
 }
 
 func TestEntity_QueryResources(t *testing.T) {

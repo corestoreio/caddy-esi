@@ -86,6 +86,31 @@ func NewDataTagsCapped(cap int) *DataTags {
 	}
 }
 
+// fullNextTag looks ahead if the next tag is fully contained in the data slice.
+// returns the relative start position of the next tag. returns also true if we reach the last tag in the slice.
+func (dts *DataTags) fullNextTag(nextIdx, dataLen int) (relPosStart int, hasNext, isLast bool) {
+	if nextIdx > dts.Len() {
+		return 0, false, false
+	}
+	if nextIdx == dts.Len() { // reached end of slice
+		return dataLen, true, true
+	}
+
+	dt := dts.Slice[nextIdx]
+	relPosStart = dt.Start - dts.streamPrev
+	relPosEnd := dataLen - (dts.streamCur - dt.End)
+	hasFullTagInData := dt.Start >= dts.streamPrev && dt.End <= dts.streamCur && relPosStart > 0 && relPosEnd > 0 && relPosStart < dataLen && relPosEnd <= dataLen
+	return relPosStart, hasFullTagInData, false
+}
+
+// ResetStates exported for Benchmarks. Resets the internal state machine to
+// re-run the injector.
+func (dts *DataTags) ResetStates() {
+	for k := range dts.writeStates {
+		dts.writeStates[k] = 0
+	}
+}
+
 // InjectContent inspects data argument and uses the data field in a Tag type to
 // injected the backend data at the current position in the data argument and
 // then writes the output to w. DataTags must be a sorted slice. Usually this
@@ -93,7 +118,7 @@ func NewDataTagsCapped(cap int) *DataTags {
 // be called multiple times. It tracks the stream position and inserts the ESI
 // tag once the correct position has been reached. This function cannot yet be
 // used in parallel.
-func (dts *DataTags) InjectContent(data []byte, w io.Writer) (nRead, nWritten int, _ error) {
+func (dts *DataTags) InjectContent(data []byte, w io.Writer) (nWritten int, _ error) {
 	if dts.writeStates == nil {
 		dts.writeStates = make([]uint8, len(dts.Slice))
 	}
@@ -105,17 +130,17 @@ func (dts *DataTags) InjectContent(data []byte, w io.Writer) (nRead, nWritten in
 		writeStateDone
 	)
 
-	fmt.Printf("INPUT: %q\n", data)
+	//fmt.Printf("INPUT: %q\n", data)
 
-	nRead = len(data)
+	dataLen := len(data)
 
-	if dts.Len() == 0 || len(data) == 0 {
+	if dts.Len() == 0 || dataLen == 0 {
 		wn, err := w.Write(data)
 		nWritten += wn
-		return nRead, nWritten, errors.NewWriteFailed(err, "[esitag] Failed to writeFull")
+		return nWritten, errors.NewWriteFailed(err, "[esitag] Failed to writeFull")
 	}
 
-	dts.streamCur += len(data)
+	dts.streamCur += dataLen
 
 	tagWritten := false
 	//dataStartPos := 0
@@ -127,18 +152,18 @@ func (dts *DataTags) InjectContent(data []byte, w io.Writer) (nRead, nWritten in
 		//   - DataTag cannot be found in `data`
 		//   - DataTag can have a start position but no End position
 		//   - DataTag can wait until the data comes in with the end position
-		//   - DataTags can occur 1+n times in the data
+		//   - DataTags can occur 1+n times in the data; complex case
 
 		relPosStart := dt.Start - dts.streamPrev
-		relPosEnd := len(data) - (dts.streamCur - dt.End)
+		relPosEnd := dataLen - (dts.streamCur - dt.End)
 
-		hasPosStartInData := relPosStart < len(data) && relPosEnd > len(data) && dt.Start < dts.streamCur
-		hasPosEnd__InData := relPosStart < 0 && relPosEnd > 0 && relPosEnd < len(data) && dt.End <= dts.streamCur
-		hasFullTagInData := dt.Start >= dts.streamPrev && dt.End <= dts.streamCur && relPosStart > 0 && relPosEnd > 0 && relPosStart < len(data) && relPosEnd <= len(data)
+		hasPosStartInData := relPosStart < dataLen && relPosEnd > dataLen && dt.Start < dts.streamCur
+		hasPosEnd__InData := relPosStart < 0 && relPosEnd > 0 && relPosEnd < dataLen && dt.End <= dts.streamCur
+		hasFullTagInData := dt.Start >= dts.streamPrev && dt.End <= dts.streamCur && relPosStart > 0 && relPosEnd > 0 && relPosStart < dataLen && relPosEnd <= dataLen
 
-		fmt.Printf("TagID[%d]: Data[%03d] dt.Start[%03d] dt.End[%03d] dts.streamPrev[%03d] dts.streamCur[%03d] relPosStart[%03d] relPosEnd[%03d] hasPosStartInData[%t] hasPosEnd__InData[%t] hasFullTagInData[%t]\n",
-			di, len(data), dt.Start, dt.End, dts.streamPrev, dts.streamCur, relPosStart, relPosEnd,
-			hasPosStartInData, hasPosEnd__InData, hasFullTagInData)
+		//fmt.Printf("TagID[%d]: Data[%03d] dt.Start[%03d] dt.End[%03d] dts.streamPrev[%03d] dts.streamCur[%03d] relPosStart[%03d] relPosEnd[%03d] hasPosStartInData[%t] hasPosEnd__InData[%t] hasFullTagInData[%t]\n",
+		//	di, dataLen, dt.Start, dt.End, dts.streamPrev, dts.streamCur, relPosStart, relPosEnd,
+		//	hasPosStartInData, hasPosEnd__InData, hasFullTagInData)
 
 		switch dts.writeStates[di] {
 		case writeStateDone:
@@ -146,7 +171,7 @@ func (dts *DataTags) InjectContent(data []byte, w io.Writer) (nRead, nWritten in
 		case writeStateProgress:
 			if hasPosEnd__InData {
 				if wn, err := w.Write(data[relPosEnd:]); err != nil {
-					return nRead, nWritten, errors.NewWriteFailedf(writeErr, err, di, dt.Start, dt.End)
+					return nWritten, errors.NewWriteFailedf(writeErr, err, di, dt.Start, dt.End)
 				} else {
 					nWritten += wn
 					dts.writeStates[di] = writeStateDone
@@ -156,63 +181,66 @@ func (dts *DataTags) InjectContent(data []byte, w io.Writer) (nRead, nWritten in
 		case writeStateWaiting:
 			switch {
 			case hasFullTagInData:
+				// data can contain:
+				// - one esi tag: write before, write tag, write after, hasNext is false!
+				// - two esi tags where we need to write the middle part between the ESI tags
+				// - n ESI tags. write before
 
-				switch {
-				case di == 0: // first DataTag, we must write all data before the first tag occurs
+				// look ahead
+				if nextStartPos, hasNext, isLast := dts.fullNextTag(di+1, dataLen); hasNext {
+					//fmt.Printf("TagID[%d] nextStartPos[%d] prevRelPosEnd[%d]\n",
+					//	di, nextStartPos, prevRelPosEnd)
+					//fmt.Printf("TagID[%d] before: %q\n", di, data[prevRelPosEnd:relPosStart])
+					//fmt.Printf("TagID[%d] after: %q\n", di, data[relPosEnd:nextStartPos])
+
+					if wn, err := w.Write(data[prevRelPosEnd:relPosStart]); err != nil {
+						return nWritten, errors.NewWriteFailedf(writeErr, err, di, dt.Start, dt.End)
+					} else {
+						nWritten += wn
+					}
+					if wn, err := w.Write(dt.Data); err != nil {
+						return nWritten, errors.NewWriteFailedf(writeErr, err, di, dt.Start, dt.End)
+					} else {
+						nWritten += wn
+					}
+					if isLast {
+						if wn, err := w.Write(data[relPosEnd:nextStartPos]); err != nil {
+							return nWritten, errors.NewWriteFailedf(writeErr, err, di, dt.Start, dt.End)
+						} else {
+							nWritten += wn
+						}
+					}
+				} else {
+					// we know, we only have one full tag in the current data slice.
+					// write before tag, write DataTag itself, then write the remaining chunks
 					if wn, err := w.Write(data[:relPosStart]); err != nil {
-						return nRead, nWritten, errors.NewWriteFailedf(writeErr, err, di, dt.Start, dt.End)
+						return nWritten, errors.NewWriteFailedf(writeErr, err, di, dt.Start, dt.End)
 					} else {
 						nWritten += wn
 					}
 					if wn, err := w.Write(dt.Data); err != nil {
-						return nRead, nWritten, errors.NewWriteFailedf(writeErr, err, di, dt.Start, dt.End)
-					} else {
-						nWritten += wn
-					}
-
-				case di == dts.Len()-1: // last DataTag no write all remaining
-					if wn, err := w.Write(dt.Data); err != nil {
-						return nRead, nWritten, errors.NewWriteFailedf(writeErr, err, di, dt.Start, dt.End)
+						return nWritten, errors.NewWriteFailedf(writeErr, err, di, dt.Start, dt.End)
 					} else {
 						nWritten += wn
 					}
 					if wn, err := w.Write(data[relPosEnd:]); err != nil {
-						return nRead, nWritten, errors.NewWriteFailedf(writeErr, err, di, dt.Start, dt.End)
+						return nWritten, errors.NewWriteFailedf(writeErr, err, di, dt.Start, dt.End)
 					} else {
 						nWritten += wn
 					}
-				default: // all other tags in between
-					if wn, err := w.Write(data[prevRelPosEnd:relPosStart]); err != nil {
-						return nRead, nWritten, errors.NewWriteFailedf(writeErr, err, di, dt.Start, dt.End)
-					} else {
-						nWritten += wn
-					}
-					if wn, err := w.Write(dt.Data); err != nil {
-						return nRead, nWritten, errors.NewWriteFailedf(writeErr, err, di, dt.Start, dt.End)
-					} else {
-						nWritten += wn
-					}
-
 				}
-				prevRelPosEnd = relPosEnd
 				dts.writeStates[di] = writeStateDone
+				prevRelPosEnd = relPosEnd
 
-				//if wn, err := dt.writeFull(relPosStart, relPosEnd, data[prevRelPosEnd:relPosEnd], w); err != nil {
-				//	return nRead, nWritten, errors.NewWriteFailed(err, "[esitag] Failed to writeFull")
-				//} else {
-				//	nWritten += wn
-
-				//	prevRelPosEnd = relPosEnd
-				//}
 				tagWritten = true
 			case hasPosStartInData:
 				if wn, err := w.Write(data[:relPosStart]); err != nil {
-					return nRead, nWritten, errors.NewWriteFailedf(writeErr, err, di, dt.Start, dt.End)
+					return nWritten, errors.NewWriteFailedf(writeErr, err, di, dt.Start, dt.End)
 				} else {
 					nWritten += wn
 				}
 				if wn, err := w.Write(dt.Data); err != nil {
-					return nRead, nWritten, errors.NewWriteFailedf(writeErr, err, di, dt.Start, dt.End)
+					return nWritten, errors.NewWriteFailedf(writeErr, err, di, dt.Start, dt.End)
 				} else {
 					nWritten += wn
 				}
@@ -220,103 +248,6 @@ func (dts *DataTags) InjectContent(data []byte, w io.Writer) (nRead, nWritten in
 				tagWritten = true
 			}
 		}
-
-		//switch {
-		//case dts.writeStates[di] == 0 && dt.Start >= dts.streamPrev && dt.End <= dts.streamCur:
-		//	// tags replacement fits directly into the start and end position.
-		//
-		//	if len(data) > dt.Start {
-		//		relStartPos = dt.Start
-		//	}
-		//
-		//	fmt.Printf("DEBUG1/%d: %q\n", di, data[dataStartPos:relStartPos])
-		//	wn, errW := w.Write(data[dataStartPos:relStartPos])
-		//	nWritten += wn
-		//	if errW != nil {
-		//		return nRead, nWritten, errors.NewWriteFailedf(writeErr, errW, di, dt.Start, dt.End)
-		//	}
-		//
-		//	wn, errW = w.Write(dt.Data)
-		//	nWritten += wn
-		//	if errW != nil {
-		//		return nRead, nWritten, errors.NewWriteFailedf(writeErr, errW, di, dt.Start, dt.End)
-		//	}
-		//
-		//	esiEndPos := relStartPos + (dt.End - dt.Start)
-		//	if len(data) > dt.End {
-		//		esiEndPos = dt.End
-		//	}
-		//	dataStartPos = esiEndPos
-		//	dts.lastMatchedTagStart = dt.Start
-		//	dts.lastMatchedTagEnd = dt.End
-		//	dts.writeStates[di] = 2
-		//
-		//	//fmt.Printf("DEBUG: Start:%d End:%d DataLen:%d relStartPos:%d esiEndPos:%d dataStartPos:%d\n",
-		//	//	dt.Start, dt.End, len(data), relStartPos, esiEndPos, dataStartPos)
-		//	//fmt.Printf("DEBUG: Write END: %q\n", data[esiEndPos:nextStartPos])
-		//	//
-		//	//wn, errW = w.Write(data[esiEndPos:nextStartPos])
-		//	//nWritten += wn
-		//	//if errW != nil {
-		//	//	return nRead, nWritten, errors.NewWriteFailedf(writeErr, errW, di, dt.Start, dt.End)
-		//	//}
-		//
-		//	tagWritten = true
-		//
-		//case dts.writeStates[di] == 0 && dt.Start >= dts.streamPrev && dt.Start <= dts.streamCur:
-		//	// start position is between previous and current position, which
-		//	// means that the tag begins here somewhere to start.
-		//
-		//	fmt.Printf("DEBUG2/%d: Start:%d End:%d DataLen:%d dts.streamPrev:%d dts.streamCur:%d dts.lastMatchedTag(%d/%d)\n",
-		//		di, dt.Start, dt.End, len(data), dts.streamPrev, dts.streamCur, dts.lastMatchedTagStart, dts.lastMatchedTagEnd)
-		//
-		//	var lastPos int
-		//	if dts.lastMatchedTagEnd > 0 && dts.lastMatchedTagEnd > dts.streamPrev {
-		//		lastPos = dts.lastMatchedTagEnd - dts.streamPrev
-		//	}
-		//
-		//	println("lastPos", lastPos, dt.Start-dts.streamPrev)
-		//	fmt.Printf("DEBUG2/%d: %q\n", di, data[lastPos:dt.Start-dts.streamPrev])
-		//	wn, errW := w.Write(data[lastPos : dt.Start-dts.streamPrev])
-		//	nWritten += wn
-		//	if errW != nil {
-		//		return nRead, nWritten, errors.NewWriteFailedf(writeErr, errW, di, dt.Start, dt.End)
-		//	}
-		//
-		//	wn, errW = w.Write(dt.Data)
-		//	nWritten += wn
-		//	if errW != nil {
-		//		return nRead, nWritten, errors.NewWriteFailedf(writeErr, errW, di, dt.Start, dt.End)
-		//	}
-		//	dts.lastMatchedTagStart = dt.Start
-		//	dts.lastMatchedTagEnd = dt.End
-		//	dts.writeStates[di] = 1
-		//	tagWritten = true
-		//
-		//case dt.Start < dts.streamCur && dt.Start < dts.streamPrev && dt.End > dts.streamPrev && dt.End > dts.streamCur:
-		//	// we're in the middle of writing the tag but we must discard the
-		//	// ESI tag itself. Hence we say that the tag has been written.
-		//	tagWritten = true
-		//
-		//case dts.writeStates[di] == 1 && dt.End >= dts.streamPrev && dt.End <= dts.streamCur: //  && dt.Start >= dts.streamPrev
-		//
-		//	fmt.Printf("DEBUG3/%d: Start:%d End:%d DataLen:%d dts.streamPrev:%d dts.streamCur:%d dts.lastMatchedTag(%d/%d)\n",
-		//		di, dt.Start, dt.End, len(data), dts.streamPrev, dts.streamCur, dts.lastMatchedTagStart, dts.lastMatchedTagEnd)
-		//
-		//	// reached end of ESI tag and writeFull the last chunk
-		//	fmt.Printf("DEBUG3/%d: %q\n", di, data[len(data)-(dts.streamCur-dt.End):])
-		//	if di == 0 || di == dts.Len()-1 {
-		//		wn, errW := w.Write(data[len(data)-(dts.streamCur-dt.End):])
-		//		nWritten += wn
-		//		if errW != nil {
-		//			return nRead, nWritten, errors.NewWriteFailedf(writeErr, errW, di, dt.Start, dt.End)
-		//		}
-		//	}
-		//	dts.lastMatchedTagStart = dt.Start
-		//	dts.lastMatchedTagEnd = dt.End
-		//	tagWritten = true
-		//	dts.writeStates[di] = 2
-		//}
 	}
 	//_ = tagWritten
 	if !tagWritten {
@@ -324,26 +255,13 @@ func (dts *DataTags) InjectContent(data []byte, w io.Writer) (nRead, nWritten in
 		n, err := w.Write(data)
 		nWritten += n
 		if err != nil {
-			return nRead, nWritten, errors.NewWriteFailedf("[esitag] InjectContent failed to copy remaining data to w: %s", err)
+			return nWritten, errors.NewWriteFailedf("[esitag] InjectContent failed to copy remaining data to w: %s", err)
 		}
 	}
 
-	//if dts.Len() > 0 && dts.streamPrev == 0 { // only on first call to InjectContent
-	//	lastDT := dts.Slice[dts.Len()-1]
-	//	if lastDT.End <= len(data) {
-	//		fmt.Printf("DEBUG posPrev0 END %q\n", data)
-	//		wn, errW := w.Write(data[lastDT.End:])
-	//		nWritten += wn
-	//		if errW != nil {
-	//			return nRead, nWritten, errors.NewWriteFailedf(writeErr, errW, lastDT, lastDT.Start, lastDT.End)
-	//		}
-	//	}
-	//}
-	println("\n")
+	dts.streamPrev += dataLen
 
-	dts.streamPrev += len(data)
-
-	return nRead, nWritten, nil
+	return nWritten, nil
 }
 
 // DataLen returns the total length of all data fields in bytes.
