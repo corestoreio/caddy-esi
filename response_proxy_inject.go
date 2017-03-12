@@ -51,21 +51,21 @@ func responseWrapInjector(cTag <-chan esitag.DataTag, w http.ResponseWriter) htt
 type injectingWriter struct {
 	rw              http.ResponseWriter
 	chanTag         <-chan esitag.DataTag
-	lazyTags        esitag.DataTags
+	lazyTags        *esitag.DataTags
 	responseAllowed uint8 // 0 not yet tested, 1 yes, 2 no
 	wroteHeader     bool
 	header          http.Header
-	lastWritePos    int
 }
 
 // initLazyTags reads only once from the chanTag and blocks until data is
 // available and then sorts them all to maintain the order as which they occur
-// in the HTML page. You must close chanTag or this blocks 4ever.
+// in the HTML page. ONce you're finished writing into the channel, you must
+// close chanTag or this blocks 4ever.
 func (b *injectingWriter) initLazyTags() {
 	if b.lazyTags == nil {
-		b.lazyTags = make(esitag.DataTags, 0, avgESITagsPerPage)
+		b.lazyTags = esitag.NewDataTagsCapped(avgESITagsPerPage)
 		for ct := range b.chanTag {
-			b.lazyTags = append(b.lazyTags, ct)
+			b.lazyTags.Slice = append(b.lazyTags.Slice, ct)
 		}
 		sort.Sort(b.lazyTags)
 	}
@@ -101,8 +101,9 @@ func (b *injectingWriter) WriteHeader(code int) {
 // int states. The returned int is len(p). The reason for that incorrect
 // behaviour can be looked up bytes.Buffer.WriteTo where it will panic once the
 // writer returns more data written than the data contains. Some other Caddy
-// middleware uses Buffer.WriteTo ... if you know a better solutions to return
-// the correct value, let me know.
+// middleware (probably template stuff) uses Buffer.WriteTo and this is a hacky
+// way to get around that middleware ... if you know a better solutions to
+// return the correct value, let me know.
 func (b *injectingWriter) Write(p []byte) (int, error) {
 	const (
 		notTested uint8 = iota
@@ -111,7 +112,6 @@ func (b *injectingWriter) Write(p []byte) (int, error) {
 	)
 
 	if b.responseAllowed == notTested {
-		// Only plain text response is benchIsResponseAllowed, so detect content type.
 		// Hopefully data is longer than 512 bytes ;-)
 		b.responseAllowed = yes
 		if !isResponseAllowed(p) {
@@ -124,12 +124,12 @@ func (b *injectingWriter) Write(p []byte) (int, error) {
 	}
 	b.initLazyTags()
 
-	// might be buggy in InjectContent on multiple calls to Write(). Fix is to a
-	// position counter to the InjectContent. The position is pos+=len(data)
-	_, _, err := b.lazyTags.InjectContent(newSimpleReader(p), b.rw, b.lastWritePos)
-	// The write of InjectContent is invisible as we write more data as
-	// sometimes the bytes.Buffer.WriteTo checks
-	b.lastWritePos += len(p)
+	_, err := b.lazyTags.InjectContent(p, b.rw)
+	// The write of InjectContent is invisible as we write more data. If it
+	// returns more data written than the input `p` contains, the next
+	// middlewares would panic when using buffer.WriteTo. So only return len(p)
+	// as the amount of data written. Maybe I or someone can remove this
+	// misbehaviour one day ...
 	return len(p), err
 }
 

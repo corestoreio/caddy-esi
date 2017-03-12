@@ -15,7 +15,6 @@
 package caddyesi
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
 	"sort"
@@ -130,13 +129,13 @@ func (mw *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, er
 						}
 						close(coaChanTag)
 					}()
-					tags := make(esitag.DataTags, 0, avgESITagsPerPage)
+					tags := esitag.NewDataTagsCapped(avgESITagsPerPage)
 					for tag := range coaChanTag {
-						tags = append(tags, tag)
+						tags.Slice = append(tags.Slice, tag)
 					}
 					return tags, nil
 				})
-				for _, tag := range doRes.(esitag.DataTags) {
+				for _, tag := range doRes.(*esitag.DataTags).Slice {
 					chanTag <- tag
 				}
 			}()
@@ -188,8 +187,6 @@ func (mw *Middleware) serveBuffered(cfg *PathConfig, pageID uint64, w http.Respo
 		return code, nil
 	}
 
-	bufRdr := bytes.NewReader(buf.Bytes())
-
 	// Parse the buffer to find Tag tags. First buffer Read happens within this
 	// Group.Do block. We make sure with the Group.Do call that Tag tags for a
 	// specific page ID gets only parsed once, even if multiple requests are
@@ -199,7 +196,7 @@ func (mw *Middleware) serveBuffered(cfg *PathConfig, pageID uint64, w http.Respo
 	// run a performance load test to see if it's worth to switch to Group.DoChan
 	groupEntitiesResult, err, shared := mw.Group.Do(strconv.FormatUint(pageID, 10), func() (interface{}, error) {
 
-		entities, err := esitag.Parse(bufRdr)
+		entities, err := esitag.Parse(newSimpleReader(buf.Bytes()))
 		if cfg.Log.IsDebug() {
 			const contentMaxLength = 512
 			var content string
@@ -251,9 +248,9 @@ func (mw *Middleware) serveBuffered(cfg *PathConfig, pageID uint64, w http.Respo
 		close(cTags)
 	}()
 
-	tags := make(esitag.DataTags, 0, avgESITagsPerPage)
+	tags := esitag.NewDataTagsCapped(avgESITagsPerPage)
 	for t := range cTags {
-		tags = append(tags, t)
+		tags.Slice = append(tags.Slice, t)
 	}
 
 	// Calculates the correct Content-Length and enables now the real writing to the
@@ -263,12 +260,9 @@ func (mw *Middleware) serveBuffered(cfg *PathConfig, pageID uint64, w http.Respo
 	// restore original order as occurred in the HTML document.
 	sort.Sort(tags)
 
-	if _, err := bufRdr.Seek(0, 0); err != nil { // Reset io.Reader
-		return http.StatusInternalServerError, err
-	}
 	// read the 2nd time from the buffer to finally inject the content from the resource backends
 	// into the HTML page
-	if _, _, err := tags.InjectContent(bufRdr, bufResW, 0); err != nil {
+	if _, err := tags.InjectContent(buf.Bytes(), bufResW); err != nil {
 		return http.StatusInternalServerError, err
 	}
 

@@ -22,6 +22,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"io/ioutil"
+
 	"github.com/SchumacherFM/caddyesi/esitag"
 	"github.com/stretchr/testify/assert"
 )
@@ -128,7 +130,7 @@ func TestResponseWrapInjector(t *testing.T) {
 
 	t.Run("Run injector once on text data", func(t *testing.T) {
 		dtChan := make(chan esitag.DataTag, 1)
-		dtChan <- esitag.DataTag{Data: []byte(`Hello XML`), End: 16, Start: 12}
+		dtChan <- esitag.DataTag{Data: []byte(`Hello XML`), Start: 12, End: 16}
 		close(dtChan)
 
 		rec := httptest.NewRecorder()
@@ -155,8 +157,46 @@ func TestResponseWrapInjector(t *testing.T) {
 		if _, err := rwi.Write(html2); err != nil {
 			t.Fatal(err)
 		}
-		// This test will fail once InjectContent has been bug fixed.
-		assert.Exactly(t, "<HtMl><bOdY> <Hello><world status=\"sinking\"></world></Hello>|<data>Text an<Hello><world status=\"sinking\"></world></Hello>/data></body></html>",
+
+		assert.Exactly(t,
+			"<HtMl><bOdY> <Hello><world status=\"sinking\"></world></Hello>|<data>Text and much more content.</data></body></html>",
 			rec.Body.String())
+	})
+
+	t.Run("xyzRun injector on large file with multiple different sized writes", func(t *testing.T) {
+		// Changing the page09.html content, you have also to adjust the DataTag ...
+		dtChan := make(chan esitag.DataTag, 1)
+		dtChan <- esitag.DataTag{Start: 25297, End: 25450, Data: []byte("<table border='1' cellpadding='3' cellspacing='2'><tr><th>Key</th><th>Value</th></tr>\n<tr><td>Session</td><td>session_</td></tr>\n<tr><td>Next Session Integer</td><td>5</td></tr>\n<tr><td>RequestURI</td><td>/page_blog_post.html</td></tr>\n<tr><td>Headers</td><td>User-Agent: curl/7.47.1<br>\n</td></tr>\n<tr><td>Time</td><td>Sun, 05 Mar 2017 20:15:14 +0100</td></tr>\n</table>\n\n<!-- Duration:565.039µs Error:none Tag:include src=\"grpcServerDemo\" printdebug=\"1\" key=\"session_{Fsession}\" forwardheaders=\"all\" timeout=\"4ms\" onerror=\"Demo gRPC server unavailable :-(\" -->\n")}
+		close(dtChan)
+
+		html, err := ioutil.ReadFile("testdata/page09.html")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rec := httptest.NewRecorder()
+		rwi := responseWrapInjector(dtChan, rec)
+
+		// First we write 32768 and then the rest 42291-32768=9523
+		from := 0
+		to := 32768
+
+		n, err := rwi.Write(html[from:to])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		from = to
+		to = 42701
+		n2, err := rwi.Write(html[from:to])
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		//if err := ioutil.WriteFile("testdata/page09_out.html", rec.Body.Bytes(), 0644); err != nil {
+		//	t.Fatal(err)
+		//}
+		//assert.Exactly(t, 43111, rec.Body.Len())
+		//assert.Exactly(t, n+n2, rec.Body.Len()) // extra data 410
 	})
 }
