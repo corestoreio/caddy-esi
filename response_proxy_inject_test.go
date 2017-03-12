@@ -193,9 +193,12 @@ func TestResponseWrapInjector(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		_ = n + n2
+
 		//if err := ioutil.WriteFile("testdata/page09_out.html", rec.Body.Bytes(), 0644); err != nil {
 		//	t.Fatal(err)
 		//}
+		// bug: todo fix it: the bug is that 410 \x00 bytes gets written ...
 		//assert.Exactly(t, 43111, rec.Body.Len())
 		//assert.Exactly(t, n+n2, rec.Body.Len()) // extra data 410
 	})
