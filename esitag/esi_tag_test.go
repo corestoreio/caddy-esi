@@ -396,10 +396,78 @@ func newTestDataTags(dts ...esitag.DataTag) *esitag.DataTags {
 	}
 }
 
+type failWriter struct {
+	buf    bytes.Buffer
+	failAt int
+	writes int
+}
+
+func (fw *failWriter) Write(p []byte) (n int, err error) {
+	n, err = fw.buf.Write(p)
+	if err != nil {
+		panic(err)
+	}
+	if fw.failAt == fw.writes {
+		err = errors.NewAlreadyClosedf("Network stream closed!")
+	}
+	fw.writes++
+	return n, err
+}
+
+func TestDataTags_InjectContent_WriteFailed(t *testing.T) {
+	t.Parallel()
+
+	const rawInput = `<!DOCTYPE html>
+<html class="no-js" lang="en-US">
+<head>
+	<base href="//cyrillschumacher.com/"/>
+</head>
+<body>
+	<div>
+		<p c="0"><esi:include src="http://microService0" timeout="5ms" maxbodysize="10kb"/></p>
+		<p c="1"><esi:include src="http://microService1" timeout="6ms" maxbodysize="20kb"/></p>
+		<p c="2"><esi:include src="http://microService2" timeout="7ms" maxbodysize="30kb"/></p>
+		<p c="3"><esi:include src="http://microService3" timeout="8ms" maxbodysize="40kb"/></p>
+	</div>
+</body>
+</html>`
+
+	ets, err := esitag.Parse(bytes.NewBufferString(rawInput))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tags := newTestDataTags()
+	for k := 0; k < len(ets); k++ {
+		ets[k].DataTag.Data = []byte(fmt.Sprintf("Content from MicroService %d", k))
+		tags.Slice = append(tags.Slice, ets[k].DataTag)
+	}
+
+	const sep = `p>`
+	w := new(failWriter)
+	w.failAt = 3
+
+	hasError := false
+	for _, part := range strings.SplitAfter(rawInput, sep) {
+		written, err := tags.InjectContent([]byte(part), w)
+		if err != nil {
+			// t.Log(part)
+			assert.True(t, errors.IsWriteFailed(err), "%+v", err)
+			assert.True(t, errors.IsAlreadyClosed(err), "%+v", err)
+			assert.Exactly(t, 0, written)
+			hasError = true
+		}
+	}
+	if !hasError {
+		t.Error("Should have expected a write error but no error has occured")
+	}
+}
+
 func TestDataTags_InjectContent_MultipleWrites(t *testing.T) {
+	t.Parallel()
 
 	runner := func(rawInput, want string) func(*testing.T) {
 		runTest := func(t *testing.T, sep string) {
+
 			ets, err := esitag.Parse(bytes.NewBufferString(rawInput))
 			if err != nil {
 				t.Fatal(err)
@@ -677,28 +745,28 @@ func BenchmarkDataTags_InjectContent(b *testing.B) {
 			[]byte(`<p>Hello Jonathan Gopher. You're logged in.</p>`),
 		},
 	))
-	//b.Run("Page2", runner("testdata/page2.html",
-	//	[][]byte{
-	//		[]byte(`<p>Hello John Gopher. You're logged in.</p>`),
-	//		[]byte(`<h1>You have 4 items in your shopping cart.</h1>`),
-	//	},
-	//))
-	//b.Run("Page3", runner("testdata/page3.html",
-	//	[][]byte{
-	//		[]byte(`<p>This microservice generates content one. </p>`),
-	//		[]byte(`<h1>This microservice generates content two. </h1>`),
-	//		[]byte(`<script> alert('This microservice generates content three. ');</script>`),
-	//	},
-	//))
-	//b.Run("Page4", runner("testdata/page4.html",
-	//	[][]byte{
-	//		[]byte(`<p>This microservice generates content one. </p>`),
-	//		[]byte(`<h1>This microservice generates content two. @</h1>`),
-	//		[]byte(`<h1>This microservice generates content three. €</h1>`),
-	//		[]byte(`<h1>This microservice generates content four. 4</h1>`),
-	//		[]byte(`<h1>This microservice generates content five. 5</h1>`),
-	//	},
-	//))
+	b.Run("Page2", runner("testdata/page2.html",
+		[][]byte{
+			[]byte(`<p>Hello John Gopher. You're logged in.</p>`),
+			[]byte(`<h1>You have 4 items in your shopping cart.</h1>`),
+		},
+	))
+	b.Run("Page3", runner("testdata/page3.html",
+		[][]byte{
+			[]byte(`<p>This microservice generates content one. </p>`),
+			[]byte(`<h1>This microservice generates content two. </h1>`),
+			[]byte(`<script> alert('This microservice generates content three. ');</script>`),
+		},
+	))
+	b.Run("Page4", runner("testdata/page4.html",
+		[][]byte{
+			[]byte(`<p>This microservice generates content one. </p>`),
+			[]byte(`<h1>This microservice generates content two. @</h1>`),
+			[]byte(`<h1>This microservice generates content three. €</h1>`),
+			[]byte(`<h1>This microservice generates content four. 4</h1>`),
+			[]byte(`<h1>This microservice generates content five. 5</h1>`),
+		},
+	))
 }
 
 func TestEntity_QueryResources(t *testing.T) {
