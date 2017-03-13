@@ -8,7 +8,8 @@ retrieving from heterogeneous backends aka. micro services.
 
 #### Some features:
 
-- Query data from HTTP, HTTPS, gRPC, Redis, Memcache and soon SQL. Default implementation: HTTP/S.
+- Query data from HTTP, HTTPS, HTTP2, gRPC, Redis, Memcache and soon SQL.
+Default implementation: HTTP/S/2.
 - Multiple incoming requests trigger only one single parsing of the ESI tags per
 page
 - Querying multiple backend server parallel and concurrent.
@@ -173,8 +174,8 @@ Implemented:
 - [x] Basic ESI Tag
 - [x] With timeout
 - [ ] With ttl
-- [x] Load local file after timeout
-- [ ] Flip src to AJAX call after timeout
+- [x] Load local file after timeout for error handling
+- [ ] Flip src to AJAX call or HTTP2 push after timeout
 - [x] Forward all headers
 - [x] Forward some headers
 - [x] Forward POST,PATCH, PUT data
@@ -192,8 +193,8 @@ Implemented:
 - [ ] fCGI access
 - [x] gRPC access
 - [x] Shell scripts/programs access (stderr|out|in) communication
-- [x] Handle compressed content from backends (Go http.Client)
 - [x] Query HTTP/S backend servers
+- [x] Handle compressed content from backends (Go http.Client)
 - [x] Coalesce multiple requests into one backend request
 
 Only HTTP backend resources are enabled by default.
@@ -580,17 +581,30 @@ supported. You should switch to a server side scripting language ;-).
 
 # Building
 
-Use build tags to enable the different backend resource handlers in package
-`esitag/backend`. Supported tags are:
+The following command enables HTTP/S/2 backends:
 
-- esiall: enables all handlers
-- esigrpc: compiles gRPC handler only
-- esiredis: compiles Redis handler only
-- esimemcache: compiles Memcache handler only
-- esishell: compiles shell handler only
-- .... ?
+```bash
+$ go get -u github.com/mholt/caddy/...
+# maybe checkout different version of caddy. Tested with 0.9.5
+$ go get -u github.com/SchumacherDM/caddyesi/...
+```
 
-See file `integration.sh` for examples.
+In file `$GOPATH/src/github.com/mholt/caddy/caddy/caddymain/run.go` add the line
+`_ "github.com/SchumacherFM/caddyesi"` after the text `// This is where other plugins get plugged in (imported)`.
+
+In file `$GOPATH/src/github.com/mholt/caddy/caddyhttp/httpserver/plugin.go` find
+the variable `directives` and add the entry `"esi",` between `hugo` and
+`mailout`. At the moment I'm not quite sure if that is the correct place. If any
+other middleware fails, you should change the position of the `esi` entry to
+somewhere else. Please report back here by opening an issue.
+
+Then you are ready to compile Caddy with ESI support:
+
+```
+$ GOOS=linux GOARCH=amd64 go build -o caddyesi $GOPATH/src/github.com/mholt/caddy/caddy/main.go
+```
+
+Change `GOOS` and `GOARCH` to whatever architecture and operating system you are targeting.
 
 # Contribute
 
@@ -601,44 +615,35 @@ Multi-time pull request senders gets collaborator access.
 
 # Attribution
 
-### https://godoc.org/golang.org/x/sync/syncmap
+### github.com/vdobler/ht
 
-In package `esitag` the type `EntitiesMap` and its files starting with
-`syncmap_*.go`.
-
-```text
-Copyright 2016 The Go Authors. All rights reserved.
-Use of this source code is governed by a BSD-style
-license that can be found in the LICENSE file.
-
-Copyright (c) 2009 The Go Authors. All rights reserved.
+Copyright (c) 2014, Volker Dobler
+All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
+modification, are permitted provided that the following conditions are met:
 
-   * Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-   * Redistributions in binary form must reproduce the above
-copyright notice, this list of conditions and the following disclaimer
-in the documentation and/or other materials provided with the
-distribution.
-   * Neither the name of Google Inc. nor the names of its
-contributors may be used to endorse or promote products derived from
-this software without specific prior written permission.
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+* Neither the name of ht nor the names of its
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-```
 
 ### github.com/dustin/go-humanize
 
