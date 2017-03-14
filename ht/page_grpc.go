@@ -65,7 +65,7 @@ func pageGRPC() (t *ht.Test) {
 				// This test also runs on Travis and compiled with -race so must
 				// set the limit to a higher seconds value. Usually it can be
 				// run with "0.9995 ≤ 0.2s".
-				Limits:             "0.9995 ≤ 1.5s",
+				Limits:             "0.9995 ≤ 2.2s",
 				IndividualSessions: false,
 			},
 		),
