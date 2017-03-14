@@ -69,4 +69,4 @@ BenchmarkMiddleware/ServeHTTP_Parallel-4           	   50000	     37046 ns/op	  
 BenchmarkMiddleware/ServeHTTP_Parallel-4           	   30000	     36492 ns/op	   46009 B/op	      66 allocs/op
 BenchmarkMiddleware/ServeHTTP_Parallel-4           	   50000	     37666 ns/op	   46020 B/op	      66 allocs/op
 PASS
-ok  	github.com/SchumacherFM/caddyesi	148.143s
+ok  	github.com/corestoreio/caddy-esi	148.143s

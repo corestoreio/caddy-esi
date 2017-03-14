@@ -1,4 +1,4 @@
-// Copyright 2016-2017, Cyrill @ Schumacher.fm and the CaddyESI Contributors
+// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -22,7 +22,7 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/SchumacherFM/caddyesi/esitag"
+	"github.com/corestoreio/caddy-esi/esitag"
 )
 
 func responseWrapInjector(cTag <-chan esitag.DataTag, w http.ResponseWriter) http.ResponseWriter {

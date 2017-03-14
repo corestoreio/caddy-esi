@@ -3,7 +3,7 @@
 set -exo pipefail
 
 sed -i.bak '/This is where other plugins get plugged in (imported)/a\
-_ "github.com/SchumacherFM/caddyesi"\'$'\n' $GOPATH/src/github.com/mholt/caddy/caddy/caddymain/run.go
+_ "github.com/corestoreio/caddy-esi"\'$'\n' $GOPATH/src/github.com/mholt/caddy/caddy/caddymain/run.go
 
 sed -i.bak '/directives that add middleware to the stack/a\
 "esi",\'$'\n' $GOPATH/src/github.com/mholt/caddy/caddyhttp/httpserver/plugin.go
@@ -22,4 +22,4 @@ go build -tags esiall -race -o caddy.bin $GOPATH/src/github.com/mholt/caddy/cadd
 ./caddy.bin -conf ./Caddyfile &
 sleep 6
 
-go run $GOPATH/src/github.com/SchumacherFM/caddyesi/ht/*.go
+go run $GOPATH/src/github.com/corestoreio/caddy-esi/ht/*.go

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SchumacherFM/caddyesi/helper"
+	"github.com/corestoreio/caddy-esi/helper"
 )
 
 // now mocked out for testing

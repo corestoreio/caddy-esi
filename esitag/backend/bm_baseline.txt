@@ -72,4 +72,4 @@ BenchmarkNewFetchShellExec_Parallel-4                     	     500	   2665239 n
 BenchmarkNewFetchShellExec_Parallel-4                     	     500	   2631616 ns/op	   32120 B/op	     108 allocs/op
 FAIL
 exit status 1
-FAIL	github.com/SchumacherFM/caddyesi/esitag/backend	132.869s
+FAIL	github.com/corestoreio/caddy-esi/esitag/backend	132.869s

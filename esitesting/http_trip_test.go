@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/SchumacherFM/caddyesi/esitesting"
+	"github.com/corestoreio/caddy-esi/esitesting"
 	"github.com/corestoreio/errors"
 	"github.com/stretchr/testify/assert"
 )

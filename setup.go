@@ -1,4 +1,4 @@
-// Copyright 2016-2017, Cyrill @ Schumacher.fm and the CaddyESI Contributors
+// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -21,10 +21,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SchumacherFM/caddyesi/esicache"
-	"github.com/SchumacherFM/caddyesi/esitag"
-	_ "github.com/SchumacherFM/caddyesi/esitag/backend" // Let them register depending on the build tag
-	"github.com/SchumacherFM/caddyesi/helper"
+	"github.com/corestoreio/caddy-esi/esicache"
+	"github.com/corestoreio/caddy-esi/esitag"
+	_ "github.com/corestoreio/caddy-esi/esitag/backend" // Let them register depending on the build tag
+	"github.com/corestoreio/caddy-esi/helper"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
 	"github.com/corestoreio/log/zapw"

@@ -119,4 +119,4 @@ BenchmarkEntities_UniqueID-4                         	 5000000	       294 ns/op	
 BenchmarkEntities_UniqueID-4                         	 5000000	       311 ns/op	      96 B/op	       1 allocs/op
 BenchmarkEntities_UniqueID-4                         	 5000000	       291 ns/op	      96 B/op	       1 allocs/op
 PASS
-ok  	github.com/SchumacherFM/caddyesi/esitag	734.949s
+ok  	github.com/corestoreio/caddy-esi/esitag	734.949s

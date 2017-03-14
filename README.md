@@ -4,7 +4,7 @@ This plugin implements partial ESI [Edge Side Includes](https://en.wikipedia.org
 support for the [Caddy Webserver](https://caddyserver.com) to allow data
 retrieving from heterogeneous backends aka. micro services.
 
-[![Build Status](https://travis-ci.org/SchumacherFM/caddyesi.svg?branch=master)](https://travis-ci.org/SchumacherFM/caddyesi)
+[![Build Status](https://travis-ci.org/corestoreio/caddy-esi.svg?branch=master)](https://travis-ci.org/corestoreio/caddy-esi)
 
 #### Some features:
 
@@ -590,7 +590,7 @@ $ go get -u github.com/SchumacherDM/caddyesi/...
 ```
 
 In file `$GOPATH/src/github.com/mholt/caddy/caddy/caddymain/run.go` add the line
-`_ "github.com/SchumacherFM/caddyesi"` after the text `// This is where other plugins get plugged in (imported)`.
+`_ "github.com/corestoreio/caddy-esi"` after the text `// This is where other plugins get plugged in (imported)`.
 
 In file `$GOPATH/src/github.com/mholt/caddy/caddyhttp/httpserver/plugin.go` find
 the variable `directives` and add the entry `"esi",` between `hugo` and
