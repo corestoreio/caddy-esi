@@ -23,9 +23,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/alicebob/miniredis"
 	"github.com/corestoreio/caddy-esi"
 	"github.com/corestoreio/caddy-esi/esitesting"
-	"github.com/alicebob/miniredis"
 )
 
 func TestMiddleware_ServeHTTP_Redis(t *testing.T) {

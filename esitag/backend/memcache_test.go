@@ -26,9 +26,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/corestoreio/caddy-esi/esitag"
 	"github.com/corestoreio/caddy-esi/esitag/backend"
-	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/corestoreio/errors"
 	"github.com/mitchellh/go-ps"
 	"github.com/stretchr/testify/assert"

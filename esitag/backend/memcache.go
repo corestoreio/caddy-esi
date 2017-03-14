@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/corestoreio/caddy-esi/esitag"
 	"github.com/bradfitz/gomemcache/memcache"
+	"github.com/corestoreio/caddy-esi/esitag"
 	"github.com/corestoreio/errors"
 )
 

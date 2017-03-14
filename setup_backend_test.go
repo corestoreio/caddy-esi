@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/corestoreio/caddy-esi/esitesting"
 	"github.com/alicebob/miniredis"
+	"github.com/corestoreio/caddy-esi/esitesting"
 	"github.com/corestoreio/errors"
 )
 

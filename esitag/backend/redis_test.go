@@ -25,9 +25,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis"
 	"github.com/corestoreio/caddy-esi/esitag"
 	"github.com/corestoreio/caddy-esi/esitag/backend"
-	"github.com/alicebob/miniredis"
 	"github.com/corestoreio/errors"
 	"github.com/mitchellh/go-ps"
 	"github.com/stretchr/testify/assert"
