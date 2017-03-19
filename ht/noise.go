@@ -16,6 +16,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/vdobler/ht/ht"
@@ -24,6 +25,11 @@ import (
 var noisyCounter chan int
 
 func init() {
+	if noNoise := os.Getenv("ESI_DISABLE_NOISE"); noNoise != "" {
+		println("[ht/main] Background noise requests disabled: ", noNoise)
+		return
+	}
+
 	noisyCounter = make(chan int) // must be blocking
 	// generator for incremented integers to be race free
 	go func() {
