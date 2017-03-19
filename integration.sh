@@ -22,4 +22,8 @@ go build -tags esiall -race -o caddy.bin $GOPATH/src/github.com/mholt/caddy/cadd
 ./caddy.bin -conf ./Caddyfile &
 sleep 6
 
+lsof -n -i | grep LISTEN
+
 go run $GOPATH/src/github.com/corestoreio/caddy-esi/ht/*.go
+
+lsof -n -i | grep LISTEN
