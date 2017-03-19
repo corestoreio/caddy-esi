@@ -23,7 +23,8 @@ before_install:
   - if [ "$TRAVIS_OS_NAME" = osx ]; then brew install memcached; fi
   - if [ "$TRAVIS_OS_NAME" = osx ]; then /usr/local/opt/memcached/bin/memcached -l 127.0.0.1:11211 -d; fi
   - if [ "$TRAVIS_OS_NAME" = osx ]; then brew install redis; fi
-  - if [ "$TRAVIS_OS_NAME" = osx ]; then brew services start redis; fi
+  - if [ "$TRAVIS_OS_NAME" = osx ]; then which redis-server; fi
+  - if [ "$TRAVIS_OS_NAME" = osx ]; then redis-server /usr/local/etc/redis.conf; fi
 
 install:
   - go get -tags esiall -t ./...
