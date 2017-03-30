@@ -28,6 +28,9 @@ import (
 )
 
 // https://github.com/garyburd/redigo/issues/207 <-- context to be added to the package: declined.
+// TODO: instead of getting a single key via GET, we must use MGET to retrieve
+// multiple keys within one connection to Redis. During page parsing we know
+// ahead of all possible Redis keys!
 
 func init() {
 	esitag.RegisterResourceHandlerFactory("redis", NewRedis)
