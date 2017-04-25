@@ -4,6 +4,16 @@ This plugin implements partial ESI [Edge Side Includes](https://en.wikipedia.org
 support for the [Caddy Webserver](https://caddyserver.com) to allow data
 retrieving from heterogeneous backends aka. micro services.
 
+### Test Users Wanted!
+
+This plugin has the pre-beta status and we need some users who tests it with
+various other middlewares on either their test server or even in production. The
+plugin has been running currently for a couple of weeks on
+[https://cyrillschumacher.com](https://cyrillschumacher.com/projects/2017-03-04-edge-side-includes-with-caddy/).
+So far it runs smoothly. Please test it and report bugs in the issue tracker.
+
+Thanks!
+
 [![Build Status](https://travis-ci.org/corestoreio/caddy-esi.svg?branch=master)](https://travis-ci.org/corestoreio/caddy-esi)
 
 #### Some features:
