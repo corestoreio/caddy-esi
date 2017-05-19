@@ -13,4 +13,6 @@
 // the License.
 
 // Package backend provides integrations for 3rd party resources.
+//
+// TODO(CyS) Add https://open.dgraph.io/post/badger/
 package backend
