@@ -1,4 +1,5 @@
-# ESI Tags for Caddy Server (Alpha, WIP)
+# ESI Tags for Caddy Server (Alpha, WIP
+)
 
 This plugin implements partial ESI [Edge Side Includes](https://en.wikipedia.org/wiki/Edge_Side_Includes) 
 support for the [Caddy Webserver](https://caddyserver.com) to allow data
