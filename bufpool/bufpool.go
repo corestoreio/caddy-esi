@@ -5,6 +5,8 @@ import (
 	"sync"
 )
 
+const bufferMaxSize = 1 << 18 // 256KiB
+
 var bufferPool = New(8 * 1024) // estimated *cough* average size
 
 // Get returns a buffer from the pool.
@@ -15,6 +17,16 @@ func Get() *bytes.Buffer {
 // Put returns a buffer to the pool.
 // The buffer is reset before it is put back into circulation.
 func Put(buf *bytes.Buffer) {
+	// @see https://go-review.googlesource.com/c/go/+/136116/4/src/fmt/print.go
+	// Proper usage of a sync.Pool requires each entry to have approximately
+	// the same memory cost. To obtain this property when the stored type
+	// contains a variably-sized buffer, we add a hard limit on the maximum buffer
+	// to place back in the pool.
+	//
+	// See https://golang.org/issue/23199
+	if buf.Cap() > bufferMaxSize {
+		return
+	}
 	bufferPool.Put(buf)
 }
 
@@ -40,6 +52,16 @@ func (t Tank) Get() *bytes.Buffer {
 // away otherwise your returned byte slice will be empty.
 // For using String() no copying is required.
 func (t Tank) Put(buf *bytes.Buffer) {
+	// @see https://go-review.googlesource.com/c/go/+/136116/4/src/fmt/print.go
+	// Proper usage of a sync.Pool requires each entry to have approximately
+	// the same memory cost. To obtain this property when the stored type
+	// contains a variably-sized buffer, we add a hard limit on the maximum buffer
+	// to place back in the pool.
+	//
+	// See https://golang.org/issue/23199
+	if buf.Cap() > bufferMaxSize {
+		return
+	}
 	buf.Reset()
 	t.p.Put(buf)
 }

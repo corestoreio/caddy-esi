@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -40,12 +40,12 @@ type esiMemCache struct {
 func NewMemCache(opt *esitag.ResourceOptions) (esitag.ResourceHandler, error) {
 	addr, _, params, err := opt.ParseNoSQLURL()
 	if err != nil {
-		return nil, errors.NewNotValidf("[backend] NewMemCache error parsing URL %q => %s", opt.URL, err)
+		return nil, errors.NotValid.Newf("[backend] NewMemCache error parsing URL %q => %s", opt.URL, err)
 	}
 
 	idleTimeout, err := time.ParseDuration(params.Get("idle_timeout"))
 	if err != nil {
-		return nil, errors.NewNotValidf("[backend] NewMemCache.ParseNoSQLURL. Parameter idle_timeout not valid in  %q", opt.URL)
+		return nil, errors.NotValid.Newf("[backend] NewMemCache.ParseNoSQLURL. Parameter idle_timeout not valid in  %q", opt.URL)
 	}
 
 	servers := []string{addr}
@@ -66,7 +66,7 @@ func NewMemCache(opt *esitag.ResourceOptions) (esitag.ResourceHandler, error) {
 
 	// some pseudo ping
 	if _, err := mc.pool.Get("caddyesi_key_not_found"); err != nil && err != memcache.ErrCacheMiss {
-		return nil, errors.NewFatalf("[backend] MemCache ping failed: %s", err)
+		return nil, errors.Fatal.Newf("[backend] MemCache ping failed: %s", err)
 	}
 
 	return mc, nil
@@ -97,7 +97,7 @@ func (mc *esiMemCache) doRequest(args *esitag.ResourceArgs) (_ http.Header, _ []
 
 	itm, err := mc.pool.Get(args.Tag.Key)
 	if err == memcache.ErrCacheMiss {
-		return nil, nil, errors.NewNotFoundf("[backend] URL %q: Key %q not found", mc.url, args.Tag.Key)
+		return nil, nil, errors.NotFound.Newf("[backend] URL %q: Key %q not found", mc.url, args.Tag.Key)
 	}
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "[backend] Memcache.Get %q => %q", mc.url, args.Tag.Key)
@@ -128,7 +128,7 @@ func (mc *esiMemCache) doRequestCancel(args *esitag.ResourceArgs) (_ http.Header
 
 		itm, err := mc.pool.Get(args.Tag.Key)
 		if err == memcache.ErrCacheMiss {
-			retErr <- errors.NewNotFoundf("[backend] URL %q: Key %q not found", mc.url, args.Tag.Key)
+			retErr <- errors.NotFound.Newf("[backend] URL %q: Key %q not found", mc.url, args.Tag.Key)
 			return
 		}
 

@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -118,7 +118,7 @@ func (dts *DataTags) InjectContent(data []byte, w io.Writer) (nWritten int, _ er
 	if dts.Len() == 0 || dataLen == 0 {
 		wn, err := w.Write(data)
 		nWritten += wn
-		return nWritten, errors.NewWriteFailed(err, "[esitag] Failed to write")
+		return nWritten, errors.WriteFailed.New(err, "[esitag] Failed to write")
 	}
 
 	dts.streamCur += dataLen
@@ -152,7 +152,7 @@ func (dts *DataTags) InjectContent(data []byte, w io.Writer) (nWritten int, _ er
 			if hasPosEndInData {
 				wn, err := w.Write(data[relPosEnd:])
 				if err != nil {
-					return nWritten, errors.NewWriteFailed(err, writeErr, di, dt.Start, dt.End)
+					return nWritten, errors.WriteFailed.New(err, writeErr, di, dt.Start, dt.End)
 				}
 				nWritten += wn
 				dts.writeStates[di] = writeStateDone
@@ -174,20 +174,20 @@ func (dts *DataTags) InjectContent(data []byte, w io.Writer) (nWritten int, _ er
 					//fmt.Printf("TagID[%d] after: %q\n", di, data[relPosEnd:nextStartPos])
 					wn, err := w.Write(data[prevRelPosEnd:relPosStart])
 					if err != nil {
-						return nWritten, errors.NewWriteFailed(err, writeErr, di, dt.Start, dt.End)
+						return nWritten, errors.WriteFailed.New(err, writeErr, di, dt.Start, dt.End)
 					}
 					nWritten += wn
 
 					wn, err = w.Write(dt.Data)
 					if err != nil {
-						return nWritten, errors.NewWriteFailed(err, writeErr, di, dt.Start, dt.End)
+						return nWritten, errors.WriteFailed.New(err, writeErr, di, dt.Start, dt.End)
 					}
 					nWritten += wn
 
 					if isLast {
 						wn, err := w.Write(data[relPosEnd:nextStartPos])
 						if err != nil {
-							return nWritten, errors.NewWriteFailed(err, writeErr, di, dt.Start, dt.End)
+							return nWritten, errors.WriteFailed.New(err, writeErr, di, dt.Start, dt.End)
 						}
 						nWritten += wn
 					}
@@ -196,19 +196,19 @@ func (dts *DataTags) InjectContent(data []byte, w io.Writer) (nWritten int, _ er
 					// write before tag, write DataTag itself, then write the remaining chunks
 					wn, err := w.Write(data[:relPosStart])
 					if err != nil {
-						return nWritten, errors.NewWriteFailed(err, writeErr, di, dt.Start, dt.End)
+						return nWritten, errors.WriteFailed.New(err, writeErr, di, dt.Start, dt.End)
 					}
 					nWritten += wn
 
 					wn, err = w.Write(dt.Data)
 					if err != nil {
-						return nWritten, errors.NewWriteFailed(err, writeErr, di, dt.Start, dt.End)
+						return nWritten, errors.WriteFailed.New(err, writeErr, di, dt.Start, dt.End)
 					}
 					nWritten += wn
 
 					wn, err = w.Write(data[relPosEnd:])
 					if err != nil {
-						return nWritten, errors.NewWriteFailed(err, writeErr, di, dt.Start, dt.End)
+						return nWritten, errors.WriteFailed.New(err, writeErr, di, dt.Start, dt.End)
 					}
 					nWritten += wn
 				}
@@ -219,13 +219,13 @@ func (dts *DataTags) InjectContent(data []byte, w io.Writer) (nWritten int, _ er
 			case hasPosStartInData:
 				wn, err := w.Write(data[:relPosStart])
 				if err != nil {
-					return nWritten, errors.NewWriteFailed(err, writeErr, di, dt.Start, dt.End)
+					return nWritten, errors.WriteFailed.New(err, writeErr, di, dt.Start, dt.End)
 				}
 				nWritten += wn
 
 				wn, err = w.Write(dt.Data)
 				if err != nil {
-					return nWritten, errors.NewWriteFailed(err, writeErr, di, dt.Start, dt.End)
+					return nWritten, errors.WriteFailed.New(err, writeErr, di, dt.Start, dt.End)
 				}
 				nWritten += wn
 
@@ -239,7 +239,7 @@ func (dts *DataTags) InjectContent(data []byte, w io.Writer) (nWritten int, _ er
 		n, err := w.Write(data)
 		nWritten += n
 		if err != nil {
-			return nWritten, errors.NewWriteFailed(err, "[esitag] InjectContent failed to copy remaining data to w")
+			return nWritten, errors.WriteFailed.New(err, "[esitag] InjectContent failed to copy remaining data to w")
 		}
 	}
 

@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -24,10 +24,10 @@ import (
 
 	"github.com/corestoreio/caddy-esi/esitag"
 	"github.com/corestoreio/errors"
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 )
 
-// https://github.com/garyburd/redigo/issues/207 <-- context to be added to the package: declined.
+// https://github.com/gomodule/redigo/issues/207 <-- context to be added to the package: declined.
 // TODO: instead of getting a single key via GET, we must use MGET to retrieve
 // multiple keys within one connection to Redis. During page parsing we know
 // ahead of all possible Redis keys!
@@ -46,20 +46,20 @@ type esiRedis struct {
 func NewRedis(opt *esitag.ResourceOptions) (esitag.ResourceHandler, error) {
 	addr, pw, params, err := opt.ParseNoSQLURL()
 	if err != nil {
-		return nil, errors.NewNotValidf("[backend] Redis error parsing URL %q => %s", opt.URL, err)
+		return nil, errors.NotValid.Newf("[backend] Redis error parsing URL %q => %s", opt.URL, err)
 	}
 
 	maxActive, err := strconv.Atoi(params.Get("max_active"))
 	if err != nil {
-		return nil, errors.NewNotValidf("[backend] NewRedis.ParseNoSQLURL. Parameter max_active not valid in  %q", opt.URL)
+		return nil, errors.NotValid.Newf("[backend] NewRedis.ParseNoSQLURL. Parameter max_active not valid in  %q", opt.URL)
 	}
 	maxIdle, err := strconv.Atoi(params.Get("max_idle"))
 	if err != nil {
-		return nil, errors.NewNotValidf("[backend] NewRedis.ParseNoSQLURL. Parameter max_idle not valid in  %q", opt.URL)
+		return nil, errors.NotValid.Newf("[backend] NewRedis.ParseNoSQLURL. Parameter max_idle not valid in  %q", opt.URL)
 	}
 	idleTimeout, err := time.ParseDuration(params.Get("idle_timeout"))
 	if err != nil {
-		return nil, errors.NewNotValidf("[backend] NewRedis.ParseNoSQLURL. Parameter idle_timeout not valid in  %q", opt.URL)
+		return nil, errors.NotValid.Newf("[backend] NewRedis.ParseNoSQLURL. Parameter idle_timeout not valid in  %q", opt.URL)
 	}
 
 	r := &esiRedis{
@@ -98,10 +98,10 @@ func NewRedis(opt *esitag.ResourceOptions) (esitag.ResourceHandler, error) {
 
 	pong, err := redis.String(conn.Do("PING"))
 	if err != nil && err != redis.ErrNil {
-		return nil, errors.NewFatalf("[backend] Redis Ping failed: %s", err)
+		return nil, errors.Fatal.Newf("[backend] Redis Ping failed: %s", err)
 	}
 	if pong != "PONG" {
-		return nil, errors.NewFatalf("[backend] Redis Ping not Pong: %#v", pong)
+		return nil, errors.Fatal.Newf("[backend] Redis Ping not Pong: %#v", pong)
 	}
 
 	return r, nil
@@ -135,7 +135,7 @@ func (er *esiRedis) doRequest(args *esitag.ResourceArgs) (_ http.Header, _ []byt
 
 	value, err := redis.Bytes(conn.Do("GET", args.Tag.Key))
 	if err == redis.ErrNil {
-		return nil, nil, errors.NewNotFoundf("[backend] URL %q: Key %q not found", er.url, args.Tag.Key)
+		return nil, nil, errors.NotFound.Newf("[backend] URL %q: Key %q not found", er.url, args.Tag.Key)
 	}
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "[backend] Redis.Get %q => %q", er.url, args.Tag.Key)
@@ -169,7 +169,7 @@ func (er *esiRedis) doRequestCancel(args *esitag.ResourceArgs) (_ http.Header, _
 
 		value, err := redis.Bytes(conn.Do("GET", args.Tag.Key))
 		if err == redis.ErrNil {
-			retErr <- errors.NewNotFoundf("[backend] URL %q: Key %q not found", er.url, args.Tag.Key)
+			retErr <- errors.NotFound.Newf("[backend] URL %q: Key %q not found", er.url, args.Tag.Key)
 			return
 		}
 		if err != nil {

@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -38,6 +38,9 @@ import (
 
 var mwTestHeaders = http.Header{"X-Esi-Test": []string{"GopherX"}}
 
+// TODO(CS 02.02.2019) the logic in github.com/mholt/caddy/caddyhttp/templates/templates.go:35 Templates.ServeHTTP
+//   has changed and this test case must be refactored
+
 func mwTestHandler(t *testing.T, caddyFile string) httpserver.Handler {
 	ctc := caddy.NewTestController("http", caddyFile)
 
@@ -76,7 +79,7 @@ func mwTestHandler(t *testing.T, caddyFile string) httpserver.Handler {
 	mids := httpserver.GetConfig(ctc).Middleware()
 
 	finalHandler := httpserver.HandlerFunc(func(w http.ResponseWriter, r *http.Request) (int, error) {
-		return http.StatusNotImplemented, errors.New("Should not be called! Or File not found")
+		return http.StatusNotImplemented, errors.New("[TestCaddyESI]: Should not be called! Or File not found")
 	})
 
 	var stack httpserver.Handler = finalHandler
@@ -87,7 +90,7 @@ func mwTestHandler(t *testing.T, caddyFile string) httpserver.Handler {
 	return stack
 }
 
-func mwTestRunner(caddyFile string, r *http.Request, bodyContains string, wantErrBhf errors.BehaviourFunc) func(*testing.T) {
+func mwTestRunner(caddyFile string, r *http.Request, bodyContains string, wantErrBhf errors.Kind) func(*testing.T) {
 
 	// Add here the middlewares Header and Template just to make sure that
 	// caddyesi middleware processes the other middlewares correctly.
@@ -101,8 +104,8 @@ func mwTestRunner(caddyFile string, r *http.Request, bodyContains string, wantEr
 		for ii := 1; ii <= 2; ii++ {
 			rec := httptest.NewRecorder()
 			code, err := stack.ServeHTTP(rec, r)
-			if wantErrBhf != nil {
-				assert.True(t, wantErrBhf(err), "Code %d Error: %s", code, err)
+			if wantErrBhf > 0 {
+				assert.True(t, wantErrBhf.Match(err), "Code %d Error:\n%+v", code, err)
 				return
 			} else if err != nil {
 				t.Fatalf("Iteration %d Code %d\n%+v", ii, code, err)
@@ -132,7 +135,7 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 	// t.Parallel() not possible due to the global map in backend
 
 	const errMsg = `mwTest01: A random micro service error`
-	defer esitag.RegisterResourceHandler("mwtest01", esitesting.MockRequestError(errors.NewWriteFailedf(errMsg))).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("mwtest01", esitesting.MockRequestError(errors.WriteFailed.Newf(errMsg))).DeferredDeregister()
 
 	t.Run("Protocol scheme in ESI tag not supported triggers error", mwTestRunner(
 		`esi {
@@ -140,7 +143,7 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 		}`,
 		httptest.NewRequest("GET", "/page06.html", nil),
 		"XXX<esi:include   src=\"unsupported://micro.service/esi/foo\"",
-		errors.IsNotSupported,
+		errors.NotSupported,
 	))
 
 	t.Run("Middleware inactive due to GET allowed but POST request supplied", mwTestRunner(
@@ -149,7 +152,7 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 		}`,
 		httptest.NewRequest("POST", "/page01.html", nil),
 		"<esi:include   src=\"mwTest01://micro.service/esi/foo\"",
-		nil,
+		errors.NoKind,
 	))
 
 	t.Run("Middleware inactive due to GET request on another path", mwTestRunner(
@@ -157,7 +160,7 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 		}`,
 		httptest.NewRequest("GET", "/page01.html", nil),
 		"<esi:include   src=\"mwTest01://micro.service/esi/foo\"",
-		nil,
+		errors.NoKind,
 	))
 
 	{
@@ -174,7 +177,7 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 		}`,
 			httptest.NewRequest("GET", "/page01.html", nil),
 			`my important global error message`,
-			nil,
+			errors.NoKind,
 		))
 		logContent, err := ioutil.ReadFile(tmpLogFile)
 		if err != nil {
@@ -191,7 +194,7 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 		`esi`,
 		httptest.NewRequest("GET", "/page01.html", nil),
 		caddyesi.DefaultOnError,
-		nil,
+		errors.NoKind,
 	))
 
 	defer esitag.RegisterResourceHandler("mwtest02a", esitesting.MockRequestContent("Micro1Service1")).DeferredDeregister()
@@ -203,14 +206,14 @@ func TestMiddleware_ServeHTTP_Once(t *testing.T) {
 		`<p>Micro1Service1 "mwTest02A://microService1" Timeout 5ms MaxBody 10 kB</p>
 <p>Micro2Service2 "mwTest02B://microService2" Timeout 6ms MaxBody 20 kB</p>
 <p>Micro3Service3 "mwTest02C://microService3" Timeout 7ms MaxBody 30 kB</p>`,
-		nil,
+		errors.NoKind,
 	))
 
 	t.Run("ESI tags not present in page07.html", mwTestRunner(
 		`esi`,
 		httptest.NewRequest("GET", "/page07.html", nil),
 		`<esi_include   src="whuuusaa://micro.service/esi/foo" />`,
-		nil,
+		errors.NoKind,
 	))
 
 }

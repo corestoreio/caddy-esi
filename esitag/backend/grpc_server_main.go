@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -41,12 +41,12 @@ type server struct{}
 func (s server) GetHeaderBody(_ context.Context, arg *esigrpc.ResourceArgs) (*esigrpc.HeaderBody, error) {
 
 	if arg.GetExternalReq() == nil {
-		return nil, errors.NewEmptyf("[grpc_server] GetExternalReq cannot be empty")
+		return nil, errors.Empty.Newf("[grpc_server] GetExternalReq cannot be empty")
 	}
 
 	if strings.Contains(arg.GetKey(), "error") {
 		// If you change the text, a test will fail
-		return nil, errors.NewInterruptedf("[grpc_server] Interrupted. Detected word error in %q for URL %q", arg.GetKey(), arg.GetUrl())
+		return nil, errors.Interrupted.Newf("[grpc_server] Interrupted. Detected word error in %q for URL %q", arg.GetKey(), arg.GetUrl())
 	}
 
 	if strings.HasSuffix(arg.GetKey(), ".html") {

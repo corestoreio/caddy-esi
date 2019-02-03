@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -45,14 +45,14 @@ type server struct {
 func (s server) GetHeaderBody(_ context.Context, arg *esigrpc.ResourceArgs) (*esigrpc.HeaderBody, error) {
 
 	if arg.GetExternalReq() == nil {
-		return nil, errors.NewEmptyf("[grpc_server] GetExternalReq cannot be empty")
+		return nil, errors.Empty.Newf("[grpc_server] GetExternalReq cannot be empty")
 	}
 
 	// key will be set in an ESI tag.
 	// <esi:include src="grpcServerDemo" key="session_{Fsession}" timeout="500ms" onerror="Demo gRPC server unavailable :-("/>
 	key := arg.GetKey() // key is now e.g. "session_JHDASDHASKDH_\x00"
 	if len(key) < 8 || len(key) > 128 {
-		return nil, errors.NewNotValidf("[grpc_server] Session key %q not valid", key)
+		return nil, errors.NotValid.Newf("[grpc_server] Session key %q not valid", key)
 	}
 
 	if _, ok := s.session.Get(key); !ok {
@@ -60,7 +60,7 @@ func (s server) GetHeaderBody(_ context.Context, arg *esigrpc.ResourceArgs) (*es
 	}
 	inc, err := s.session.IncrementInt64(key, 1)
 	if err != nil {
-		return nil, errors.NewFatalf("[grpc_server] Failed to increment %q", key)
+		return nil, errors.Fatal.Newf("[grpc_server] Failed to increment %q", key)
 	}
 
 	var buf bytes.Buffer

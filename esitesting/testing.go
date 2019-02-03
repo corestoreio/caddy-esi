@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -31,7 +31,7 @@ func init() {
 		return ResourceMock{
 			DoRequestFn: func(*esitag.ResourceArgs) (_ http.Header, content []byte, err error) {
 				// mockTimeout://duration
-				return nil, nil, errors.NewTimeoutf("[backend] Timeout after %q", opt.URL)
+				return nil, nil, errors.Timeout.Newf("[backend] Timeout after %q", opt.URL)
 			},
 		}, nil
 	})

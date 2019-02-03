@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -91,7 +91,7 @@ func TestNewFetchHTTP_Serial(t *testing.T) {
 	})
 
 	t.Run("Error Reading body", func(t *testing.T) {
-		haveErr := errors.NewAlreadyClosedf("Brain already closed")
+		haveErr := errors.AlreadyClosed.Newf("Brain already closed")
 
 		hdr, content, err := backend.NewFetchHTTP(esitesting.NewHTTPTrip(200, "A response longer than 15 bytes", haveErr)).DoRequest(rfa)
 		assert.Nil(t, hdr, "Header")
@@ -104,7 +104,7 @@ func TestNewFetchHTTP_Serial(t *testing.T) {
 		hdr, content, err := backend.NewFetchHTTP(esitesting.NewHTTPTrip(204, "A response longer than 15 bytes", nil)).DoRequest(rfa)
 		assert.Nil(t, hdr, "Header")
 		assert.Empty(t, content)
-		assert.True(t, errors.IsNotSupported(err), "%+v", err)
+		assert.True(t, errors.NotSupported.Match(err), "%+v", err)
 	})
 
 	t.Run("Request context cancel", func(t *testing.T) {

@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -43,7 +43,7 @@ func strReader(s string) io.ReadCloser {
 	return ioutil.NopCloser(strings.NewReader(s))
 }
 
-func testRunner(fileOrContent string, wantTags esitag.Entities, wantErrBhf errors.BehaviourFunc) func(*testing.T) {
+func testRunner(fileOrContent string, wantTags esitag.Entities, wantErrBhf errors.Kind) func(*testing.T) {
 	var rc io.ReadCloser
 	isFile := strings.HasSuffix(fileOrContent, ".html")
 	if isFile {
@@ -60,9 +60,9 @@ func testRunner(fileOrContent string, wantTags esitag.Entities, wantErrBhf error
 	return func(t *testing.T) {
 		defer rc.Close()
 		haveTags, err := esitag.Parse(rc)
-		if wantErrBhf != nil {
+		if wantErrBhf > 0 {
 			assert.Nil(t, haveTags)
-			assert.True(t, wantErrBhf(err), "%+v %s", err, t.Name())
+			assert.True(t, wantErrBhf.Match(err), "%+v %s", err, t.Name())
 			return
 		}
 		require.NoError(t, err, " In Test %s", t.Name())
@@ -110,7 +110,7 @@ var page3Results = esitag.Entities{
 
 func TestParseESITags_File(t *testing.T) {
 	t.Run("Page0", testRunner(
-		("page0.html"),
+		"page0.html",
 		esitag.Entities{
 			&esitag.Entity{
 				RawTag: []byte("include   src=\"https://micro.service/esi/foo\"\n                                            "),
@@ -120,10 +120,10 @@ func TestParseESITags_File(t *testing.T) {
 				},
 			},
 		},
-		nil,
+		errors.NoKind,
 	))
 	t.Run("Page1", testRunner(
-		("page1.html"),
+		"page1.html",
 		esitag.Entities{
 			&esitag.Entity{
 				RawTag: []byte("include src=\"https://micro.service/esi/foo\" timeout=\"8ms\" onerror=\"testdata/nocart.html\""),
@@ -133,10 +133,10 @@ func TestParseESITags_File(t *testing.T) {
 				},
 			},
 		},
-		nil,
+		errors.NoKind,
 	))
 	t.Run("Page2", testRunner(
-		("page2.html"),
+		"page2.html",
 		esitag.Entities{
 			&esitag.Entity{
 				RawTag: []byte("include src=\"https://micro.service/customer/account\" timeout=\"8ms\" onerror=\"testdata/nocart.html\""),
@@ -153,17 +153,17 @@ func TestParseESITags_File(t *testing.T) {
 				},
 			},
 		},
-		nil,
+		errors.NoKind,
 	))
 	t.Run("Page3", testRunner(
-		("page3.html"),
+		"page3.html",
 		page3Results,
-		nil,
+		errors.NoKind,
 	))
 	t.Run("Page5 onerror file not found", testRunner(
-		("page5.html"),
+		"page5.html",
 		nil,
-		errors.IsFatal,
+		errors.Fatal,
 	))
 
 }
@@ -252,16 +252,16 @@ src="https://micro4.service4/esi/foo"/>@<esi:include src="https://micro5.service
 				},
 			},
 		},
-		nil,
+		errors.NoKind,
 	))
 
 	t.Run("Empty", testRunner(
 		(``),
 		nil,
-		nil,
+		errors.NoKind,
 	))
 	t.Run("Null Bytes", testRunner(
-		("x \x00 <i>x</i>          \x00<esi:include\x00 src=\"https://...\" />\x00"),
+		"x \x00 <i>x</i>          \x00<esi:include\x00 src=\"https://...\" />\x00",
 		esitag.Entities{
 			&esitag.Entity{
 				RawTag: []byte("include\x00 src=\"https://...\" "),
@@ -271,26 +271,26 @@ src="https://micro4.service4/esi/foo"/>@<esi:include src="https://micro5.service
 				},
 			},
 		},
-		nil,
+		errors.NoKind,
 	))
 	t.Run("Not supported scheme in src attribute", testRunner(
-		("x \x00 <i>x</i>          \x00<esi:include\x00 src=\"ftp://...\" />\x00"),
+		"x \x00 <i>x</i>          \x00<esi:include\x00 src=\"ftp://...\" />\x00",
 		nil,
-		errors.IsNotSupported,
+		errors.NotSupported,
 	))
 	t.Run("Missing EndTag, returns empty slice", testRunner(
-		(`<esi:include src="..." <b>`),
+		`<esi:include src="..." <b>`,
 		nil,
-		nil,
+		errors.NoKind,
 	))
 	t.Run("Error when parsing timeout attribute", testRunner(
-		(`<esi:include src="gopher1" timeout="10xyz" />`),
+		`<esi:include src="gopher1" timeout="10xyz" />`,
 		nil,
-		errors.IsNotValid,
+		errors.NotValid,
 	))
 
 	t.Run("Multitags in Buffer", testRunner(
-		(`abcdefg<esi:include src="url1"/>u p<esi:include src="url2" />k`),
+		`abcdefg<esi:include src="url1"/>u p<esi:include src="url2" />k`,
 		esitag.Entities{
 			&esitag.Entity{
 				RawTag: []byte("include src=\"url1\""),
@@ -307,6 +307,6 @@ src="https://micro4.service4/esi/foo"/>@<esi:include src="https://micro5.service
 				},
 			},
 		},
-		nil,
+		errors.NoKind,
 	))
 }

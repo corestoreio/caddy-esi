@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -155,7 +155,7 @@ func setupLogger(pc *PathConfig) error {
 		w, err = os.OpenFile(pc.LogFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 		// maybe handle file close on server restart or shutdown
 		if err != nil {
-			return errors.NewFatalf("[caddyesi] Failed to open file %q with error: %s", pc.LogFile, err)
+			return errors.Fatal.Newf("[caddyesi] Failed to open file %q with error: %s", pc.LogFile, err)
 		}
 	}
 
@@ -189,37 +189,37 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 
 	case "timeout":
 		if !c.NextArg() {
-			return errors.NewNotValidf("[caddyesi] timeout: %s", c.ArgErr())
+			return errors.NotValid.Newf("[caddyesi] timeout: %s", c.ArgErr())
 		}
 		d, err := time.ParseDuration(c.Val())
 		if err != nil {
-			return errors.NewNotValidf("[caddyesi] Invalid duration in timeout configuration: %q Error: %s", c.Val(), err)
+			return errors.NotValid.Newf("[caddyesi] Invalid duration in timeout configuration: %q Error: %s", c.Val(), err)
 		}
 		pc.Timeout = d
 
 	case "ttl":
 		if !c.NextArg() {
-			return errors.NewNotValidf("[caddyesi] ttl: %s", c.ArgErr())
+			return errors.NotValid.Newf("[caddyesi] ttl: %s", c.ArgErr())
 		}
 		d, err := time.ParseDuration(c.Val())
 		if err != nil {
-			return errors.NewNotValidf("[caddyesi] Invalid duration in ttl configuration: %q Error: %s", c.Val(), err)
+			return errors.NotValid.Newf("[caddyesi] Invalid duration in ttl configuration: %q Error: %s", c.Val(), err)
 		}
 		pc.TTL = d
 
 	case "max_body_size":
 		if !c.NextArg() {
-			return errors.NewNotValidf("[caddyesi] max_body_size: %s", c.ArgErr())
+			return errors.NotValid.Newf("[caddyesi] max_body_size: %s", c.ArgErr())
 		}
 		d, err := humanize.ParseBytes(c.Val())
 		if err != nil {
-			return errors.NewNotValidf("[caddyesi] Invalid max body size value configuration: %q Error: %s", c.Val(), err)
+			return errors.NotValid.Newf("[caddyesi] Invalid max body size value configuration: %q Error: %s", c.Val(), err)
 		}
 		pc.MaxBodySize = d
 
 	case "cache":
 		if !c.NextArg() {
-			return errors.NewNotValidf("[caddyesi] cache: %s", c.ArgErr())
+			return errors.NotValid.Newf("[caddyesi] cache: %s", c.ArgErr())
 		}
 
 		if err := esicache.MainRegistry.Register(pc.Scope, c.Val()); err != nil {
@@ -228,40 +228,40 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 
 	case "page_id_source":
 		if !c.NextArg() {
-			return errors.NewNotValidf("[caddyesi] page_id_source: %s", c.ArgErr())
+			return errors.NotValid.Newf("[caddyesi] page_id_source: %s", c.ArgErr())
 		}
 		pc.PageIDSource = helper.CommaListToSlice(c.Val())
 
 	case "allowed_methods":
 		if !c.NextArg() {
-			return errors.NewNotValidf("[caddyesi] allowed_methods: %s", c.ArgErr())
+			return errors.NotValid.Newf("[caddyesi] allowed_methods: %s", c.ArgErr())
 		}
 		pc.AllowedMethods = helper.CommaListToSlice(strings.ToUpper(c.Val()))
 	case "cmd_header_name":
 		if !c.NextArg() {
-			return errors.NewNotValidf("[caddyesi] cmd_header_name: %s", c.ArgErr())
+			return errors.NotValid.Newf("[caddyesi] cmd_header_name: %s", c.ArgErr())
 		}
 		pc.CmdHeaderName = http.CanonicalHeaderKey(c.Val())
 	case "on_error":
 		if !c.NextArg() {
-			return errors.NewNotValidf("[caddyesi] allowed_methods: %s", c.ArgErr())
+			return errors.NotValid.Newf("[caddyesi] allowed_methods: %s", c.ArgErr())
 		}
 		if err := pc.parseOnError(c.Val()); err != nil {
 			return errors.Wrap(err, "[caddyesi] PathConfig.parseOnError")
 		}
 	case "log_file":
 		if !c.NextArg() {
-			return errors.NewNotValidf("[caddyesi] log_file: %s", c.ArgErr())
+			return errors.NotValid.Newf("[caddyesi] log_file: %s", c.ArgErr())
 		}
 		pc.LogFile = c.Val()
 	case "log_level":
 		if !c.NextArg() {
-			return errors.NewNotValidf("[caddyesi] log_level: %s", c.ArgErr())
+			return errors.NotValid.Newf("[caddyesi] log_level: %s", c.ArgErr())
 		}
 		pc.LogLevel = strings.ToLower(c.Val())
 	case "resources":
 		if !c.NextArg() {
-			return errors.NewNotValidf("[caddyesi] resources: %s", c.ArgErr())
+			return errors.NotValid.Newf("[caddyesi] resources: %s", c.ArgErr())
 		}
 		// c.Val() contains the file name or raw-content ;-)
 		items, err := UnmarshalResourceItems(c.Val())
@@ -278,7 +278,7 @@ func configLoadParams(c *caddy.Controller, pc *PathConfig) error {
 		}
 	default:
 		c.NextArg()
-		return errors.NewNotSupportedf("[caddyesi] Key %q with value %q not supported", key, c.Val())
+		return errors.NotSupported.Newf("[caddyesi] Key %q with value %q not supported", key, c.Val())
 	}
 
 	return nil

@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -79,13 +79,13 @@ func (a *ResourceArgs) IsPostAllowed() bool {
 func (a *ResourceArgs) Validate() (err error) {
 	switch {
 	case a.URL == "":
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %#v the URL value is empty", a)
+		err = errors.Empty.Newf("[esibackend] For ResourceArgs %#v the URL value is empty", a)
 	case a.ExternalReq == nil:
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the ExternalReq value is nil", a.URL)
+		err = errors.Empty.Newf("[esibackend] For ResourceArgs %q the ExternalReq value is nil", a.URL)
 	case a.Tag.Timeout < 1:
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the timeout value is empty", a.URL)
+		err = errors.Empty.Newf("[esibackend] For ResourceArgs %q the timeout value is empty", a.URL)
 	case a.Tag.MaxBodySize == 0:
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the maxBodySize value is empty", a.URL)
+		err = errors.Empty.Newf("[esibackend] For ResourceArgs %q the maxBodySize value is empty", a.URL)
 	}
 	return
 }
@@ -95,13 +95,13 @@ func (a *ResourceArgs) Validate() (err error) {
 func (a *ResourceArgs) ValidateWithKey() (err error) {
 	switch {
 	case a.Tag.Key == "":
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %#v the Key value is empty", a)
+		err = errors.Empty.Newf("[esibackend] For ResourceArgs %#v the Key value is empty", a)
 	case a.ExternalReq == nil:
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the ExternalReq value is nil", a.Tag.Key)
+		err = errors.Empty.Newf("[esibackend] For ResourceArgs %q the ExternalReq value is nil", a.Tag.Key)
 	case a.Tag.Timeout < 1:
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the timeout value is empty", a.Tag.Key)
+		err = errors.Empty.Newf("[esibackend] For ResourceArgs %q the timeout value is empty", a.Tag.Key)
 	case a.Tag.MaxBodySize == 0:
-		err = errors.NewEmptyf("[esibackend] For ResourceArgs %q the maxBodySize value is empty", a.Tag.Key)
+		err = errors.Empty.Newf("[esibackend] For ResourceArgs %q the maxBodySize value is empty", a.Tag.Key)
 	}
 	return
 }
@@ -359,7 +359,7 @@ func (ro *ResourceOptions) ParseNoSQLURL() (address, password string, params url
 				port = "11211"
 			default:
 				// might leak password because raw URL gets output ...
-				return "", "", nil, errors.NewNotSupportedf("[backend] ParseNoSQLURL unsupported scheme %q because Port is empty. URL: %q", u.Scheme, ro.URL)
+				return "", "", nil, errors.NotSupported.Newf("[backend] ParseNoSQLURL unsupported scheme %q because Port is empty. URL: %q", u.Scheme, ro.URL)
 			}
 		}
 	}
@@ -374,7 +374,7 @@ func (ro *ResourceOptions) ParseNoSQLURL() (address, password string, params url
 
 	params, err = url.ParseQuery(u.RawQuery)
 	if err != nil {
-		return "", "", nil, errors.NewNotValidf("[backend] ParseNoSQLURL: Failed to parse %q for parameters in URL %q with error %s", u.RawQuery, ro.URL, err)
+		return "", "", nil, errors.NotValid.Newf("[backend] ParseNoSQLURL: Failed to parse %q for parameters in URL %q with error %s", u.RawQuery, ro.URL, err)
 	}
 
 	for i := 0; i < len(defaultPoolConnectionParameters); i = i + 2 {
@@ -405,7 +405,7 @@ func newResourceHandlerFromFactory(scheme string, opt *ResourceOptions) (Resourc
 	if f, ok := factoryResourceHandlers.factories[scheme]; ok && scheme != "" {
 		return f(opt)
 	}
-	return nil, errors.NewNotSupportedf("[backend] Alias %q not supported in factory registry", scheme)
+	return nil, errors.NotSupported.Newf("[backend] Alias %q not supported in factory registry", scheme)
 }
 
 // ResourceHandler gets implemented by any client which is able to speak to any
@@ -431,7 +431,7 @@ type ResourceHandler interface {
 func NewResourceHandler(opt *ResourceOptions) (ResourceHandler, error) {
 	idx := strings.Index(opt.URL, "://")
 	if idx < 0 {
-		return nil, errors.NewNotValidf("[backend] Unknown scheme in URL: %q. Does not contain ://", opt.URL)
+		return nil, errors.NotValid.Newf("[backend] Unknown scheme in URL: %q. Does not contain ://", opt.URL)
 	}
 	scheme := opt.URL[:idx]
 
@@ -487,7 +487,7 @@ func NewResource(idx int, url string) (*Resource, error) {
 	var ok bool
 	r.handler, ok = LookupResourceHandler(schemeAlias)
 	if !ok {
-		return nil, errors.NewNotSupportedf("[esibackend] NewResource protocol or alias %q not yet supported for URL/Alias %q", schemeAlias, r.url)
+		return nil, errors.NotSupported.Newf("[esibackend] NewResource protocol or alias %q not yet supported for URL/Alias %q", schemeAlias, r.url)
 	}
 
 	return r, nil

@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -137,7 +137,7 @@ func (pc *PathConfig) parseOnError(val string) (err error) {
 	case "html", "htm", "xml", "txt", "json":
 		pc.OnError, err = ioutil.ReadFile(filepath.Clean(val))
 		if err != nil {
-			return errors.NewFatalf("[caddyesi] PathConfig.parseOnError. Failed to process %q with error: %s. Scope %q", val, err, pc.Scope)
+			return errors.Fatal.Newf("[caddyesi] PathConfig.parseOnError. Failed to process %q with error: %s. Scope %q", val, err, pc.Scope)
 		}
 	default:
 		pc.OnError = []byte(val)

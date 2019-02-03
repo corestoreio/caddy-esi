@@ -58,7 +58,7 @@ func TestNewHttpTrip_Ok(t *testing.T) {
 
 func TestNewHttpTrip_Error(t *testing.T) {
 	t.Parallel()
-	tr := esitesting.NewHTTPTrip(501, "Hello Error", errors.NewNotValidf("test not valid"))
+	tr := esitesting.NewHTTPTrip(501, "Hello Error", errors.NotValid.Newf("test not valid"))
 	cl := &http.Client{
 		Transport: tr,
 	}

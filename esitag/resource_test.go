@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -47,7 +47,7 @@ func TestNewResourceHandler_Mock(t *testing.T) {
 	n1, n2, err := rh.DoRequest(nil)
 	assert.Nil(t, n1)
 	assert.Nil(t, n2)
-	assert.True(t, errors.IsTimeout(err), "Error should have behaviour timeout: %+v", err)
+	assert.True(t, errors.Timeout.Match(err), "Error should have behaviour timeout: %+v", err)
 }
 
 func TestNewResource(t *testing.T) {
@@ -73,7 +73,7 @@ func TestNewResource(t *testing.T) {
 	t.Run("URL scheme not found", func(t *testing.T) {
 		r, err := esitag.NewResource(0, "ftp://cart.service")
 		assert.Nil(t, r)
-		assert.True(t, errors.IsNotSupported(err), "%+v", err)
+		assert.True(t, errors.NotSupported.Match(err), "%+v", err)
 	})
 
 	t.Run("URL Template", func(t *testing.T) {
@@ -126,7 +126,7 @@ func TestResourceArgs_Validate(t *testing.T) {
 	t.Run("URL", func(t *testing.T) {
 		rfa := esitag.ResourceArgs{}
 		err := rfa.Validate()
-		assert.True(t, errors.IsEmpty(err), "%+v", err)
+		assert.True(t, errors.Empty.Match(err), "%+v", err)
 		assert.Contains(t, err.Error(), `URL value`)
 	})
 	t.Run("ExternalReq", func(t *testing.T) {
@@ -134,7 +134,7 @@ func TestResourceArgs_Validate(t *testing.T) {
 			URL: "http://www",
 		}
 		err := rfa.Validate()
-		assert.True(t, errors.IsEmpty(err), "%+v", err)
+		assert.True(t, errors.Empty.Match(err), "%+v", err)
 		assert.Contains(t, err.Error(), `ExternalReq value`)
 	})
 	t.Run("timeout", func(t *testing.T) {
@@ -143,7 +143,7 @@ func TestResourceArgs_Validate(t *testing.T) {
 			ExternalReq: httptest.NewRequest("GET", "/", nil),
 		}
 		err := rfa.Validate()
-		assert.True(t, errors.IsEmpty(err), "%+v", err)
+		assert.True(t, errors.Empty.Match(err), "%+v", err)
 		assert.Contains(t, err.Error(), `timeout value`)
 	})
 	t.Run("maxBodySize", func(t *testing.T) {
@@ -155,7 +155,7 @@ func TestResourceArgs_Validate(t *testing.T) {
 			},
 		}
 		err := rfa.Validate()
-		assert.True(t, errors.IsEmpty(err), "%+v", err)
+		assert.True(t, errors.Empty.Match(err), "%+v", err)
 		assert.Contains(t, err.Error(), `maxBodySize value`)
 	})
 	t.Run("Correct", func(t *testing.T) {
@@ -513,7 +513,7 @@ func TestResourceArgs_ValidateWithKey(t *testing.T) {
 	t.Run("URL", func(t *testing.T) {
 		rfa := esitag.ResourceArgs{}
 		err := rfa.ValidateWithKey()
-		assert.True(t, errors.IsEmpty(err), "%+v", err)
+		assert.True(t, errors.Empty.Match(err), "%+v", err)
 		assert.Contains(t, err.Error(), `Key value`)
 	})
 	t.Run("ExternalReq", func(t *testing.T) {
@@ -523,7 +523,7 @@ func TestResourceArgs_ValidateWithKey(t *testing.T) {
 			},
 		}
 		err := rfa.ValidateWithKey()
-		assert.True(t, errors.IsEmpty(err), "%+v", err)
+		assert.True(t, errors.Empty.Match(err), "%+v", err)
 		assert.Contains(t, err.Error(), `ExternalReq value`)
 	})
 	t.Run("timeout", func(t *testing.T) {
@@ -534,7 +534,7 @@ func TestResourceArgs_ValidateWithKey(t *testing.T) {
 			},
 		}
 		err := rfa.ValidateWithKey()
-		assert.True(t, errors.IsEmpty(err), "%+v", err)
+		assert.True(t, errors.Empty.Match(err), "%+v", err)
 		assert.Contains(t, err.Error(), `timeout value`)
 	})
 	t.Run("maxBodySize", func(t *testing.T) {
@@ -546,7 +546,7 @@ func TestResourceArgs_ValidateWithKey(t *testing.T) {
 			},
 		}
 		err := rfa.ValidateWithKey()
-		assert.True(t, errors.IsEmpty(err), "%+v", err)
+		assert.True(t, errors.Empty.Match(err), "%+v", err)
 		assert.Contains(t, err.Error(), `maxBodySize value`)
 	})
 	t.Run("Correct", func(t *testing.T) {

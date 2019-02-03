@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -72,21 +72,21 @@ func TestNewRedis(t *testing.T) {
 		t.Parallel()
 		be, err := backend.NewRedis(esitag.NewResourceOptions("redis://localHorst/?max_active=∏"))
 		assert.Nil(t, be)
-		assert.True(t, errors.IsNotValid(err), "%+v", err)
+		assert.True(t, errors.NotValid.Match(err), "%+v", err)
 		assert.Error(t, err)
 	})
 	t.Run("Failed to parse max_idle", func(t *testing.T) {
 		t.Parallel()
 		be, err := backend.NewRedis(esitag.NewResourceOptions("redis://localHorst/?max_idle=∏"))
 		assert.Nil(t, be)
-		assert.True(t, errors.IsNotValid(err), "%+v", err)
+		assert.True(t, errors.NotValid.Match(err), "%+v", err)
 		assert.Error(t, err)
 	})
 	t.Run("Failed to parse idle_timeout", func(t *testing.T) {
 		t.Parallel()
 		be, err := backend.NewRedis(esitag.NewResourceOptions("redis://localHorst/?idle_timeout=∏"))
 		assert.Nil(t, be)
-		assert.True(t, errors.IsNotValid(err), "%+v", err)
+		assert.True(t, errors.NotValid.Match(err), "%+v", err)
 		assert.Error(t, err)
 	})
 
@@ -94,7 +94,7 @@ func TestNewRedis(t *testing.T) {
 		t.Parallel()
 
 		be, err := esitag.NewResourceHandler(esitag.NewResourceOptions("redis://empty:myPassword@clusterName.xxxxxx.0001.usw2.cache.amazonaws.com:6379"))
-		assert.True(t, errors.IsFatal(err), "%+v", err)
+		assert.True(t, errors.Fatal.Match(err), "%+v", err)
 		assert.Nil(t, be)
 	})
 
@@ -170,7 +170,7 @@ func TestNewRedis(t *testing.T) {
 		if be != nil {
 			t.Fatalf("NewResourceHandler to %q returns not nil", mr.Addr())
 		}
-		assert.True(t, errors.IsFatal(err), "%+v", err)
+		assert.True(t, errors.Fatal.Match(err), "%+v", err)
 	})
 
 	// getMrBee mr == MiniRedis; Bee = Back EEnd ;-)
@@ -236,7 +236,7 @@ func TestNewRedis(t *testing.T) {
 				MaxBodySize: 100,
 			},
 		))
-		require.True(t, errors.IsNotFound(err), "%+v", err)
+		require.True(t, errors.NotFound.Match(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Empty(t, content, "Content must be empty")
 	})
@@ -256,7 +256,7 @@ func TestNewRedis(t *testing.T) {
 				MaxBodySize: 100,
 			},
 		))
-		require.True(t, errors.IsNotFound(err), "%+v", err)
+		require.True(t, errors.NotFound.Match(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Empty(t, content, "Content must be empty")
 	})
@@ -266,7 +266,7 @@ func TestNewRedis(t *testing.T) {
 		defer closer()
 
 		hdr, content, err := be.DoRequest(&esitag.ResourceArgs{})
-		require.True(t, errors.IsEmpty(err), "%+v", err)
+		require.True(t, errors.Empty.Match(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Nil(t, content, "Content must be nil")
 	})
@@ -280,7 +280,7 @@ func TestNewRedis(t *testing.T) {
 				Key: "Hello",
 			},
 		})
-		require.True(t, errors.IsEmpty(err), "%+v", err)
+		require.True(t, errors.Empty.Match(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Nil(t, content, "Content must be nil")
 	})
@@ -296,7 +296,7 @@ func TestNewRedis(t *testing.T) {
 				Key: "Hello",
 			},
 		))
-		require.True(t, errors.IsEmpty(err), "%+v", err)
+		require.True(t, errors.Empty.Match(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Nil(t, content, "Content must be nil")
 	})
@@ -313,7 +313,7 @@ func TestNewRedis(t *testing.T) {
 				Timeout: time.Second,
 			},
 		))
-		require.True(t, errors.IsEmpty(err), "%+v", err)
+		require.True(t, errors.Empty.Match(err), "%+v", err)
 		assert.Nil(t, hdr, "Header return must be nil")
 		assert.Nil(t, content, "Content must be nil")
 	})
@@ -358,6 +358,6 @@ func TestRedisNewResourceHandler(t *testing.T) {
 	t.Run("Scheme Error", func(t *testing.T) {
 		be, err := esitag.NewResourceHandler(esitag.NewResourceOptions("mysql://localhost"))
 		assert.Nil(t, be)
-		assert.True(t, errors.IsNotSupported(err), "%+v", err)
+		assert.True(t, errors.NotSupported.Match(err), "%+v", err)
 	})
 }

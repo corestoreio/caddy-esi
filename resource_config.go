@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -136,14 +136,14 @@ func UnmarshalResourceItems(fileName string) (itms ResourceItems, err error) {
 		case strings.HasPrefix(fileName, "<?xml"):
 			extType = setBit(extType, typeXML)
 		default:
-			return nil, errors.NewNotSupportedf("[kvconfig] Content-Type %q not supported", fileName)
+			return nil, errors.NotSupported.Newf("[kvconfig] Content-Type %q not supported", fileName)
 		}
 	}
 
 	if hasBit(extType, shouldReadFile) {
 		data, err = ioutil.ReadFile(fileName)
 		if err != nil {
-			return nil, errors.NewFatalf("[backend] Failed to read file %q with error: %s", fileName, err)
+			return nil, errors.Fatal.Newf("[backend] Failed to read file %q with error: %s", fileName, err)
 		}
 	} else {
 		data = []byte(fileName)
@@ -152,7 +152,7 @@ func UnmarshalResourceItems(fileName string) (itms ResourceItems, err error) {
 	switch {
 	case hasBit(extType, typeJSON):
 		if err := json.Unmarshal(data, &itms); err != nil {
-			return nil, errors.NewFatalf("[backend] Failed to parse JSON: %s", err)
+			return nil, errors.Fatal.Newf("[backend] Failed to parse JSON: %s", err)
 		}
 	case hasBit(extType, typeXML):
 		var xi = &struct {
@@ -160,11 +160,11 @@ func UnmarshalResourceItems(fileName string) (itms ResourceItems, err error) {
 			Items   []*ResourceItem `xml:"item" json:"items"`
 		}{}
 		if err := xml.Unmarshal(data, xi); err != nil {
-			return nil, errors.NewFatalf("[backend] Failed to parse XML: %s\n%s", err, string(data))
+			return nil, errors.Fatal.Newf("[backend] Failed to parse XML: %s\n%s", err, string(data))
 		}
 		itms = ResourceItems(xi.Items)
 	default:
-		return nil, errors.NewNotSupportedf("[kvconfig] Content-Type %q not supported", fileName)
+		return nil, errors.NotSupported.Newf("[kvconfig] Content-Type %q not supported", fileName)
 	}
 
 	// If the field URL contains the name of an Alias of any other field, then copy

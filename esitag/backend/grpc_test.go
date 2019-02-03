@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -17,13 +17,12 @@
 package backend_test
 
 import (
+	"bytes"
+	"io/ioutil"
 	"net/http"
 	"sync"
 	"testing"
 	"time"
-
-	"bytes"
-	"io/ioutil"
 
 	"github.com/corestoreio/caddy-esi/esitag"
 	"github.com/corestoreio/caddy-esi/esitag/backend"
@@ -71,7 +70,7 @@ func TestNewGRPCClient(t *testing.T) {
 		if err == nil {
 			t.Error("Missing required error")
 		}
-		if !errors.IsNotValid(err) {
+		if !errors.NotValid.Match(err) {
 			t.Errorf("error should have behaviour NotValid: %+v", err)
 		}
 		if cl != nil {
@@ -86,7 +85,7 @@ func TestNewGRPCClient(t *testing.T) {
 			t.Error("Missing required error")
 		}
 		// tb.Log(err)
-		if !errors.IsNotValid(err) {
+		if !errors.NotValid.Match(err) {
 			t.Errorf("error should have behaviour NotValid: %+v", err)
 		}
 		if cl != nil {
@@ -102,7 +101,7 @@ func TestNewGRPCClient(t *testing.T) {
 		if err == nil {
 			t.Error("Missing required error")
 		}
-		if !errors.IsFatal(err) {
+		if !errors.Fatal.Match(err) {
 			t.Errorf("error should have behaviour Fatal: %+v", err)
 		}
 		if cl != nil {
@@ -121,7 +120,7 @@ func TestNewGRPCClient(t *testing.T) {
 			t.Error("Missing required error")
 		}
 		//tb.Log(err)
-		if !errors.IsFatal(err) {
+		if !errors.Fatal.Match(err) {
 			t.Errorf("error should have behaviour Fatal: %+v", err)
 		}
 		if cl != nil {

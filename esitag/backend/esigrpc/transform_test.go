@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -28,7 +28,7 @@ func TestStringSliceToHeader(t *testing.T) {
 		x := []string{"X-Content-Value"}
 		h, err := esigrpc.StringSliceToHeader(x...)
 		assert.Nil(t, h)
-		assert.True(t, errors.IsNotValid(err), "%+v", err)
+		assert.True(t, errors.NotValid.Match(err), "%+v", err)
 	})
 	t.Run("balanaced", func(t *testing.T) {
 		x := []string{"X-Content-Value", "a", "X-Content-Value", "b"}

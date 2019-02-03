@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -54,7 +54,7 @@ type grpcClient struct {
 func NewGRPCClient(opt *esitag.ResourceOptions) (esitag.ResourceHandler, error) {
 	addr, _, params, err := opt.ParseNoSQLURL()
 	if err != nil {
-		return nil, errors.NewNotValidf("[esibackend_grpc] Error parsing URL %q => %s", opt.URL, err)
+		return nil, errors.NotValid.Newf("[esibackend_grpc] Error parsing URL %q => %s", opt.URL, err)
 	}
 
 	opts := make([]grpc.DialOption, 0, 4)
@@ -62,7 +62,7 @@ func NewGRPCClient(opt *esitag.ResourceOptions) (esitag.ResourceHandler, error) 
 	if to := params.Get("timeout"); to != "" {
 		d, err := time.ParseDuration(to)
 		if err != nil {
-			return nil, errors.NewNotValidf("[esibackend_grpc] Cannot parse timeout %q with error %v", to, err)
+			return nil, errors.NotValid.Newf("[esibackend_grpc] Cannot parse timeout %q with error %v", to, err)
 		}
 		opts = append(opts, grpc.WithTimeout(d), grpc.WithBlock())
 	}
@@ -76,7 +76,7 @@ func NewGRPCClient(opt *esitag.ResourceOptions) (esitag.ResourceHandler, error) 
 			var err error
 			creds, err = credentials.NewClientTLSFromFile(caFile, sn)
 			if err != nil {
-				return nil, errors.NewFatalf("[esibackend_grpc] Failed to create TLS credentials %v from file %q", err, caFile)
+				return nil, errors.Fatal.Newf("[esibackend_grpc] Failed to create TLS credentials %v from file %q", err, caFile)
 			}
 		} else {
 			creds = credentials.NewClientTLSFromCert(nil, sn)
@@ -88,7 +88,7 @@ func NewGRPCClient(opt *esitag.ResourceOptions) (esitag.ResourceHandler, error) 
 
 	conn, err := grpc.Dial(addr, opts...)
 	if err != nil {
-		return nil, errors.NewFatalf("[esibackend_grpc] Failed to dial: %v", err)
+		return nil, errors.Fatal.Newf("[esibackend_grpc] Failed to dial: %v", err)
 	}
 
 	return &grpcClient{
@@ -123,7 +123,7 @@ func (mc *grpcClient) DoRequest(args *esitag.ResourceArgs) (http.Header, []byte,
 		body, err = ioutil.ReadAll(r.Body)
 		r.Body.Close()
 		if err != nil {
-			return nil, nil, errors.NewReadFailedf("[esibackend] Body too large: %s", err)
+			return nil, nil, errors.ReadFailed.Newf("[esibackend] Body too large: %s", err)
 		}
 		r.Body = ioutil.NopCloser(bytes.NewReader(body))
 	}

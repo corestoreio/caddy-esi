@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -58,7 +58,7 @@ func (fs *fetchShellExec) DoRequest(args *esitag.ResourceArgs) (http.Header, []b
 
 	const urlPrefix = `sh://`
 	if len(args.URL) <= len(urlPrefix) {
-		return nil, nil, errors.NewNotValidf("[esibackend] URL %q not valid. Must start with %q", args.URL, urlPrefix)
+		return nil, nil, errors.NotValid.Newf("[esibackend] URL %q not valid. Must start with %q", args.URL, urlPrefix)
 	}
 	cmdArgs := ""
 	cmdName := args.URL[len(urlPrefix):]
@@ -107,7 +107,7 @@ func (fs *fetchShellExec) DoRequest(args *esitag.ResourceArgs) (http.Header, []b
 		}
 
 		if stdErr.Len() > 0 {
-			retErr = errors.NewFatalf("[esibackend] FetchShellExec Process %q error: %q", args.URL, stdErr)
+			retErr = errors.Fatal.Newf("[esibackend] FetchShellExec Process %q error: %q", args.URL, stdErr)
 			return
 		}
 		ln := stdOut.Len()

@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -119,7 +119,7 @@ func SplitAttributes(raw string) ([]string, error) {
 
 	ret = ret[1:] // first index is always the word "include", so drop it
 	if len(ret)%2 == 1 {
-		return nil, errors.NewNotValidf("[esitag] Imbalanced attributes in %#v", ret)
+		return nil, errors.NotValid.Newf("[esitag] Imbalanced attributes in %#v", ret)
 	}
 	for i := 0; i < len(ret); i = i + 2 {
 		val := ret[i+1]
@@ -162,13 +162,13 @@ func (et *Entity) ParseRaw() error {
 		case "coalesce":
 			b, err := strconv.ParseBool(value)
 			if err != nil {
-				return errors.NewNotValidf("[caddyesi] Failed to parse coalesce %q into bool value in tag %q with error %s", value, et.RawTag, err)
+				return errors.NotValid.Newf("[caddyesi] Failed to parse coalesce %q into bool value in tag %q with error %s", value, et.RawTag, err)
 			}
 			et.Coalesce = b
 		case "printdebug":
 			b, err := strconv.ParseBool(value)
 			if err != nil {
-				return errors.NewNotValidf("[caddyesi] Failed to parse printdebug %q into bool value in tag %q with error %s", value, et.RawTag, err)
+				return errors.NotValid.Newf("[caddyesi] Failed to parse printdebug %q into bool value in tag %q with error %s", value, et.RawTag, err)
 			}
 			et.PrintDebug = b
 		case "condition":
@@ -183,19 +183,19 @@ func (et *Entity) ParseRaw() error {
 			var err error
 			et.Timeout, err = time.ParseDuration(value)
 			if err != nil {
-				return errors.NewNotValidf("[caddyesi] ESITag.ParseRaw. Cannot parse duration in timeout: %s => %q\nTag: %q", err, value, et.RawTag)
+				return errors.NotValid.Newf("[caddyesi] ESITag.ParseRaw. Cannot parse duration in timeout: %s => %q\nTag: %q", err, value, et.RawTag)
 			}
 		case "ttl":
 			var err error
 			et.TTL, err = time.ParseDuration(value)
 			if err != nil {
-				return errors.NewNotValidf("[caddyesi] ESITag.ParseRaw. Cannot parse duration in ttl: %s => %q\nTag: %q", err, value, et.RawTag)
+				return errors.NotValid.Newf("[caddyesi] ESITag.ParseRaw. Cannot parse duration in ttl: %s => %q\nTag: %q", err, value, et.RawTag)
 			}
 		case "maxbodysize":
 			var err error
 			et.MaxBodySize, err = humanize.ParseBytes(value)
 			if err != nil {
-				return errors.NewNotValidf("[caddyesi] ESITag.ParseRaw. Cannot max body size in maxbodysize: %s => %q\nTag: %q", err, value, et.RawTag)
+				return errors.NotValid.Newf("[caddyesi] ESITag.ParseRaw. Cannot max body size in maxbodysize: %s => %q\nTag: %q", err, value, et.RawTag)
 			}
 		case "forwardpostdata":
 			value = strings.ToLower(value)
@@ -222,12 +222,12 @@ func (et *Entity) ParseRaw() error {
 			// if an attribute starts with x we'll ignore it because the
 			// developer might want to temporarily disable an attribute.
 			if len(attr) > 1 && attr[0] != 'x' {
-				return errors.NewNotSupportedf("[esitag] Unsupported attribute name %q with value %q", attr, value)
+				return errors.NotSupported.Newf("[esitag] Unsupported attribute name %q with value %q", attr, value)
 			}
 		}
 	}
 	if len(et.Resources) == 0 || srcCounter == 0 {
-		return errors.NewEmptyf("[caddyesi] ESITag.ParseRaw. src (Items: %d/Src: %d) cannot be empty in Tag which requires at least one resource: %q", len(et.Resources), srcCounter, et.RawTag)
+		return errors.Empty.Newf("[caddyesi] ESITag.ParseRaw. src (Items: %d/Src: %d) cannot be empty in Tag which requires at least one resource: %q", len(et.Resources), srcCounter, et.RawTag)
 	}
 
 	return nil
@@ -243,7 +243,7 @@ func (et *Entity) parseOnError(val string) (err error) {
 	case "html", "htm", "xml", "txt", "json":
 		et.OnError, err = ioutil.ReadFile(filepath.Clean(val))
 		if err != nil {
-			return errors.NewFatalf("[caddyesi] ESITag.ParseRaw. Failed to process %q as template with error: %s\nTag: %q", val, err, et.RawTag)
+			return errors.Fatal.Newf("[caddyesi] ESITag.ParseRaw. Failed to process %q as template with error: %s\nTag: %q", val, err, et.RawTag)
 		}
 	default:
 		et.OnError = []byte(val)
@@ -315,7 +315,7 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 
 			if err != nil {
 
-				if errors.IsNotFound(err) {
+				if errors.NotFound.Match(err) {
 					if et.Log.IsDebug() {
 						et.Log.Debug("esitag.Entity.QueryResources.ResourceHandler.NotFound",
 							log.Err(err), log.Duration(log.KeyNameDuration, monotime.Since(timeStart)), lFields)
@@ -362,7 +362,7 @@ func (et *Entity) QueryResources(externalReq *http.Request) ([]byte, error) {
 		// go to next resource
 	}
 	// error temporarily timeout so fall back to a maybe provided file.
-	return nil, errors.NewTemporaryf("[esitag] Requests to all resources have temporarily failed: %s", mErr)
+	return nil, errors.Temporary.Newf("[esitag] Requests to all resources have temporarily failed: %s", mErr)
 }
 
 // Entities represents a list of Tag tags found in one HTML page.
@@ -456,7 +456,7 @@ func (et Entities) QueryResources(cTag chan<- DataTag, r *http.Request) error {
 			// A temporary error describes that we have problems reaching the
 			// backend resource and that the circuit breaker has been triggered
 			// or maybe even stopped querying.
-			isTempErr := errors.IsTemporary(err)
+			isTempErr := errors.Temporary.Match(err)
 
 			if err != nil && !isTempErr {
 				// err should have in most cases temporary error behaviour.

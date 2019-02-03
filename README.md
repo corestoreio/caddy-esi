@@ -723,7 +723,7 @@ CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 ```
 
-### github.com/garyburd/redigo
+### github.com/gomodule/redigo
 
 ```text
 Copyright 2012 Gary Burd

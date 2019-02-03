@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -24,7 +24,7 @@ import (
 // It returns an error if the parts slice isn't balanced.
 func StringSliceToHeader(parts ...string) (http.Header, error) {
 	if len(parts)%2 == 1 {
-		return nil, errors.NewNotValidf("[esigrpc] Slice %v not balanced", parts)
+		return nil, errors.NotValid.Newf("[esigrpc] Slice %v not balanced", parts)
 	}
 	h := http.Header{}
 	for i := 0; i < len(parts); i = i + 2 {

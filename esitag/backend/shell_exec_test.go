@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -70,7 +70,7 @@ func TestFetchShellExec(t *testing.T) {
 		)
 		header, content, err := backend.NewFetchShellExec().DoRequest(rfa)
 		require.Error(t, err, "%+v", err)
-		assert.True(t, errors.IsFatal(err))
+		assert.True(t, errors.Fatal.Match(err))
 		assert.Contains(t, err.Error(), `I'm an evil error`)
 		assert.Nil(t, header)
 		assert.Nil(t, content)

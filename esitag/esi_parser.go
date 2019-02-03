@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -158,7 +158,7 @@ func (e *finder) scan(b byte) (bool, error) {
 		e.buf = append(e.buf, b)
 		e.tagState = stateData
 	default:
-		return false, errors.NewNotImplementedf("[esitag] Parser detected an unknown state in machine: %d with Byte: %q", e.tagState, rune(b))
+		return false, errors.NotImplemented.Newf("[esitag] Parser detected an unknown state in machine: %d with Byte: %q", e.tagState, rune(b))
 	}
 	e.n++
 	return false, nil

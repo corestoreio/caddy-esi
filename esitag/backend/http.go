@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -122,7 +122,7 @@ func (fh *fetchHTTP) DoRequest(args *esitag.ResourceArgs) (http.Header, []byte, 
 	}
 
 	if resp.StatusCode != http.StatusOK { // this can be made configurable in an Tag tag
-		return nil, nil, errors.NewNotSupportedf("[backend] FetchHTTP: Response Code %q not supported for URL %q", resp.StatusCode, args.URL)
+		return nil, nil, errors.NotSupported.Newf("[backend] FetchHTTP: Response Code %q not supported for URL %q", resp.StatusCode, args.URL)
 	}
 
 	// not yet worth to put the resp.Body reader into its own goroutine

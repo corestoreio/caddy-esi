@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -28,28 +28,28 @@ func TestConfigUnmarshal(t *testing.T) {
 
 	t.Run("File extension not supported", func(t *testing.T) {
 		items, err := caddyesi.UnmarshalResourceItems("./testdata/config_01.txt")
-		assert.True(t, errors.IsNotSupported(err))
+		assert.True(t, errors.NotSupported.Match(err))
 		assert.Nil(t, items, "Items should be nil")
 	})
 
 	t.Run("File not found", func(t *testing.T) {
 		data, err := caddyesi.UnmarshalResourceItems("./testdata/config_99.xml")
-		assert.True(t, errors.IsFatal(err), "%+v", err)
+		assert.True(t, errors.Fatal.Match(err), "%+v", err)
 		assert.Nil(t, data, "Data should be nil")
 	})
 	t.Run("XML unmarshalling failed", func(t *testing.T) {
 		data, err := caddyesi.UnmarshalResourceItems("./testdata/config_00.xml")
-		assert.True(t, errors.IsFatal(err), "%+v", err)
+		assert.True(t, errors.Fatal.Match(err), "%+v", err)
 		assert.Nil(t, data, "Data should be nil")
 	})
 	t.Run("JSON unmarshalling failed", func(t *testing.T) {
 		data, err := caddyesi.UnmarshalResourceItems("./testdata/config_00.json")
-		assert.True(t, errors.IsFatal(err), "%+v", err)
+		assert.True(t, errors.Fatal.Match(err), "%+v", err)
 		assert.Nil(t, data, "Data should be nil")
 	})
 	t.Run("Unknown content type", func(t *testing.T) {
 		data, err := caddyesi.UnmarshalResourceItems("this is a text file")
-		assert.True(t, errors.IsNotSupported(err), "%+v", err)
+		assert.True(t, errors.NotSupported.Match(err), "%+v", err)
 		assert.Nil(t, data, "Data should be nil")
 	})
 

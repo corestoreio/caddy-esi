@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -31,14 +31,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func testPluginSetup(config string, wantPC PathConfigs, cacheCount int, requestFuncs []string, wantErrBhf errors.BehaviourFunc) func(*testing.T) {
+func testPluginSetup(config string, wantPC PathConfigs, cacheCount int, requestFuncs []string, wantErrBhf errors.Kind) func(*testing.T) {
 	return func(t *testing.T) {
 		defer esicache.MainRegistry.Clear()
 
 		c := caddy.NewTestController("http", config)
 
-		if err := PluginSetup(c); wantErrBhf != nil {
-			assert.True(t, wantErrBhf(err), "(%s):\n%+v", t.Name(), err)
+		if err := PluginSetup(c); wantErrBhf > 0 {
+			assert.True(t, wantErrBhf.Match(err), "(%s):\n%+v", t.Name(), err)
 			return
 		} else if err != nil {
 			t.Fatalf("Expected no errors, got: %+v", err)
@@ -95,7 +95,7 @@ func TestPluginSetup(t *testing.T) {
 		},
 		0,   // cache length
 		nil, // kv services []string
-		nil,
+		errors.NoKind,
 	))
 
 	t.Run("config with allowed_methods", testPluginSetup(
@@ -111,7 +111,7 @@ func TestPluginSetup(t *testing.T) {
 		},
 		0,   // cache length
 		nil, // kv services []string
-		nil,
+		errors.NoKind,
 	))
 
 	t.Run("config with cmd_header_name", testPluginSetup(
@@ -127,7 +127,7 @@ func TestPluginSetup(t *testing.T) {
 		},
 		0,   // cache length
 		nil, // kv services []string
-		nil,
+		errors.NoKind,
 	))
 	t.Run("config with cmd_header_name but value not provided", testPluginSetup(
 		`esi {
@@ -136,7 +136,7 @@ func TestPluginSetup(t *testing.T) {
 		nil,
 		0,   // cache length
 		nil, // kv services []string
-		errors.IsNotValid,
+		errors.NotValid,
 	))
 
 	t.Run("config with page_id_source", testPluginSetup(
@@ -152,7 +152,7 @@ func TestPluginSetup(t *testing.T) {
 		},
 		0,   // cache length
 		nil, // kv services []string
-		nil,
+		errors.NoKind,
 	))
 
 	t.Run("config with page_id_source but errors", testPluginSetup(
@@ -162,7 +162,7 @@ func TestPluginSetup(t *testing.T) {
 		nil,
 		0,   // cache length
 		nil, // kv services []string
-		errors.IsNotValid,
+		errors.NotValid,
 	))
 
 	t.Run("Parse timeout fails", testPluginSetup(
@@ -172,7 +172,7 @@ func TestPluginSetup(t *testing.T) {
 		nil,
 		0,   // cache length
 		nil, // kv services []string
-		errors.IsNotValid,
+		errors.NotValid,
 	))
 
 	t.Run("esi with path to /blog and /guestbook", testPluginSetup(
@@ -192,7 +192,7 @@ func TestPluginSetup(t *testing.T) {
 		},
 		0,   // cache length
 		nil, // kv services []string
-		nil,
+		errors.NoKind,
 	))
 
 	t.Run("Log level info and file stderr", testPluginSetup(
@@ -210,7 +210,7 @@ func TestPluginSetup(t *testing.T) {
 		},
 		0,   // cache length
 		nil, // kv services []string
-		nil,
+		errors.NoKind,
 	))
 
 	t.Run("OnError String", testPluginSetup(
@@ -226,7 +226,7 @@ func TestPluginSetup(t *testing.T) {
 		},
 		0,   // cache length
 		nil, // kv services []string
-		nil,
+		errors.NoKind,
 	))
 
 	t.Run("OnError File", testPluginSetup(
@@ -242,7 +242,7 @@ func TestPluginSetup(t *testing.T) {
 		},
 		0,   // cache length
 		nil, // kv services []string
-		nil,
+		errors.NoKind,
 	))
 
 	t.Run("OnError File not found", testPluginSetup(
@@ -252,7 +252,7 @@ func TestPluginSetup(t *testing.T) {
 		nil,
 		0,   // cache length
 		nil, // kv services []string
-		errors.IsFatal,
+		errors.Fatal,
 	))
 
 }
@@ -267,11 +267,11 @@ func TestSetupLogger(t *testing.T) {
 		osStdErr = os.Stderr
 	}()
 
-	runner := func(pc *PathConfig, wantErrBhf errors.BehaviourFunc) func(*testing.T) {
+	runner := func(pc *PathConfig, wantErrBhf errors.Kind) func(*testing.T) {
 		return func(t *testing.T) {
 			haveErr := setupLogger(pc)
-			if wantErrBhf != nil {
-				assert.True(t, wantErrBhf(haveErr), "%+v", haveErr)
+			if wantErrBhf > 0 {
+				assert.True(t, wantErrBhf.Match(haveErr), "%+v", haveErr)
 			} else {
 				assert.NoError(t, haveErr, "%+v", haveErr)
 			}
@@ -281,7 +281,7 @@ func TestSetupLogger(t *testing.T) {
 		LogLevel: "debug",
 		LogFile:  "stderr",
 	}
-	t.Run("Debug Stderr", runner(pc, nil))
+	t.Run("Debug Stderr", runner(pc, errors.NoKind))
 	assert.True(t, pc.Log.IsDebug())
 	pc.Log.Debug("DebugStdErr", log.String("debug01", "stderr01"))
 	assert.Contains(t, buf.String(), `"msg":"DebugStdErr","debug01":"stderr01"`)
@@ -290,7 +290,7 @@ func TestSetupLogger(t *testing.T) {
 		LogLevel: "info",
 		LogFile:  "stdout",
 	}
-	t.Run("Info Stdout", runner(pc, nil))
+	t.Run("Info Stdout", runner(pc, errors.NoKind))
 	assert.True(t, pc.Log.IsInfo(), "Loglevel should be info")
 	pc.Log.Info("InfoStdOut", log.String("info01", "stdout01"))
 	assert.Contains(t, buf.String(), `InfoStdOut","info01":"stdout01"`)
@@ -299,7 +299,7 @@ func TestSetupLogger(t *testing.T) {
 		LogLevel: "",
 		LogFile:  "stdout",
 	}
-	t.Run("No Log Level, Blackhole", runner(pc, nil))
+	t.Run("No Log Level, Blackhole", runner(pc, errors.NoKind))
 	assert.False(t, pc.Log.IsInfo())
 	assert.False(t, pc.Log.IsDebug())
 	pc.Log.Info("NoLogLevelStdOut", log.String("info01", "noLogLevelstdout01"))
@@ -309,7 +309,7 @@ func TestSetupLogger(t *testing.T) {
 		LogLevel: "debug",
 		LogFile:  "",
 	}
-	t.Run("No Log File, Blackhole", runner(pc, nil))
+	t.Run("No Log File, Blackhole", runner(pc, errors.NoKind))
 	assert.False(t, pc.Log.IsInfo())
 	assert.False(t, pc.Log.IsDebug())
 	pc.Log.Info("NoLogFileStdOut", log.String("info01", "noLogFilestdout01"))
@@ -319,7 +319,7 @@ func TestSetupLogger(t *testing.T) {
 		LogLevel: "debug",
 		LogFile:  "/root",
 	}
-	t.Run("Log File open fails", runner(pc, errors.IsFatal))
+	t.Run("Log File open fails", runner(pc, errors.Fatal))
 	assert.Exactly(t, pc.Log.(log.BlackHole), log.BlackHole{})
 
 	tmpFile, clean := esitesting.Tempfile(t)
@@ -329,7 +329,7 @@ func TestSetupLogger(t *testing.T) {
 		LogLevel: "debug",
 		LogFile:  tmpFile,
 	}
-	t.Run("Log File open success write", runner(pc, nil))
+	t.Run("Log File open success write", runner(pc, errors.NoKind))
 	assert.True(t, pc.Log.IsInfo())
 	assert.True(t, pc.Log.IsDebug())
 	pc.Log.Info("InfoWriteToTempFile", log.Int("info03", 2412))

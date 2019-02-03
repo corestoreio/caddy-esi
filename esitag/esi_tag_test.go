@@ -1,4 +1,4 @@
-// Copyright 2015-2017, Cyrill @ Schumacher.fm and the CoreStore contributors
+// Copyright 2015-present, Cyrill @ Schumacher.fm and the CoreStore contributors
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -109,7 +109,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 	defer esitag.RegisterResourceHandler("awsRedis2", esitesting.MockRequestContent("Any content")).DeferredDeregister()
 	defer esitag.RegisterResourceHandler("awsRedis3", esitesting.MockRequestContent("Any content")).DeferredDeregister()
 
-	runner := func(rawTag []byte, wantErrBhf errors.BehaviourFunc, wantET *esitag.Entity) func(*testing.T) {
+	runner := func(rawTag []byte, wantErrBhf errors.Kind, wantET *esitag.Entity) func(*testing.T) {
 		return func(t *testing.T) {
 			if wantET != nil {
 				wantET.RawTag = rawTag
@@ -118,8 +118,8 @@ func TestESITag_ParseRaw(t *testing.T) {
 				RawTag: rawTag,
 			}
 
-			if haveErr := haveET.ParseRaw(); wantErrBhf != nil {
-				assert.True(t, wantErrBhf(haveErr), "%+v", haveErr)
+			if haveErr := haveET.ParseRaw(); wantErrBhf > 0 {
+				assert.True(t, wantErrBhf.Match(haveErr), "%+v", haveErr)
 				return
 			} else {
 				require.NoError(t, haveErr)
@@ -152,7 +152,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 
 	t.Run("1x src, timeout, onerror, forwardheaders", runner(
 		[]byte(`include src="https://micro.service/checkout/cart" timeout="9ms" onerror="testdata/nocart.html" forwardheaders="Cookie , accept-language, AUTHORIZATION"`),
-		nil,
+		errors.NoKind,
 		&esitag.Entity{
 			Resources: []*esitag.Resource{
 				esitag.MustNewResource(0, "https://micro.service/checkout/cart"),
@@ -167,7 +167,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 
 	t.Run("2x src, timeout, onerror, forwardheaders", runner(
 		[]byte(`include src="https://micro1.service/checkout/cart" src="https://micro2.service/checkout/cart" ttl="9ms"  returnheaders="cookie , ACCEPT-Language, Authorization"`),
-		nil,
+		errors.NoKind,
 		&esitag.Entity{
 			Resources: []*esitag.Resource{
 				esitag.MustNewResource(0, "https://micro1.service/checkout/cart"),
@@ -182,13 +182,13 @@ func TestESITag_ParseRaw(t *testing.T) {
 
 	t.Run("at least one source attribute is required", runner(
 		[]byte(`include key="product_234234" returnheaders=" all  " forwardheaders=" all  "`),
-		errors.IsEmpty,
+		errors.Empty,
 		nil,
 	))
 
 	t.Run("white spaces in returnheaders and forwardheaders", runner(
 		[]byte(`include key="product_234234" returnheaders=" all  " forwardheaders=" all  " src="awsRedis1"`),
-		nil,
+		errors.NoKind,
 		&esitag.Entity{
 			Resources: []*esitag.Resource{
 				esitag.MustNewResource(0, "awsRedis1"),
@@ -203,7 +203,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 
 	t.Run("resource not an URL but an alias to KV storage", runner(
 		[]byte(`include key="product_4711" returnheaders='all' forwardheaders="all	" src="awsRedis3"`),
-		nil,
+		errors.NoKind,
 		&esitag.Entity{
 			Resources: []*esitag.Resource{
 				esitag.MustNewResource(0, "awsRedis3"),
@@ -218,7 +218,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 
 	t.Run("key as template with single quotes", runner(
 		[]byte(`include key='product_234234_{HmyHeaderKey}' src="awsRedis2"  returnheaders=" all  " forwardheaders=" all  "`),
-		nil,
+		errors.NoKind,
 		&esitag.Entity{
 			Resources: []*esitag.Resource{
 				esitag.MustNewResource(0, "awsRedis2"),
@@ -233,7 +233,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 
 	t.Run("ignore attribute starting with x", runner(
 		[]byte(`include xkey='product_234234_{HmyHeaderKey}' src="awsRedis2"  returnheaders=" all  " forwardheaders=" all  "`),
-		nil,
+		errors.NoKind,
 		&esitag.Entity{
 			Resources: []*esitag.Resource{
 				esitag.MustNewResource(0, "awsRedis2"),
@@ -247,7 +247,7 @@ func TestESITag_ParseRaw(t *testing.T) {
 
 	t.Run("enable printdebug", runner(
 		[]byte(`include  src="awsRedis3" printdebug="1" coalesce="true"`),
-		nil,
+		errors.NoKind,
 		&esitag.Entity{
 			Resources: []*esitag.Resource{
 				esitag.MustNewResource(0, "awsRedis3"),
@@ -261,13 +261,13 @@ func TestESITag_ParseRaw(t *testing.T) {
 
 	t.Run("printdebug returns error", runner(
 		[]byte(`include  src="awsRedis3" printdebug="errrr" coalesce="true"`),
-		errors.IsNotValid,
+		errors.NotValid,
 		nil,
 	))
 
 	t.Run("enable coalesce", runner(
 		[]byte(`include  src="awsRedis3" coalesce="true"`),
-		nil,
+		errors.NoKind,
 		&esitag.Entity{
 			Resources: []*esitag.Resource{
 				esitag.MustNewResource(0, "awsRedis3"),
@@ -280,37 +280,37 @@ func TestESITag_ParseRaw(t *testing.T) {
 
 	t.Run("error in coalesce", runner(
 		[]byte(`include key='product_234234_{HmyHeaderKey}' src="awsRedis3" coalesce="Yo!"`),
-		errors.IsNotValid,
+		errors.NotValid,
 		nil,
 	))
 
 	t.Run("show not supported unknown attribute", runner(
 		[]byte(`include ykey='product_234234_{HmyHeaderKey}' src="awsRedis2"  returnheaders=" all  " forwardheaders=" all  "`),
-		errors.IsNotSupported,
+		errors.NotSupported,
 		nil,
 	))
 
 	t.Run("timeout parsing failed", runner(
 		[]byte(`include timeout="9a"`),
-		errors.IsNotValid,
+		errors.NotValid,
 		nil,
 	))
 
 	t.Run("ttl parsing failed", runner(
 		[]byte(`include ttl="8a"`),
-		errors.IsNotValid,
+		errors.NotValid,
 		nil,
 	))
 
 	t.Run("key only one quotation mark and fails", runner(
 		[]byte(`include key='`),
-		errors.IsEmpty,
+		errors.Empty,
 		nil,
 	))
 
 	t.Run("failed to balanced pairs", runner(
 		[]byte(`src='https://catalog.corestore.io/product='`),
-		errors.IsNotValid,
+		errors.NotValid,
 		nil,
 	))
 }
@@ -335,11 +335,11 @@ func BenchmarkESITag_ParseRaw_MicroServicse(b *testing.B) {
 
 func TestSplitAttributes(t *testing.T) {
 
-	runner := func(in string, want []string, wantErrBhf errors.BehaviourFunc) func(*testing.T) {
+	runner := func(in string, want []string, wantErrBhf errors.Kind) func(*testing.T) {
 		return func(t *testing.T) {
 			have, haveErr := esitag.SplitAttributes(in)
-			if wantErrBhf != nil {
-				assert.True(t, wantErrBhf(haveErr), "%+v", haveErr)
+			if wantErrBhf > 0 {
+				assert.True(t, wantErrBhf.Match(haveErr), "%+v", haveErr)
 			} else if haveErr != nil {
 				t.Errorf("Error not expected: %+v", haveErr)
 			}
@@ -361,31 +361,31 @@ func TestSplitAttributes(t *testing.T) {
 			"forwardheaders", "Cookie , Accept-Language, Authorization",
 			"returnheaders", "Set-Cookie , Authorization",
 		},
-		nil,
+		errors.NoKind,
 	))
 
 	t.Run("Split imbalanced", runner(
 		`src="https://micro2.service/checkout/cart" ttl=" 19ms"`,
 		nil,
-		errors.IsNotValid,
+		errors.NotValid,
 	))
 
 	t.Run("Unicode correct", runner(
 		`include src="https://.Ø/checkout/cart" ttl="€"`,
 		[]string{"src", "https://\uf8ff.Ø/checkout/cart", "ttl", "€"},
-		nil,
+		errors.NoKind,
 	))
 
 	t.Run("Whitespace", runner(
 		` `,
 		[]string{},
-		nil,
+		errors.NoKind,
 	))
 
 	t.Run("Empty", runner(
 		``,
 		[]string{},
-		nil,
+		errors.NoKind,
 	))
 
 }
@@ -408,7 +408,7 @@ func (fw *failWriter) Write(p []byte) (n int, err error) {
 		panic(err)
 	}
 	if fw.failAt == fw.writes {
-		err = errors.NewAlreadyClosedf("Network stream closed!")
+		err = errors.AlreadyClosed.Newf("Network stream closed!")
 	}
 	fw.writes++
 	return n, err
@@ -451,8 +451,8 @@ func TestDataTags_InjectContent_WriteFailed(t *testing.T) {
 		written, err := tags.InjectContent([]byte(part), w)
 		if err != nil {
 			// t.Log(part)
-			assert.True(t, errors.IsWriteFailed(err), "%+v", err)
-			assert.True(t, errors.IsAlreadyClosed(err), "%+v", err)
+			assert.True(t, errors.WriteFailed.Match(err), "%+v", err)
+			assert.True(t, errors.AlreadyClosed.Match(err), "%+v", err)
 			assert.Exactly(t, 0, written)
 			hasError = true
 		}
@@ -773,7 +773,7 @@ func TestEntity_QueryResources(t *testing.T) {
 
 	// req is the incoming request from outer space. it may contain harmful HTTP
 	// headers (which gets used in the template for key and URL)
-	runner := func(req *http.Request, page string, wantResponse string, wantErrBhf errors.BehaviourFunc) func(*testing.T) {
+	runner := func(req *http.Request, page string, wantResponse string, wantErrBhf errors.Kind) func(*testing.T) {
 		return func(t *testing.T) {
 
 			entities, err := esitag.Parse(strings.NewReader(page))
@@ -783,9 +783,9 @@ func TestEntity_QueryResources(t *testing.T) {
 			entity := entities[0]
 
 			content, haveErr := entity.QueryResources(req)
-			if wantErrBhf != nil {
+			if wantErrBhf > 0 {
 				assert.Empty(t, content)
-				assert.True(t, wantErrBhf(haveErr), "%+v", haveErr)
+				assert.True(t, wantErrBhf.Match(haveErr), "%+v", haveErr)
 				return
 			}
 			assert.Exactly(t, wantResponse, string(content), "Test %s", t.Name())
@@ -794,17 +794,17 @@ func TestEntity_QueryResources(t *testing.T) {
 	}
 
 	defer esitag.RegisterResourceHandler("testa1", esitesting.MockRequestContent("Response from micro1.service1")).DeferredDeregister()
-	defer esitag.RegisterResourceHandler("testa2", esitesting.MockRequestError(errors.NewFatalf("should not get called"))).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("testa2", esitesting.MockRequestError(errors.Fatal.Newf("should not get called"))).DeferredDeregister()
 	t.Run("1st request to first Micro1", runner(
 		httptest.NewRequest("GET", "http://cyrillschumacher.com/esi/endpoint1", nil),
 		`<html><head></head><body>
 			<p><esi:include src="testA1://micro1" src="testA2://micro2" timeout="5s" maxbodysize="15KB"/></p>
 		</body></html>`,
 		"Response from micro1.service1 \"testA1://micro1\" Timeout 5s MaxBody 15 kB",
-		nil,
+		errors.NoKind,
 	))
 
-	defer esitag.RegisterResourceHandler("testb1", esitesting.MockRequestError(errors.NewTimeoutf("Timed out"))).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("testb1", esitesting.MockRequestError(errors.Timeout.Newf("Timed out"))).DeferredDeregister()
 	defer esitag.RegisterResourceHandler("testb2", esitesting.MockRequestContent("Response from micro2.service2")).DeferredDeregister()
 	t.Run("2nd request to 2nd Micro2", runner(
 		httptest.NewRequest("GET", "http://cyrillschumacher.com/esi/endpoint1", nil),
@@ -812,18 +812,18 @@ func TestEntity_QueryResources(t *testing.T) {
 			<p><esi:include src="testB1://micro1.service1" src="testB2://micro2.service2" timeout="5s" maxbodysize="15KB"/></p>
 		</body></html>`,
 		"Response from micro2.service2 \"testB2://micro2.service2\" Timeout 5s MaxBody 15 kB",
-		nil,
+		errors.NoKind,
 	))
 
-	defer esitag.RegisterResourceHandler("testc1", esitesting.MockRequestError(errors.NewTimeoutf("Timed out"))).DeferredDeregister()
-	defer esitag.RegisterResourceHandler("testc2", esitesting.MockRequestError(errors.NewFatalf("Should not get called because testc1 gets only assigned to type Entity and all other protocoals gets discarded"))).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("testc1", esitesting.MockRequestError(errors.Timeout.Newf("Timed out"))).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("testc2", esitesting.MockRequestError(errors.Fatal.Newf("Should not get called because testc1 gets only assigned to type Entity and all other protocoals gets discarded"))).DeferredDeregister()
 	t.Run("2nd request to 2nd Micro2 with different protocol, fails", runner(
 		httptest.NewRequest("GET", "http://cyrillschumacher.com/esi/endpoint1", nil),
 		`<html><head></head><body>
 			<p><esi:include src="testC1://micro1.service1" src="testC2://micro2.service2"  timeout="5s" maxbodysize="15KB" /></p>
 		</body></html>`,
 		"",
-		errors.IsTemporary,
+		errors.Temporary,
 	))
 }
 
@@ -844,7 +844,7 @@ func TestEntity_QueryResources_Multi_Calls(t *testing.T) {
 				return nil, []byte(`Content`), nil
 			}
 
-			return nil, nil, errors.NewTimeoutf("Timed out") // this can be any error not timeout only
+			return nil, nil, errors.Timeout.Newf("Timed out") // this can be any error not timeout only
 		},
 	}).DeferredDeregister()
 
@@ -866,10 +866,10 @@ func TestEntity_QueryResources_Multi_Calls(t *testing.T) {
 	var contentCount int
 	for i := 0; i < 10; i++ {
 		content, haveErr := entity.QueryResources(req)
-		if haveErr != nil && !errors.IsTemporary(haveErr) {
+		if haveErr != nil && !errors.Temporary.Match(haveErr) {
 			t.Fatalf("%+v", haveErr)
 		}
-		if errors.IsTemporary(haveErr) {
+		if errors.Temporary.Match(haveErr) {
 			tempErrCount++
 		} else if len(content) == 7 {
 			contentCount++
@@ -940,7 +940,7 @@ func TestEntities_QueryResources(t *testing.T) {
 		assert.False(t, hasTag, "Did not expect to receive any DataTag on the channel")
 	})
 
-	defer esitag.RegisterResourceHandler("teste2a", esitesting.MockRequestError(errors.NewAlreadyClosedf("Ups already closed"))).DeferredDeregister()
+	defer esitag.RegisterResourceHandler("teste2a", esitesting.MockRequestError(errors.AlreadyClosed.Newf("Ups already closed"))).DeferredDeregister()
 	defer esitag.RegisterResourceHandler("teste2b", esitesting.MockRequestContent("Content")).DeferredDeregister()
 	t.Run("QueryResources failed on 2 out of 3 services", func(t *testing.T) {
 		entities, err := esitag.Parse(strings.NewReader(`<html><head></head><body>
