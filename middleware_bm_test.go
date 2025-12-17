@@ -25,8 +25,8 @@ import (
 	"github.com/corestoreio/caddy-esi/esitag"
 	"github.com/corestoreio/caddy-esi/esitesting"
 	"github.com/corestoreio/errors"
-	"github.com/mholt/caddy"
-	"github.com/mholt/caddy/caddyhttp/httpserver"
+	"github.com/caddyserver/caddy"
+	"github.com/caddyserver/caddy/caddyhttp/httpserver"
 )
 
 func BenchmarkMiddleware(b *testing.B) {

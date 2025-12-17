@@ -1,4 +1,4 @@
-// Copied from github.com/mholt/caddy/caddyhttp/httpserver/replacer.go and stripped
+// Copied from github.com/caddyserver/caddy/caddyhttp/httpserver/replacer.go and stripped
 // a lot of things off.
 // Copyright Caddy Contributors and Matt Holt.  Apache License Version 2.0, January 2004
 

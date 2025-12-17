@@ -29,7 +29,7 @@ import (
 	"github.com/corestoreio/caddy-esi/helper"
 	"github.com/corestoreio/errors"
 	"github.com/corestoreio/log"
-	"github.com/mholt/caddy/caddyhttp/httpserver"
+	"github.com/caddyserver/caddy/caddyhttp/httpserver"
 	"github.com/pierrec/xxHash/xxHash64"
 )
 

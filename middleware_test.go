@@ -29,16 +29,16 @@ import (
 	"github.com/corestoreio/caddy-esi/esitag"
 	"github.com/corestoreio/caddy-esi/esitesting"
 	"github.com/corestoreio/errors"
-	"github.com/mholt/caddy"
-	"github.com/mholt/caddy/caddyhttp/header"
-	"github.com/mholt/caddy/caddyhttp/httpserver"
-	"github.com/mholt/caddy/caddyhttp/templates"
+	"github.com/caddyserver/caddy"
+	"github.com/caddyserver/caddy/caddyhttp/header"
+	"github.com/caddyserver/caddy/caddyhttp/httpserver"
+	"github.com/caddyserver/caddy/caddyhttp/templates"
 	"github.com/stretchr/testify/assert"
 )
 
 var mwTestHeaders = http.Header{"X-Esi-Test": []string{"GopherX"}}
 
-// TODO(CS 02.02.2019) the logic in github.com/mholt/caddy/caddyhttp/templates/templates.go:35 Templates.ServeHTTP
+// TODO(CS 02.02.2019) the logic in github.com/caddyserver/caddy/caddyhttp/templates/templates.go:35 Templates.ServeHTTP
 //   has changed and this test case must be refactored
 
 func mwTestHandler(t *testing.T, caddyFile string) httpserver.Handler {

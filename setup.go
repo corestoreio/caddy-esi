@@ -29,8 +29,8 @@ import (
 	"github.com/corestoreio/log"
 	"github.com/corestoreio/log/zapw"
 	"github.com/dustin/go-humanize"
-	"github.com/mholt/caddy"
-	"github.com/mholt/caddy/caddyhttp/httpserver"
+	"github.com/caddyserver/caddy"
+	"github.com/caddyserver/caddy/caddyhttp/httpserver"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

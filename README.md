@@ -595,15 +595,15 @@ supported. You should switch to a server side scripting language ;-).
 The following command enables HTTP/S/2 backends:
 
 ```bash
-$ go get -u github.com/mholt/caddy/...
+$ go get -u github.com/caddyserver/caddy/...
 # maybe checkout different version of caddy. Tested with 0.9.5
 $ go get -u github.com/SchumacherDM/caddyesi/...
 ```
 
-In file `$GOPATH/src/github.com/mholt/caddy/caddy/caddymain/run.go` add the line
+In file `$GOPATH/src/github.com/caddyserver/caddy/caddy/caddymain/run.go` add the line
 `_ "github.com/corestoreio/caddy-esi"` after the text `// This is where other plugins get plugged in (imported)`.
 
-In file `$GOPATH/src/github.com/mholt/caddy/caddyhttp/httpserver/plugin.go` find
+In file `$GOPATH/src/github.com/caddyserver/caddy/caddyhttp/httpserver/plugin.go` find
 the variable `directives` and add the entry `"esi",` between `hugo` and
 `mailout`. At the moment I'm not quite sure if that is the correct place. If any
 other middleware fails, you should change the position of the `esi` entry to
@@ -612,7 +612,7 @@ somewhere else. Please report back here by opening an issue.
 Then you are ready to compile Caddy with ESI support:
 
 ```
-$ GOOS=linux GOARCH=amd64 go build -o caddyesi $GOPATH/src/github.com/mholt/caddy/caddy/main.go
+$ GOOS=linux GOARCH=amd64 go build -o caddyesi $GOPATH/src/github.com/caddyserver/caddy/caddy/main.go
 ```
 
 Change `GOOS` and `GOARCH` to whatever architecture and operating system you are targeting.
